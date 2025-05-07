@@ -4,33 +4,26 @@ import { Menu, X } from "lucide-react"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-
+  // const [user,setUser]=useState()
   return (
-    <nav className="bg-brown-900 text-cream sticky top-0 z-50 border-b border-brown-700">
+    <nav className="bg-brown-900 text-[#5D4037] text-cream sticky top-0 z-50 border-b border-brown-700">
       <div className="container mx-auto flex items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center space-x-2">
           <span className="font-serif text-2xl font-bold">♟ ChessMasters</span>
         </Link>
 
-        {/* desktop links */}
-        <div className="hidden md:flex items-center space-x-6">
-          {["Play", "Tournaments", "Learn", "About"].map((label) => (
-            <Link
-              key={label}
-              to={`#${label.toLowerCase()}`}
-              className="hover:text-gold-400 transition"
-            >
-              {label}
-            </Link>
-          ))}
-          <Link to="#signup">
-            <button className="bg-gold-500 text-brown-900 px-4 py-2 rounded-md font-semibold hover:bg-gold-600 transition">
-              Sign Up
-            </button>
-          </Link>
-        </div>
+       <div className="hidden items-center space-x-6 md:flex">
+        <Link
+        to={"/game"}
+        className="inline-block bg-amber-900 p-2 px-5 text-white rounded-md hover:text-gold-500 transition-all"
+        >Play </Link>
+        <Link
+        to={"/register"}
+        className="inline-block bg-amber-900 p-2 px-5 text-white rounded-md hover:text-gold-500 transition-all"
+        >Register </Link>
 
-        {/* mobile menu button */}
+       </div>
+
         <button
           className="md:hidden"
           onClick={() => setIsOpen((v) => !v)}
@@ -40,10 +33,9 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* mobile menu */}
       {isOpen && (
         <div className="md:hidden bg-brown-800 border-t border-brown-700">
-          {["Play", "Tournaments", "Learn", "About", "Sign Up"].map((label) => (
+          {["Play", "Learn", "Sign Up"].map((label) => (
             <Link
               key={label}
               to={label === "Sign Up" ? "#signup" : `#${label.toLowerCase()}`}

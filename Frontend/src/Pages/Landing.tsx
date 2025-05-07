@@ -4,7 +4,7 @@ import {  Twitter,  ArrowRight, Github } from "lucide-react";
 import { Button, Card, Navbar } from "../Components";
 import { useNavigate } from "react-router-dom";
 import logo from '../assets/logo.jpg'
-// simple fade-in variant
+
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -32,7 +32,6 @@ export default function Landing() {
     <div className="min-h-screen bg-[#EFEBE9] text-[#5D4037]">
       <Navbar />
 
-      {/* Hero */}
         
       <div className="flex gap-6 items-center justify-center">
       <div className="flex items-center justify-center mt-16">
