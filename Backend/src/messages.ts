@@ -1,3 +1,5 @@
 export const INIT_GAME="init_game"
 export const MOVE="move"
 export const GAME_OVER="game_over"
+export const RECONNECT="reconnect"
+export const GAME_NOT_FOUND="game_not_found"

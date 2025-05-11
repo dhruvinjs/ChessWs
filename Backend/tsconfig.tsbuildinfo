@@ -1,1 +1,1 @@
-{"root":["./src/index.ts","./src/messages.ts","./src/classes/gamemanager.ts","./src/classes/games.ts"],"version":"5.8.3"}
+{"root":["./src/game-controllers.ts","./src/index.ts","./src/messages.ts","./src/middleware.ts","./src/redisclient.ts","./src/user-controller.ts","./src/classes/gamemanager.ts","./src/classes/games.ts"],"version":"5.8.3"}
