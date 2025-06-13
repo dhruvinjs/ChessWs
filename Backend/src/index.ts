@@ -1,15 +1,18 @@
+import dotenv from 'dotenv'
+dotenv.config({
+   path:'./env'
+})
 import { WebSocketServer,WebSocket } from "ws";   
 import { GameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
 import {gameRouter} from './game-controllers'
-import dotenv from 'dotenv'
 import { Prisma, PrismaClient } from "@prisma/client";
-dotenv.config({
-   path:'./env'
-})
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
+import { parse } from "url";
+
+
 const port=process.env.PORT
 const app=express()
 
@@ -35,17 +38,23 @@ app.use(cors({
    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-let allSockets:User[]=[]   
-wss.on('connection',(socket)=>{
-   // socket.send("Helo connection")
-   gameManager.addUser(socket)
+wss.on("connection",async(socket,req)=>{
+   const {query}=parse(req.url!,true)
+   //This guestId is basically is the cookie which I am generating 
+   //and will be used for reconvery mechanism
+   const guestId=query.guestId as string;
    
-   socket.on('close',()=>(console.log('A player disconnected')))
+   if(!guestId){
+      //if cookie not provided the websocket connection will not start
+      //cookie-mandatory
+      socket.close()
+      return;
+   }
+   gameManager.addUser(socket,guestId)
+   socket.on("close",()=>console.log("Disconnected player"))
+   
 
 })
-
-
-
 
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);

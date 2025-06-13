@@ -1,7 +1,8 @@
 import {WebSocket} from 'ws'
 import { Chess } from 'chess.js';
-import { GAME_OVER, INIT_GAME, MOVE } from '../messages';
+import { GAME_NOT_FOUND, GAME_OVER, INIT_GAME, MOVE } from '../messages';
 import {redis} from '../redisClient'
+import { raw } from '@prisma/client/runtime/library';
 export class Games{
     public user1:WebSocket;
     public user2:WebSocket;
@@ -12,10 +13,12 @@ export class Games{
     private gameId:string;
     private user1Id:string;
     private user2Id:string
+    // constructor()
     //Note this will be called when we are starting a new game
         constructor(user1:WebSocket,user2:WebSocket,gameId:string,user1Id:string
             ,user2Id:string
         ){
+
             this.user1=user1
             this.user2=user2
             this.board=new Chess(),
@@ -35,6 +38,8 @@ export class Games{
             this.user2Id=user2Id
             console.log("New Game started")
         }
+
+        
     async makeMove(socket:WebSocket,move:{
         from:string,
         to:string,
@@ -83,7 +88,7 @@ export class Games{
             this.user2.send(message);
             return;
         }
-        //socket which assigned to opp is current sokcet that sends message
+        //socket which assigned to opp is current socket that sends message
         const opponent=socket === this.user1 ? this.user2 : this.user1
         opponent.send(JSON.stringify({
             type:"move",
@@ -91,32 +96,46 @@ export class Games{
         }))
     }
 
-    async reconnectPlayer(id:string,socket:WebSocket,gameId:string){
+    static async reconnectPlayer(playerId:string,socket:WebSocket,gameId:string){
         
-        if(id===this.user1Id){
-            this.user1=socket
-        }
-        else{
-         this.user2=socket       
+        // if(id===this.user1Id){
+        //     this.user1=socket
+        // }
+        // else{
+        //  this.user2=socket       
+        // }
+        const gameData=await redis.hGetAll(`game:${gameId}`)
+        if(!gameData){
+            socket.send(JSON.stringify({
+                type:GAME_NOT_FOUND,
+                message:"Game Not found"
+            }))
+            return;
         }
         
-        const color = id===this.user1Id ? 'w' : 'b';
+        const color = playerId===gameData.user1 ? 'w' : 'b';
 
-        const rawMoves=await redis.hGet(`game:${gameId}`,'moves')
-        this.moves = rawMoves ? JSON.parse(rawMoves) : []
-        this.board=new Chess()
-        this.moves.forEach(m=>this.board.move(m))
         
+        const rawMoves=await redis.hGet(`game:${gameId}`,"moves")
+        const moves=rawMoves ? JSON.parse(rawMoves) : []
+        const board=new Chess()
+        moves.forEach((m:any)=>board.move(m))
         
         
         socket.send(JSON.stringify({
             type: 'GAME_STATE',
             payload: {
-                fen: this.board.fen(),
-                moves: this.moves,
-                turn: this.board.turn(),    
+                fen: board.fen(),
+                moves: moves,
+                turn: board.turn(),    
                 yourColor: color
             }
             }));
     }
+
+    // static async redisGameData(){
+
+    // }
+
+    
 }

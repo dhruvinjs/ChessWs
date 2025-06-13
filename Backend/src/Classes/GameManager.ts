@@ -1,113 +1,126 @@
-import { WebSocket } from "ws";
+import {v4 as uuidv4} from "uuid"
+import { redis } from "../redisClient"
+import { WebSocket } from "ws"
+import { ASSIGN_ID, GAME_NOT_FOUND, INIT_GAME, MATCH_NOT_FOUND, MOVE, PLAYER_NOT_FOUND, RECONNECT } from "../messages"
 import { Games } from "./Games"
-import { GAME_NOT_FOUND, INIT_GAME, MOVE, RECONNECT } from "../messages";
-import { v4 as uuidv4 } from "uuid";
-import { createClient } from "redis";
-import { redis } from "../redisClient";
+
 export class GameManager{
-    //Will bind the uuid with the socket 
-    private socketMap:Map<string,WebSocket>=new Map()
-    private guestKey="guest_queue"
     private activeGames:Map<string,Games>=new Map()
-    
-    addUser(socket:WebSocket){
-    const newUUid=uuidv4()
-
-    this.socketMap.set(newUUid,socket)
-    // console.log(socket)
-    // console.log(this.socketMap)
-    redis.setEx(`temp:${newUUid}`,1800,"waiting")
-
-    this.addHandler(socket,newUUid)
-
-    socket.send(JSON.stringify({
-        type:"ASSIGN_ID",
-        id:newUUid
-    }))
-
-    redis.lPush(this.guestKey,newUUid)
-
-   }
-    
-   
-   addHandler(socket:WebSocket,tempId:string){
-          socket.on('message',async (message) => {
-          const jsonMessage=JSON.parse(message.toString())
-
-          const {type}=jsonMessage
-
-            if(type===INIT_GAME){
+    private socketMap:Map<string,WebSocket>=new Map()
+    addUser(socket:WebSocket,guestId:string){
+        this.socketMap.set(guestId,socket)
+        redis.get(`user:${guestId}:game`).then((existingGameId)=>{
+           
+           if(existingGameId){
+            this.socketMap.get(guestId)
+                 Games.reconnectPlayer(guestId,socket,existingGameId)
                 
-                const waitingUsers = await redis.lRange(this.guestKey, 0, -1);
-                console.log("Current Redis Queue:", waitingUsers);
-                const user1Id=waitingUsers.find(id=>id!==tempId)
-                if (!user1Id) {
-                        console.log("No valid opponent found");
-                        socket.send(JSON.stringify({
-                        type: "MATCH_NOT_FOUND",
-                        message: "No opponent available right now"
-                        }));
-                        return;
-                    }
+                 this.addHandler(socket,guestId)
 
-            console.log(`Matched ${tempId} with ${user1Id}`);
-            await redis.lRem(this.guestKey, 1, user1Id);
+            }
+        })
+        
+        
+        
+        redis.setEx(`temp:${guestId}`,1800,"waiting")
+        socket.send(JSON.stringify({
+           type:ASSIGN_ID,
+           id:guestId
+       }))
+       redis.lPush(process.env.GUEST_KEY as string,guestId)
+        this.addHandler(socket,guestId)
+    }
 
-              const user1socket = this.socketMap.get(user1Id);
-                if (!user1socket) {
-                    console.log(`Socket not found for ${user1Id}`);
+    private addHandler(socket:WebSocket,guestId:string){
+       
+       socket.on("message",async(message:string)=>{
+
+           const jsonMessage=JSON.parse(message)
+            const {type}=jsonMessage
+            
+            //New Game Block
+            if(type===INIT_GAME){
+                const waitingId=await redis.lRange(process.env.GUEST_KEY as string,1,-1)
+                console.log(waitingId)
+                const user1Id=waitingId.find(id => guestId!==id)
+                if(!user1Id){
                     socket.send(JSON.stringify({
-                    type: "OPPONENT_LEFT",
-                    message: "Opponent disconnected"
-                    }));
-                    return;
+                        type:MATCH_NOT_FOUND,
+                        message:"No opponent available right now"
+                    }))
+                    return
                 }
-
-
-          const newGameId=uuidv4()
-                    const game=new Games(user1socket,socket,newGameId,user1Id,tempId)
-                    await redis.multi().hSet(`game:${newGameId}`, {
-                        user1: user1Id,
-                        user2: tempId,
-                        moves: JSON.stringify([])
-                    }).expire(`game:${newGameId}`,1800)
-                    .setEx(`user:${user1Id}:game`,1800,newGameId)
-                    .setEx(`user:${tempId}:game`,1800,newGameId)
-                    .exec()
-                    this.activeGames.set(newGameId,game)                            
+                // this.socketMap.set()
+                console.log(`Matched ${guestId} with ${user1Id}`);
+                await redis.lRem(process.env.GUEST_KEY as string,1,user1Id)
+                const user1socket=this.socketMap.get(user1Id)
+                if(!user1socket){
+                    socket.send(JSON.stringify({
+                        type:PLAYER_NOT_FOUND,
+                        message:"Player not found"
+                    }))
+                    return
                 }
+                // const user2Socket=this.socketMap.get(guestId)
+                const newGameId=uuidv4()
+                const newGame=new Games(user1socket,socket,newGameId,user1Id,guestId)
+                await redis.multi().hSet(`game:${newGameId}`,{
+                    user1:user1Id,
+                    user2:guestId,
+                    moves:JSON.stringify([])
+                }).setEx(`user:${user1Id}:game`,1800,newGameId)
+                  .setEx(`user:${guestId}:game`,1800,newGameId)
+                  .exec();
+                  this.activeGames.set(newGameId,newGame)
+                  console.log(`Set Redis game for ${user1Id} and ${guestId} → ${newGameId}`);
+                // console.log(this.activeGames)
+            }
+
+            if(type===MOVE){
+                const {payload}=jsonMessage//from and to moves
+                console.log(guestId)
+                const gameId=await redis.get(`user:${guestId}:game`)
+                console.log(gameId)
+                if(!gameId) return
+                const game=this.activeGames.get(gameId)
+                if(game){
+                    game.makeMove(socket,payload)
+                } 
+            }
 
 
-               if(type===RECONNECT){
+
+            if(type===RECONNECT){
                 const {id}=jsonMessage
                 const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
-                        type:GAME_NOT_FOUND
+                        type:GAME_NOT_FOUND,
+                        message:"Game Not found"
                     }))
                     return
                 }
-                const game=this.activeGames.get(gameId)
+                const game=await redis.hGet(`game:${gameId}`,gameId)
+                console.log(game)
+                // const gameIns=new Games(game)
                 if(game){
-                game.reconnectPlayer(id,socket,gameId)
-               }
-            }
-                
-                if(type===MOVE){
-                    console.log("Inside move")
-                    const id=jsonMessage.payload
-
-                    const gameId = await redis.get(`user:${tempId}:game`);
-                    console.log(jsonMessage.payload)
-                    if(!gameId) return
-
-                    const game=this.activeGames.get(gameId)
-
-                    if(game){
-                        game.makeMove(socket,jsonMessage.payload)
-                    }
+                    Games.reconnectPlayer(id,socket,gameId)
+                }else{
+                   socket.send(JSON.stringify({
+                        type:GAME_NOT_FOUND,
+                        message:"Game Not found"
+                    }))
+                    return 
                 }
 
-        })
+            }
 
-}}
+
+       })
+    
+    
+    
+    
+    
+    }
+}
