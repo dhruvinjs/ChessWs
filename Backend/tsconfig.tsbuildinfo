@@ -1,1 +1,1 @@
-{"root":["./src/game-controllers.ts","./src/index.ts","./src/messages.ts","./src/middleware.ts","./src/redisclient.ts","./src/user-controller.ts","./src/classes/gamemanager.ts","./src/classes/games.ts","./src/services/gameservices.ts"],"version":"5.8.3"}
+{"root":["./src/game-controllers.ts","./src/index.ts","./src/messages.ts","./src/middleware.ts","./src/redisclient.ts","./src/user-controller.ts","./src/classes/gamemanager.ts","./src/services/gameservices.ts","./src/services/matchmaking.ts"],"version":"5.8.3"}

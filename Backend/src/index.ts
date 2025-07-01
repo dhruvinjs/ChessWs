@@ -43,7 +43,7 @@ wss.on("connection",async(socket,req)=>{
    //This guestId is basically is the cookie which I am generating 
    //and will be used for reconvery mechanism
    const guestId=query.guestId as string;
-   
+   console.log(guestId,query)
    if(!guestId){
       //if cookie not provided the websocket connection will not start
       //cookie-mandatory
@@ -51,7 +51,9 @@ wss.on("connection",async(socket,req)=>{
       return;
    }
    gameManager.addUser(socket,guestId)
-   socket.on("close",()=>console.log("Disconnected player"))
+   socket.on("close",()=>
+   gameManager.handleDisconnection(guestId)
+   )
    
 
 })
