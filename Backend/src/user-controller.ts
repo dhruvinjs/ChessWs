@@ -11,8 +11,7 @@ const router=express.Router()
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
-  ADVANCED,
-  EXPERT,
+  PRO
 }
 
 router.post('/register',async (req:Request,res:Response) => {
@@ -24,7 +23,7 @@ router.post('/register',async (req:Request,res:Response) => {
             email:z.string().email(),
             password:z.string().min(6,'Password Should be 6 char long')
             .max(100,'Password is too long '),
-               chessLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'])
+               chessLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'PRO'])
         })
 
         const validateData=schema.parse(req.body)
@@ -45,14 +44,37 @@ router.post('/register',async (req:Request,res:Response) => {
                 chessLevel:chessLevel
             }
         })
-        res.status(200).json({message:'User Created',newUser})
+        res.status(200).json({message:'User Created',success:true})
 
     } catch (error) {
         res.status(500).json({error:error})
         console.log(error)
     }
 })
+router.get("/getProfile",authMiddleware,async(req:Request,res:Response)=>{
+    try {
+        //@ts-ignore
+        const id=req.userId
 
+        const user=await pc.user.findUnique({
+            where:{id:Number(id)},
+            select:{
+                name:true,
+                email:true,
+                chessLevel:true
+            }
+        })
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return
+    }
+    res.status(200).json({success:true,user:user});
+    } catch (error) {
+          res.status(500).json({error:error})
+        console.log(error)
+    }
+})
 
 
 router.post('/login',async(req:Request,res:Response)=>{
@@ -118,4 +140,15 @@ router.post('/edit',authMiddleware,async (req:Request,res:Response) => {
     }
 })
 
+
+router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
+    try {
+        res.clearCookie("token")
+        res.status(200).json({message:"Logout sucessfull"})
+
+    } catch (error) {
+        res.status(500).json({error:error})
+        console.log(error)
+    }
+})
 export {router}

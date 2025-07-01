@@ -17,8 +17,7 @@ datasource db {
 enum ChessLevel {
   BEGINNER
   INTERMEDIATE
-  ADVANCED
-  EXPERT
+  PRO
 }
 model User {
   id Int @default(autoincrement()) @id

@@ -27,7 +27,7 @@ export default function Landing() {
     { title: "🏆 Expert Coaching", subtitle: "Get personal feedback from grandmasters." },
     { title: "⚔️ 2-Player Matches ⚔️", subtitle: "Challenge friends or find opponents online." },
   ];
-
+   
   return (
     <div className="min-h-screen bg-[#EFEBE9] text-[#5D4037]">
       <Navbar />
