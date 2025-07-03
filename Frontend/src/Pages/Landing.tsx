@@ -4,8 +4,6 @@ import {  Twitter,  ArrowRight, Github } from "lucide-react";
 import { Button, Card, Navbar } from "../Components";
 import { useNavigate } from "react-router-dom";
 import logo from '../assets/logo.jpg'
-// import { useUserStore } from "../stores/useUserStore";
-import { useEffect } from "react";
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
