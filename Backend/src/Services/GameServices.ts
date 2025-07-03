@@ -157,6 +157,8 @@ export async function reconnectPlayer(playerId:string,gameId:string,socket:WebSo
         return
     }
     const color = playerId===game.user1 ? 'w' : 'b';
+    const opponentId = playerId === game.user1 ? game.user2 : game.user1;
+
     console.log("sending the current moves to ",playerId)
     socket.send(JSON.stringify({
         type:GAME_FOUND,
@@ -164,14 +166,14 @@ export async function reconnectPlayer(playerId:string,gameId:string,socket:WebSo
             fen:game.board.fen(),
             moves:game.moves,
             color:color,
-            turn:game.board.turn()
+            turn:game.board.turn(),
+            opponentId   
         }
     }))
     const status={
         status:GAME_ACTIVE,
     }
     await redis.hSet(`game:${gameId}`,status)
-    const opponentId = playerId === game.user1 ? game.user2 : game.user1;
     const opponentSocket = socketMap.get(opponentId);
 console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
 

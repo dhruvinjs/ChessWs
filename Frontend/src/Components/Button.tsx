@@ -1,5 +1,5 @@
-import React from 'react'
-import { Loader, Loader2 } from "lucide-react"
+// import React from 'react'
+import {  Loader2 } from "lucide-react"
 import { ReactElement } from "react"
 type ButtonProps= {
     variant:"primary" | "secondary"  | "outline" ,

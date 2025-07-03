@@ -3,6 +3,7 @@ import {PrismaClient} from '@prisma/client'
 import bcrypt from 'bcrypt'
 import { z } from "zod";
 import jwt from 'jsonwebtoken'
+import {v4 as uuidv4} from "uuid"
 import { pc } from '.';
 import { authMiddleware } from './middleware';
 const router=express.Router()
@@ -151,4 +152,31 @@ router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
         console.log(error)
     }
 })
+
+//This api is used for guest cookie generation which can be used to restore games.
+router.get('/cookie', (req:Request, res:Response) => {
+    const existingId = req.cookies.guestId;
+    
+    console.log(existingId)
+  if (existingId) {
+    res.cookie('guestId', existingId, {
+    httpOnly: true,
+    secure:true,
+    maxAge: 30 * 60 * 1000, // 3
+    path: '/'
+  });
+     res.status(200).json({ guestId: existingId });
+     return
+  }
+
+  const guestCookie = uuidv4();
+//   const tempGuestId = uuidv4()
+  res.cookie('guestId', guestCookie, {
+    httpOnly: true,
+    secure:true,
+    maxAge: 30 * 60 * 1000, // 3
+    path: '/'
+  });
+  res.status(200).json({guestId:guestCookie});
+});
 export {router}

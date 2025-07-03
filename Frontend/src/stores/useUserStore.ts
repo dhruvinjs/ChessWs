@@ -14,15 +14,18 @@ interface UserStore {
   isGuest: boolean
   loading: boolean
   error: string | null
-  success: boolean
+  success: boolean,
+  
 
   login: (username: string, password: string) => Promise<void>
   register: (name: string, email: string, password: string, chessLevel: ChessLevel) => Promise<void>
   logout: () => void
-  setGuest: (guestId: string) => void
+  setGuest: () => void
 }
 
-export const useUserStore = create<UserStore>((set) => ({
+export const useUserStore = create<UserStore>(
+  
+  (set,get) => ({
   user: null,
   loading: false,
   isGuest: true,
@@ -78,16 +81,29 @@ export const useUserStore = create<UserStore>((set) => ({
     })
   },
 
-  setGuest: (guestId: string) => {
-    set({
-      user: {
-        id: guestId,
-        name: `Guest${guestId}`,
-        chessLevel: "Beginner", // default for guest, or set based on logic
-      },
-      isGuest: true,
-      error: null,
-      success: true,
-    })
-  },
+  setGuest:async() => {
+    set({loading:true})
+    const currentUser=get().user
+    if (currentUser?.id){
+        return;
+    }
+    try {
+        const response= await userApi.get("/cookie")
+        set({
+            isGuest:true,
+            loading:false,
+            user:{
+                id:response.data.guestId,
+                chessLevel:"Beginner",
+                name:"Guest"
+            }
+        })
+    } catch (error:any) {
+        set({ loading: false, error: "Guest Cookie failed" });  
+    }
+  }
+ 
 }))
+
+
+

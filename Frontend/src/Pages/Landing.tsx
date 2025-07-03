@@ -4,7 +4,8 @@ import {  Twitter,  ArrowRight, Github } from "lucide-react";
 import { Button, Card, Navbar } from "../Components";
 import { useNavigate } from "react-router-dom";
 import logo from '../assets/logo.jpg'
-
+// import { useUserStore } from "../stores/useUserStore";
+import { useEffect } from "react";
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -16,7 +17,17 @@ const fadeIn = {
 
 export default function Landing() {
   const navigate = useNavigate();
+  // const { setGuest, user, isGuest } = useUserStore()
 
+  // useEffect(() => {
+  //   if (!user?.id && isGuest) {
+  //     setGuest()
+  //   }
+  // }, [])
+  
+  
+  
+  
   const testimonials = [
     { quote: "Improved my strategy and results instantly!", author: "Alex H." },
     { quote: "This platform captures the feel of real chess with a clean interface and smart gameplay. Super impressive!", author: "Charlie T."},

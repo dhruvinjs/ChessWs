@@ -8,13 +8,13 @@ interface Move{
 }
 
 type game_status= "ended" | "waiting" | "started" | "reconnecting";
-
+type color="w" | "b" | null
 interface GameState{
     guestId:string,
-    color:"w" | "b" | null,
+    color:color,
     moves:Move[],
-    winner:"w" | "b"| null,
-    loser:"w" | "b"| null,
+    winner:color,
+    loser:color,
     gameId:string |null
     oppConnected:boolean,
     gameStatus:game_status,
@@ -24,7 +24,7 @@ interface GameState{
     initGame:(color:"w" | "b" | null,gameId:string)=>void
     setOppStatus:(status:boolean)=>void
     endGame:(winner:"w"|"b"|null,loser:"w"|"b"|null)=>void
-
+    resetGame:()=>void
 
 }
 
@@ -50,6 +50,16 @@ export const useGameStore=create<GameState>((set)=>({
       moves: [...state.moves, move],
     })),
     
-    endGame:(winner,loser)=>set({gameStatus:"ended",winner:winner,loser:loser})
+    endGame:(winner,loser)=>set({gameStatus:"ended",winner:winner,loser:loser}),
+    resetGame:()=>set({
+    winner:null,
+    loser:null,
+    gameId:null,
+    guestId:"",
+    color:null,
+    gameStatus:"waiting",
+    oppConnected:true,
+    moves: [],
+    })
 
 }))

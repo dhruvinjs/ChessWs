@@ -130,7 +130,9 @@ export class GameManager{
         const user_socket=this.socketMap.get(connected_user)
         const message=JSON.stringify({
             type:DISCONNECTED,
-            message:"Opponent Left due to bad connectivty"
+            payload:{
+                message:"Opponent Left due to bad connectivty"
+            }
         })
         user_socket?.send(message)
 

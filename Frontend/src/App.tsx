@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+// import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Game, Landing, Room } from './Pages'
-
+import { useUserStore } from './stores/useUserStore';
+import { useEffect } from 'react';
 function App() {
   // const [messages,setMessages]=useState<string[]>([])
   // const roomRef=useRef<HTMLInputElement>("") 
@@ -42,6 +43,16 @@ function App() {
   // //     socketRef.current.close()
   // //   }
   // // }, []);
+
+
+   const { user, setGuest } = useUserStore();
+
+  useEffect(() => {
+    // Only fetch guest ID if it's not already set
+    if (!user?.id) {
+      setGuest(); // fetches from cookie and stores in Zustand
+    }
+  }, []);
   return (
     <> 
     <BrowserRouter>

@@ -2,10 +2,13 @@ import dotenv from 'dotenv'
 dotenv.config({
    path:'./env'
 })
+import cookieParser from "cookie-parser";
+
+
 import { WebSocketServer,WebSocket } from "ws";   
 import { GameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
-import {gameRouter} from './game-controllers'
+// import {gameRouter} from './game-controllers'
 import { Prisma, PrismaClient } from "@prisma/client";
 import express from 'express'
 import http from 'http'
@@ -16,12 +19,21 @@ import { parse } from "url";
 const port=process.env.PORT
 const app=express()
 
+app.use(cookieParser());
 app.use(express.json()); 
 const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server });
 
 export const pc=new PrismaClient()
+app.use(cors({
+   origin: 'http://localhost:5173', // Replace '*' with specific origin(s) in production
+   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+   allowedHeaders: ['Content-Type', 'Authorization'],
+   credentials:true
+}));
+
+
 interface User{
    socket:WebSocket,
    roomId:string
@@ -30,13 +42,9 @@ interface User{
 const userRoutes=router
 const gameManager=new GameManager()
 app.use('/api/v1/user',userRoutes)
-app.use('/api/v1/game',gameRouter)
+// app.use('/api/v1/game',gameRouter)
 
-app.use(cors({
-   origin: 'http://localhost:5173', // Replace '*' with specific origin(s) in production
-   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+
 
 wss.on("connection",async(socket,req)=>{
    const {query}=parse(req.url!,true)
