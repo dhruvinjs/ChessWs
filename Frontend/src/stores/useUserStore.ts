@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { userApi } from "../api/axios"
 
-type ChessLevel = "Beginner" | "Intermediate" | "Pro"
+export type ChessLevel = "BEGINNER" | "INTERMEDIATE" | "PRO"
 
 interface User {
   id?:string,//only for guest
@@ -15,6 +15,7 @@ interface UserStore {
   loading: boolean
   error: string | null
   success: boolean,
+  message?:string
   
 
   login: (username: string, password: string) => Promise<void>
@@ -46,6 +47,7 @@ export const useUserStore = create<UserStore>(
         isGuest: false,
         loading: false,
         error: null,
+        message:response.data.message
       })
     } catch (error: any) {
       set({ error: error.response?.data?.message || "Login failed", loading: false })
@@ -66,6 +68,7 @@ export const useUserStore = create<UserStore>(
         success: response.data.success,
         error: null,
         loading: false,
+        message:response.data.message
       })
     } catch (error: any) {
       set({ error: error.response?.data?.message || "Registration failed", loading: false })
@@ -94,7 +97,7 @@ export const useUserStore = create<UserStore>(
             loading:false,
             user:{
                 id:response.data.guestId,
-                chessLevel:"Beginner",
+                chessLevel:"BEGINNER",
                 name:"Guest"
             }
         })

@@ -8,13 +8,13 @@ interface Props {
   export function Card(props: Props) {
     return (
       <div
-        className={`w-full max-w-md mx-auto rounded-xl shadow-md p-6 bg-white space-y-3 ${props.className}`}
+        className={`w-full max-w-md mx-auto rounded-xl shadow-md p-6 	bg-[#BCAAA4] space-y-3 ${props.className}`}
       >
         {props.title && (
           <h2 className="font-semibold text-xl mb-2">{props.title}</h2>
         )}
         {props.subtitle && (
-          <h2 className="text-gray-600 dark:text-wood-light text-sm mb-4">
+          <h2 className="text-shadow-amber-900 font-semibold dark:text-wood-light text-sm mb-4">
             {props.subtitle}
           </h2>
         )}

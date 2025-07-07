@@ -1,9 +1,10 @@
 
 import { motion } from "framer-motion";
-import {  Twitter,  ArrowRight, Github } from "lucide-react";
+import {    ArrowRight } from "lucide-react";
 import { Button, Card, Navbar } from "../Components";
 import { useNavigate } from "react-router-dom";
 import logo from '../assets/logo.jpg'
+import { Footer } from "../Components";
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -13,19 +14,9 @@ const fadeIn = {
   }),
 };
 
-export default function Landing() {
+export function Landing() {
   const navigate = useNavigate();
-  // const { setGuest, user, isGuest } = useUserStore()
-
-  // useEffect(() => {
-  //   if (!user?.id && isGuest) {
-  //     setGuest()
-  //   }
-  // }, [])
-  
-  
-  
-  
+    
   const testimonials = [
     { quote: "Improved my strategy and results instantly!", author: "Alex H." },
     { quote: "This platform captures the feel of real chess with a clean interface and smart gameplay. Super impressive!", author: "Charlie T."},
@@ -67,6 +58,7 @@ export default function Landing() {
         >
           Play online, get coached by grandmasters, and challenge friends in real-time matches.
         </motion.p>
+        {/* add the jwt auth secure here */}
         <motion.div
           initial="hidden" whileInView="visible" variants={fadeIn} custom={2}
           className="mt-8 flex justify-center gap-4"
@@ -147,19 +139,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#BCAAA4] text-[#5D4037] py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center">
-          <span className="font-serif font-bold mb-4 md:mb-0">🛡️🏆👥Chess Masters</span>
-          <div className="flex gap-4">
-            <Github className="h-8 w-8 hover:text-[#BF360C] transition cursor-pointer"  />
-            <Twitter className="h-8 w-8 hover:text-[#BF360C] transition" />
-            
-          </div>
-        </div>
-        <p className="text-center text-[#5D4037]/60 mt-6 text-sm">
-          &copy; {new Date().getFullYear()} Chess Masters. All rights reserved.
-        </p>
-      </footer>
+      <Footer/>
     </div>
   );
 }

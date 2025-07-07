@@ -170,11 +170,10 @@ router.get('/cookie', (req:Request, res:Response) => {
   }
 
   const guestCookie = uuidv4();
-//   const tempGuestId = uuidv4()
   res.cookie('guestId', guestCookie, {
     httpOnly: true,
     secure:true,
-    maxAge: 30 * 60 * 1000, // 3
+    maxAge: 30 * 60 * 1000, 
     path: '/'
   });
   res.status(200).json({guestId:guestCookie});

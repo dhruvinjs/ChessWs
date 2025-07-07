@@ -1,6 +1,6 @@
 // import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { Game, Landing, Room } from './Pages'
+import { Game, Landing, Auth, Room } from './Pages'
 import { useUserStore } from './stores/useUserStore';
 import { useEffect } from 'react';
 function App() {
@@ -61,6 +61,8 @@ function App() {
       <Route path='/' element={<Landing/>}/>
       <Route path='/room' element={<Room/>}/>
       <Route path='/game' element={<Game/>}/>
+      {/* <Route path='/game' element={<Game/>}/> */}
+      <Route path='/login' element={<Auth/>}/>
     </Routes>
     </BrowserRouter>
     </>
