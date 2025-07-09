@@ -7,8 +7,9 @@ import {v4 as uuidv4} from "uuid"
 import { pc } from '.';
 import { authMiddleware } from './middleware';
 const router=express.Router()
-// const pc=new PrismaClient()
-
+import {nanoid} from "nanoid"
+import { redis } from './redisClient';
+import { GAME_OVER, GAME_STARTED, INIT_GAME } from './messages';
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
@@ -20,7 +21,7 @@ router.post('/register',async (req:Request,res:Response) => {
         const schema=z.object({
             name:z.string().min(3,'Minimum UserName should be 3 letter long')
             .max(20,"Max Length of Username is 20")
-            .regex(/^[a-zA-Z0-9_]+$/,'Name should only contain letters, numbers, and underscores'),
+            .regex(/^[a-zA-Z0-9]+$/,'Name should only contain letters, numbers, and underscores'),
             email:z.string().email(),
             password:z.string().min(6,'Password Should be 6 char long')
             .max(100,'Password is too long '),
@@ -93,7 +94,7 @@ router.post('/login',async(req:Request,res:Response)=>{
             res.status(400).json({message:"password is wrong"})
         }
         const token=jwt.sign({id:user.id},process.env.SECRET_TOKEN as string,{expiresIn:'6h'})
-
+        res.clearCookie('guestId')
          res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -155,27 +156,184 @@ router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
 
 //This api is used for guest cookie generation which can be used to restore games.
 router.get('/cookie', (req:Request, res:Response) => {
-    const existingId = req.cookies.guestId;
+    try {
+        const existingId = req.cookies.guestId;
+        
+        console.log(existingId)
+      if (existingId) {
+        res.cookie('guestId', existingId, {
+        httpOnly: true,
+        secure:true,
+        maxAge: 30 * 60 * 1000, // 3
+        path: '/'
+      });
+         res.status(200).json({ guestId: existingId });
+         return
+      }
     
-    console.log(existingId)
-  if (existingId) {
-    res.cookie('guestId', existingId, {
-    httpOnly: true,
-    secure:true,
-    maxAge: 30 * 60 * 1000, // 3
-    path: '/'
-  });
-     res.status(200).json({ guestId: existingId });
-     return
-  }
-
-  const guestCookie = uuidv4();
-  res.cookie('guestId', guestCookie, {
-    httpOnly: true,
-    secure:true,
-    maxAge: 30 * 60 * 1000, 
-    path: '/'
-  });
-  res.status(200).json({guestId:guestCookie});
+      const guestCookie = uuidv4();
+      res.cookie('guestId', guestCookie, {
+        httpOnly: true,
+        secure:true,
+        maxAge: 30 * 60 * 1000, 
+        path: '/'
+      });
+      res.status(200).json({guestId:guestCookie});
+      return
+    } catch (error) {
+        res.status(500).json({error:error})
+        console.log(error)
+    }
 });
+
+
+router.post('/room/create',authMiddleware,async(req:Request,res:Response)=>{
+    try {
+        // @ts-ignore
+        const userId=req.userId 
+
+        const user=await pc.user.findUnique({
+            where:{id:userId},
+            select:{
+                name:true,
+                email:true,
+                chessLevel:true
+            }
+        })
+        if(!user){
+            res.status(200).json({
+                success:false,
+                message:"Session ended,Please login again"
+            })
+            return
+        }
+        const roomId=nanoid(8)
+       await redis.multi()
+       .hSet(`room:${roomId}`,{
+        user1:JSON.stringify(user),
+        user2:"",
+        status:INIT_GAME,
+        createdAt:Date.now()
+       })
+        .setEx(`user:${userId}:room`,1800,roomId)
+        .expire(`room:${roomId}`,1800).exec()
+
+        res.status(200).json({
+            roomId:roomId,
+            success:true
+        }) 
+        return;
+    } catch (error) {
+        res.status(500).json({error:error})
+        console.log(error)
+    }
+})
+
+router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
+    try {
+        const {roomId}=req.body
+        //@ts-ignore
+        const userId=req.userId
+        const redisRoomData=await redis.hGetAll(`room:${roomId}`)
+        if(!redisRoomData && Object.keys(redisRoomData).length === 0){
+            res.status(400).json({
+                message:"Wrong room id",
+                success:false
+            })
+            return
+        }
+        console.log(redisRoomData)
+        const redisUser1=String(redisRoomData.user1)
+        const redisUser2=String(redisRoomData.user2)
+        const user1=JSON.parse(redisUser1)
+        if(redisUser2){
+            res.status(400).json({
+                message:"Room already full or roomId expired",
+                success:false
+            })
+            return
+        } 
+         const user2=await pc.user.findUnique({
+            where:{id:userId},
+            select:{
+                name:true,
+                email:true,
+                chessLevel:true
+            }
+        })
+
+       await redis.multi().hSet(`room:${roomId}`,
+       {
+        user2:JSON.stringify(user2),
+        status:GAME_STARTED
+       })
+       .setEx(`user:${userId}:room`,1800,roomId).exec()
+
+       res.status(200).json({success:true,message:"Room joined match started"})
+       
+    } catch (error) {
+        res.status(500).json({message:"Internal Server error"})
+        console.log(error)
+    }
+})
+router.post('/room/leave',authMiddleware,async(req:Request,res:Response)=>{
+    try {
+        // @ts-ignore
+        const userId=req.userId
+        // const {roomId}=req.bo
+        const user=await pc.user.findUnique({
+        where:{id:userId},
+        select:{
+            email:true,
+            name:true,
+            chessLevel:true
+        }
+        })
+        const redisRoomid=await redis.get(`user:${userId}:room`)
+
+        if (!redisRoomid) {
+         res.status(404).json({
+            message: "User is not in any room",
+            success: false
+        });
+        return
+        }
+        // 3. Get full room data
+        const redisRoomData=await redis.hGetAll(`room:${redisRoomid}`)
+        const redisUser1 = redisRoomData.user1 ? JSON.parse(String(redisRoomData.user1)) : null;
+        const redisUser2 = redisRoomData.user2 ? JSON.parse(String(redisRoomData.user2)) : null;
+
+        const isUser1=user===redisUser1 ? true : false
+        if(isUser1){
+            await redis.hSet(`room:${redisRoomid}`,{
+                loser:JSON.stringify(redisUser1),
+                winner:JSON.stringify(redisUser2),
+                status:GAME_OVER
+            })
+            res.status(200).json({
+                message: "You Lost",
+                success: true
+            });
+            return
+        }else{
+            await redis.hSet(`room:${redisRoomid}`,{
+                loser:JSON.stringify(redisUser2),
+                winner:JSON.stringify(redisUser1),
+                status:GAME_OVER
+            })
+             res.status(200).json({
+                message: "You Lost",
+                success: true
+            });
+            return
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            message:"Internal Server error",
+            success:false
+        })
+        console.log(error)
+    }
+})
 export {router}

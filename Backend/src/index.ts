@@ -14,6 +14,7 @@ import express from 'express'
 import http from 'http'
 import cors from 'cors'
 import { parse } from "url";
+import { gameRouter } from './game-controllers';
 
 
 const port=process.env.PORT
@@ -27,7 +28,7 @@ const wss = new WebSocketServer({ server });
 
 export const pc=new PrismaClient()
 app.use(cors({
-   origin: 'http://localhost:5173', // Replace '*' with specific origin(s) in production
+   origin: 'http://localhost:5173', 
    methods: ['GET', 'POST', 'PUT', 'DELETE'],
    allowedHeaders: ['Content-Type', 'Authorization'],
    credentials:true
@@ -42,7 +43,7 @@ interface User{
 const userRoutes=router
 const gameManager=new GameManager()
 app.use('/api/v1/user',userRoutes)
-// app.use('/api/v1/game',gameRouter)
+app.use('/api/v1/game',gameRouter)
 
 
 

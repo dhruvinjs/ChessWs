@@ -187,7 +187,7 @@ console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId
 export async function getGamesCount(){
     const count=await redis.get("guest:games:total")
     console.log(count)
-    return count
+    return count ? parseInt(count) : 0
 }
 
 export async function playerLeft(){
