@@ -3,12 +3,9 @@ dotenv.config({
    path:'./env'
 })
 import cookieParser from "cookie-parser";
-
-
 import { WebSocketServer,WebSocket } from "ws";   
 import { GameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
-// import {gameRouter} from './game-controllers'
 import { Prisma, PrismaClient } from "@prisma/client";
 import express from 'express'
 import http from 'http'

@@ -35,6 +35,7 @@ export function Button(props: ButtonProps) {
         ${layout}
         `} 
         onClick={onClick}
+        
         >
         {loading && <Loader2 className="animate-spin h-4 w-4" />}
         {icon}

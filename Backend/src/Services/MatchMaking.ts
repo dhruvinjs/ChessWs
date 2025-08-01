@@ -10,8 +10,10 @@ export async function insertPlayerInQueue(playerId:string){
 }
 
 export async function matchingPlayer(currentPlayerId:string){
-    const queue=await redis.lRange(process.env.MATCHMAKING_KEY as string,0,-1);
-    const waitingPlayerId=queue.find(id=>id!=currentPlayerId)
+     const queue=await redis.lRange(process.env.MATCHMAKING_KEY as string,0,-1);
+    
+    //Find basically returns the first id not matching to currentPlayerId
+     const waitingPlayerId=queue.find(id=>id!=currentPlayerId)
     if(!waitingPlayerId) return null;
     await redis.lRem(process.env.MATCHMAKING_KEY as string,1,waitingPlayerId)
     await redis.lRem(process.env.MATCHMAKING_KEY as string,1,currentPlayerId)
@@ -20,5 +22,7 @@ export async function matchingPlayer(currentPlayerId:string){
 
 }
 export async function removePlayerFromQueue(playerId:string) {
+
         await redis.lRem(process.env.MATCHMAKING_KEY as string,0,playerId)
 }
+

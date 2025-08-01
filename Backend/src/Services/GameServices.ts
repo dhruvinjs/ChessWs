@@ -1,29 +1,25 @@
 import { WebSocket } from 'ws';
-import { CHECK, GAME_ACTIVE, GAME_FOUND, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MOVE, OPP_RECONNECTED, STALEMATE, WRONG_PLAYER_MOVE } from '../messages';
+import { CHECK, GAME_ACTIVE, GAME_FOUND, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MOVE, OPP_RECONNECTED, STALEMATE, TIME_EXECEEDED, WRONG_PLAYER_MOVE } from '../messages';
 import {redis} from '../redisClient'
 import { Chess } from 'chess.js';
 
 //This Method Will Help To return the gameState to reconnected player
 export async function getGameState(gameId:string){
-    const existingGame=await redis.hGetAll(`game:${gameId}`)
-    console.log(gameId);
-    if(!existingGame) return null;
-    // if (existingGame.status !==GAME_STARTED) return null
-console.log("Game status is:", existingGame.status)
-
-    const rawMoves=await redis.hGet(`game:${gameId}`,"moves")
-    const moves=rawMoves ? JSON.parse(rawMoves) : []
-    const board=new Chess()
-     moves.forEach((m:any)=>board.move(m))
-    const user1=String(existingGame.user1)
-    const user2=String (existingGame.user2)
-    const status=existingGame.status
+    
+    const existingGame=await redis.hGetAll(`game:${gameId}`) as Record<string,string>
+    if(Object.keys(existingGame).length === 0) return null;
+    //fen basically bring the board to current state because fen returns
+    // current state of board
+    //
+    const board=new Chess(existingGame.fen) 
+    
      return {
-    user1: user1,
-    user2: user2,
+    user1: existingGame.user1,
+    user2: existingGame.user2,
     board,
-    moves,
-    status
+    status:existingGame.status,
+    fen:existingGame.fen,
+    turn:board.turn()
   };
 }
 
@@ -32,9 +28,11 @@ export async function makeMove(
     move: { from: string; to: string; promotion?: string },
     gameId: string,
     playerId: string,
-    socketMap:Map<string,WebSocket>
+    socketMap:Map<string,WebSocket>,
+    timeOfMove:number
 ){
         const gameState=await getGameState(gameId)
+
         if(!gameState){
             socket.send(JSON.stringify({
                 type:GAME_NOT_FOUND,
@@ -43,7 +41,7 @@ export async function makeMove(
             return;
         }
 
-        const isWhiteTurn=gameState?.board.turn() === "w"
+        const isWhiteTurn=gameState.turn === "w"
         if((isWhiteTurn && gameState.user1 !== playerId) || (!isWhiteTurn && gameState?.user2 !==playerId )){
             console.log("Wrong player move")
             const message=JSON.stringify({
@@ -54,7 +52,54 @@ export async function makeMove(
            
             return null
         }
+        const lastMoveTime = await redis.hGet(`game:${gameId}:move-time`,"timeOfMove")
+        //if its the first move then lastMoveTime should be 0
+        
+        const finalLastMovetime=Number(lastMoveTime) || 0
+       
+        const {exceeded , remainingTime} = calculateTime(Number(finalLastMovetime))
+        console.log(`remaining time:${remainingTime}`)
+       
+        const  user1Socket = socketMap.get(gameState.user1)
+        const user2Socket = socketMap.get(gameState.user2)
+        if (!user1Socket || !user2Socket) {
+            console.log("One or both players disconnected")
+            return
+        }
+      
+        if (finalLastMovetime !== 0 && exceeded){
+            // socket.send(JSON.stringify(message))
+            const turn=gameState.board.turn()
+            const flippedFen = flipTurn(gameState.board.fen(),turn)
+            
+            await redis.hSet(`game:${gameId}`,{
+                fen:flippedFen,
+                status:"Active"
+            })
+            const timeoutMessage={
+                type:TIME_EXECEEDED,
+                payload:{
+                    reason:"Player execeeded the time limit",
+                    currentTurn:turn === "w" ? "b" : "w" 
+                }
+            }
+            user1Socket.send(JSON.stringify(timeoutMessage))
+            user2Socket.send(JSON.stringify(timeoutMessage))
+            await redis.hSet(`game:${gameId}:move-time`,{
+                timeOfMove:Date.now(),
+                currentPlayerId:playerId
+            })
+             gameState.board.load(flippedFen)
+
+
+            return
+        }
+    
+        
+
         const board=gameState.board
+
+        
         //Setting the moves in redis 
         try {
             board.move({
@@ -62,26 +107,24 @@ export async function makeMove(
                     to:move.to,
                     promotion:move.promotion || "q"
             })
-            const movesArr=gameState.moves
-            movesArr.push(move)
-            await redis.hSet(`game:${gameId}`,'moves',JSON.stringify(movesArr))
+
+            //0(1) for appending
+            //0(n) for retreiving the moves if needed
+            await redis.rPush(`game:${gameId}:moves`,JSON.stringify(move))
+            // const movesArr=gameState.moves
+            await redis.hSet(`game:${gameId}`,"fen",gameState.board.fen())
+            await redis.hSet(`game:${gameId}:move-time`,{
+                timeOfMove:timeOfMove,
+                currentPlayerId:playerId
+            })
             
         } catch (error) {
             console.log(error)
             return;
         }
 
-        const user1Socket = socketMap.get(gameState.user1)
-        const user2Socket = socketMap.get(gameState.user2)
 
-
-
-
-        if (!user1Socket || !user2Socket) {
-            console.log("One or both players disconnected")
-            return
-        }
-
+      
 
         if(board.isCheck()){
             const message=JSON.stringify({
@@ -144,7 +187,7 @@ export async function makeMove(
            type:"move",
            payload:move
            }))
-    }
+}
 
 
 export async function reconnectPlayer(playerId:string,gameId:string,socket:WebSocket,socketMap:Map<string,WebSocket>){
@@ -164,7 +207,6 @@ export async function reconnectPlayer(playerId:string,gameId:string,socket:WebSo
         type:GAME_FOUND,
         payload:{
             fen:game.board.fen(),
-            moves:game.moves,
             color:color,
             turn:game.board.turn(),
             opponentId   
@@ -191,5 +233,32 @@ export async function getGamesCount(){
 }
 
 export async function playerLeft(){
-    
+}
+
+export function calculateTime(lastMoveTime:number){
+    const currentTime=Date.now()
+    const elapsed = currentTime - lastMoveTime
+
+    // const ten_min=10 * 60 *1000
+    // 10 min , 60 sec , 1000 miliseconds
+    const thirty_sec_check = 30 * 1000
+    const remainingTime = Math.max(0,thirty_sec_check - elapsed)
+    const exceeded = elapsed > thirty_sec_check
+
+    return{
+        exceeded,
+        remainingTime
+    }
+}
+export function flipTurn(fen:string,turn:string ){
+    const oppTurn = turn === "w" ? 'b' : "w"
+    const part=fen.split(" ")
+    part[1]=turn === "w" ? "b" :"w"
+    // const emptyMove={
+    //     from : "",
+    //     to:"",
+    // }
+    const newFen=part.join(" ")
+    console.log(newFen)
+    return newFen
 }

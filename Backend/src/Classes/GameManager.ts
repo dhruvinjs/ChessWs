@@ -4,7 +4,7 @@ import { WebSocket } from "ws"
 import { ASSIGN_ID, DISCONNECTED, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MATCH_NOT_FOUND, MOVE, PLAYER_NOT_FOUND, RECONNECT } from "../messages"
 import { getGameState, makeMove, reconnectPlayer } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
-
+import { Chess } from "chess.js"
 export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
 
@@ -14,7 +14,7 @@ export class GameManager{
 
     const existingGameId = await redis.get(`user:${guestId}:game`);
     if (existingGameId) {
-        console.log(existingGameId)
+      console.log(existingGameId)
       // update socketMap for reconnection
       await reconnectPlayer(guestId, existingGameId, socket,this.socketMap);
       
@@ -61,15 +61,19 @@ export class GameManager{
                 }
                
                 const newGameId=uuidv4()
+                const chess=new Chess()
                 await redis.multi().hSet(`game:${newGameId}`,{
                     user1:user1Id,
                     user2:guestId,
                     moves:JSON.stringify([]),
-                    status:GAME_STARTED
+                    status:GAME_STARTED,
+                    fen:chess.fen()
+
                 }).setEx(`user:${user1Id}:game`,1800,newGameId)
                   .setEx(`user:${guestId}:game`,1800,newGameId)
                   .exec();
                 
+
                 console.log("New game started:",newGameId)
                     user1socket.send(JSON.stringify({
                         type:INIT_GAME,
@@ -90,7 +94,8 @@ export class GameManager{
                 const gameId=await redis.get(`user:${guestId}:game`)
                 console.log("GameID: ",gameId)
                 if(!gameId) return;
-                makeMove(socket,payload,gameId,guestId,this.socketMap)
+                const currentMoveTime=Date.now()
+                makeMove(socket,payload,gameId,guestId,this.socketMap,currentMoveTime)
 
             }
 
