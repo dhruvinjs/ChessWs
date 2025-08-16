@@ -3,7 +3,7 @@ import { Chessboard } from 'react-chessboard';
 import { Square, Chess } from 'chess.js';
 import { useSocket } from '../hooks/useSocket';
 import { Button, Navbar } from '../Components';
-import { Loader2 } from 'lucide-react';
+// import { Loader2 } from 'lucide-react';
 import { OpponentCard } from '../Components/OpponentComponent';
 import { PlayerCard } from '../Components/PlayerCard';
 import confetti from "canvas-confetti"
@@ -194,7 +194,7 @@ export function Game() {
   }, [socket, fen]);
 
   useEffect(() => {
-    const updateWidth = () => {
+    const   updateWidth = () => {
       const w = window.innerWidth;
       if (w < 640) setBoardWidth(w - 60);
       else if (w > 1024) setBoardWidth(400);
@@ -215,7 +215,7 @@ export function Game() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen flex-col text-amber-950 text-2xl">
-        <Loader2 className="animate-spin mb-4 size-8" />
+        {/* <Loader2 className="animate-spin mb-4 size-8" /> */}
         Connecting to game server...
       </div>
     );

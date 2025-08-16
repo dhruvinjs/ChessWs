@@ -25,7 +25,6 @@ interface UserStore {
 }
 
 export const useUserStore = create<UserStore>(
-  
   (set,get) => ({
   user: null,
   loading: false,

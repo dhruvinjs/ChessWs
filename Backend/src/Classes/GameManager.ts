@@ -42,7 +42,7 @@ export class GameManager{
             if(type===INIT_GAME){
                 await insertPlayerInQueue(guestId)
                 const match = await matchingPlayer(guestId)
-
+                
                 if(!match){   
                     socket.send(JSON.stringify({
                         type:MATCH_NOT_FOUND,

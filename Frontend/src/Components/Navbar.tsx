@@ -1,52 +1,88 @@
-import  { useState } from "react"
-import {Link} from "react-router-dom"
-import { Menu, X } from "lucide-react"
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { IoMdMenu } from "react-icons/io";
+import { ImCross } from "react-icons/im";
 
 export function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
-  // const [user,setUser]=useState()
+  const [isOpen, setIsOpen] = useState(false);
+
+  const navbarItems = [
+    { name: "Features", href: "#features" },
+    { name: "About", href: "#about" },
+    { name: "Contact", href: "#contact" },
+  ];
+  
   return (
-    <nav className="bg-brown-900 text-[#5D4037] text-cream sticky top-0 z-50 border-b border-brown-700">
-      <div className="container mx-auto flex items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center space-x-2">
-          <span className="font-serif text-2xl font-bold">♟ ChessMasters</span>
-        </Link>
+    <>
+      <div className="navbar bg-[#EFEBE9] shadow-sm text-4xl">
+ 
+        <div className="navbar-start">
+          <Link to="/" className=" font-serif text-2xl">
+             ♟️ ChessMasters
+          </Link>
+        </div>
 
-       <div className="hidden items-center space-x-6 md:flex">
-        <Link
-        to={"/game"}
-        className="inline-block bg-amber-900 p-2 px-5 text-white rounded-md hover:text-gold-500 transition-all"
-        >Play </Link>
-        <Link
-        to={"/register"}
-        className="inline-block bg-amber-900 p-2 px-5 text-white rounded-md hover:text-gold-500 transition-all"
-        >Register </Link>
+        <div className="navbar-center hidden lg:flex font-semibold">
+          <ul className="menu menu-horizontal px-2">
+            {navbarItems.map((item) => (
+              <li key={item.name}>
+                <a
+                  href={item.href}
+                  className="hover:scale-110 hover:font-bold transition-all duration-200 text-2xl"
+                >
+                  {item.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-       </div>
+        <div className="navbar-end flex items-center gap-2">
+          <a
+            className="btn bg-[#7a574a] text-xl border-none text-white hover:bg-[#5D4037] hidden md:inline-flex"
+            href="/register"
+          >
+            Register
+          </a>
 
-        <button
-          className="md:hidden"
-          onClick={() => setIsOpen((v) => !v)}
-          aria-label="Toggle menu"
-        >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+          {/* Hamburger / Close */}
+          <button
+            className="lg:hidden text-2xl p-2"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <ImCross /> : <IoMdMenu />}
+          </button>
+        </div>
       </div>
 
+      {/* MOBILE MENU */}
       {isOpen && (
-        <div className="md:hidden bg-brown-800 border-t border-brown-700">
-          {["Play", "Learn", "Sign Up"].map((label) => (
-            <Link
-              key={label}
-              to={label === "Sign Up" ? "#signup" : `#${label.toLowerCase()}`}
-              className="block px-6 py-3 hover:bg-brown-700 transition"
-              onClick={() => setIsOpen(false)}
-            >
-              {label}
-            </Link>
-          ))}
+        <div className="lg:hidden absolute top-[64px] left-0 w-full bg-[#EFEBE9] shadow-md z-50">
+          
+          <ul className="menu flex flex-col items-center  space-y-2">
+            {navbarItems.map((item) => (
+              <li key={item.name}>
+                <a
+                  href={item.href}
+                  className="hover:font-bold text-lg"
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.name}
+                </a>
+              </li>
+            ))}
+            <li>
+             <a
+                href={"/register"}
+                className="font-semibold text-lg"
+                onClick={() => setIsOpen(false)}
+                >
+                  {"Register"}
+                </a>
+            </li>
+          </ul>
         </div>
       )}
-    </nav>
-  )
+    </>
+  );
 }

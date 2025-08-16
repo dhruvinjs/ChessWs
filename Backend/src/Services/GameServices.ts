@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import { CHECK, GAME_ACTIVE, GAME_FOUND, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MOVE, OPP_RECONNECTED, STALEMATE, TIME_EXECEEDED, WRONG_PLAYER_MOVE } from '../messages';
+import { CHECK, GAME_ACTIVE, GAME_COMPLETED, GAME_FOUND, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MOVE, OPP_RECONNECTED, STALEMATE, TIME_EXECEEDED, WRONG_PLAYER_MOVE } from '../messages';
 import {redis} from '../redisClient'
 import { Chess } from 'chess.js';
 
@@ -66,10 +66,10 @@ export async function makeMove(
             console.log("One or both players disconnected")
             return
         }
-      
+      //Time Exceeded Block
         if (finalLastMovetime !== 0 && exceeded){
             // socket.send(JSON.stringify(message))
-            const turn=gameState.board.turn()
+            const turn=gameState.turn
             const flippedFen = flipTurn(gameState.board.fen(),turn)
             
             await redis.hSet(`game:${gameId}`,{
@@ -159,17 +159,19 @@ export async function makeMove(
 
         //Game Over logic
         if(board.isGameOver()){
-        //w:white b:black if next turn is white black was winner
+        
+            //w:white b:black if next turn is white black was winner
         const winner=board.turn() ==="w" ?"black" :"white"
-        //Send the message to both users that game is over
+        
+            //Send the message to both users that game is over
         const message = JSON.stringify({
-        type: GAME_OVER,
-        payload: {
-        winner: winner
-        }
+            type: GAME_OVER,
+            payload: {
+            winner: winner
+            }
         });
         const status={
-            status:"Completed",
+            status:GAME_COMPLETED,
             winner:winner
         }
         await redis.hSet(`game:${gameId}`,status)
@@ -203,13 +205,14 @@ export async function reconnectPlayer(playerId:string,gameId:string,socket:WebSo
     const opponentId = playerId === game.user1 ? game.user2 : game.user1;
 
     console.log("sending the current moves to ",playerId)
+    
     socket.send(JSON.stringify({
         type:GAME_FOUND,
         payload:{
             fen:game.board.fen(),
             color:color,
             turn:game.board.turn(),
-            opponentId   
+            opponentId 
         }
     }))
     const status={
@@ -239,11 +242,10 @@ export function calculateTime(lastMoveTime:number){
     const currentTime=Date.now()
     const elapsed = currentTime - lastMoveTime
 
-    // const ten_min=10 * 60 *1000
+    const ten_min=10 * 60 *1000
     // 10 min , 60 sec , 1000 miliseconds
-    const thirty_sec_check = 30 * 1000
-    const remainingTime = Math.max(0,thirty_sec_check - elapsed)
-    const exceeded = elapsed > thirty_sec_check
+    const remainingTime = Math.max(0,ten_min - elapsed)
+    const exceeded = elapsed > ten_min
 
     return{
         exceeded,
@@ -251,13 +253,8 @@ export function calculateTime(lastMoveTime:number){
     }
 }
 export function flipTurn(fen:string,turn:string ){
-    const oppTurn = turn === "w" ? 'b' : "w"
     const part=fen.split(" ")
     part[1]=turn === "w" ? "b" :"w"
-    // const emptyMove={
-    //     from : "",
-    //     to:"",
-    // }
     const newFen=part.join(" ")
     console.log(newFen)
     return newFen

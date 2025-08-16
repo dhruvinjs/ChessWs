@@ -32,10 +32,6 @@ app.use(cors({
 }));
 
 
-interface User{
-   socket:WebSocket,
-   roomId:string
-}
 
 const userRoutes=router
 const gameManager=new GameManager()

@@ -165,7 +165,7 @@ export function Auth(){
 
     <div className="text-center text-md text-amber-950 mt-4 ">
       {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-        <Button variant="link" onClick={()=>setIsSignUp(!isSignup)} size="sm" text={isSignup ? "Login" : "Register"}/>
+        <Button variant="outline" onClick={()=>setIsSignUp(!isSignup)} size="sm" text={isSignup ? "Login" : "Register"}/>
     </div>
 
     <div className="mt-6 text-center text-xs text-[#5D4037]">
