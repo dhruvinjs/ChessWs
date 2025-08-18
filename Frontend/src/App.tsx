@@ -1,6 +1,6 @@
 // import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { Game, Landing, Auth, Room, About } from './Pages'
+import {  Landing, Auth, Room, About } from './Pages'
 import { useUserStore } from './stores/useUserStore';
 import { useEffect } from 'react';
 import { ChessGame } from './Pages/ChessGame';
@@ -8,14 +8,14 @@ function App() {
 
 
 
-  //  const { user, setGuest } = useUserStore();
+      const { user, setGuest } = useUserStore();
 
-  // useEffect(() => {
-  //   // Only fetch guest ID if it's not already set
-  //   if (!user?.id) {
-  //     setGuest(); // fetches from cookie and stores in Zustand
-  //   }
-  // }, []);
+      useEffect(() => {
+        // Only fetch guest ID if it's not already set
+        if (!user?.id) {
+          setGuest(); // fetches from cookie and stores in Zustand
+        }
+      }, []);
   return (
     <> 
     <BrowserRouter>

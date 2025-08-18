@@ -22,11 +22,10 @@ export class GameManager{
     }
 
     // No previous game, so assign ID and queue for matchmaking
-    await redis.setEx(`temp:${guestId}`, 1800, "waiting");
-   
+    
     socket.send(JSON.stringify({
       type: ASSIGN_ID,
-      id: guestId
+      payload:{id: guestId}
     }));
 
   }
@@ -46,7 +45,9 @@ export class GameManager{
                 if(!match){   
                     socket.send(JSON.stringify({
                         type:MATCH_NOT_FOUND,
-                        message:"No opponent available right now"
+                        payload:{
+                            message:"No opponent available right now"
+                        }
                     }))
                     return
                 }
@@ -55,7 +56,9 @@ export class GameManager{
                 if(!user1socket){
                     socket.send(JSON.stringify({
                         type:PLAYER_NOT_FOUND,
-                        message:"Player not found"
+                        payload:{
+                            message:"Player not found"
+                        }
                     }))
                     return
                 }
@@ -65,7 +68,6 @@ export class GameManager{
                 await redis.multi().hSet(`game:${newGameId}`,{
                     user1:user1Id,
                     user2:guestId,
-                    moves:JSON.stringify([]),
                     status:GAME_STARTED,
                     fen:chess.fen()
 
@@ -77,12 +79,19 @@ export class GameManager{
                 console.log("New game started:",newGameId)
                     user1socket.send(JSON.stringify({
                         type:INIT_GAME,
-                        color:"w"
+                        payload:{
+                        color:"w",
+                        gameId:newGameId    
+                        }
+                        
                     }))
                   const user2socket=this.socketMap.get(guestId)
                     user2socket?.send(JSON.stringify({
                         type:INIT_GAME,
-                        color:"b"
+                        payload:{
+                            color:"b",
+                            gameId:newGameId
+                        }
                     }))
                 //   const 
                 await redis.incr("guest:games:total")
@@ -107,7 +116,9 @@ export class GameManager{
                 if(!gameId){
                     socket.send(JSON.stringify({
                         type:GAME_NOT_FOUND,
-                        message:"Game Not found"
+                        payload:{
+                            message:"Game Not found"
+                        }
                     }))
                     return
                 }

@@ -15,15 +15,13 @@ export const useSocket=()=>{
         const ws_url=`${ws_base_url}/ws?guestId=${user?.id}`
 
         const wss=new WebSocket(ws_url)
+        setSocket(wss)
 
         wss.onopen=(()=>{ 
             console.log("Socket Connected")   
-            setSocket(wss)
         })
-         wss.onmessage = (event) => {
-             const jsonMessage=JSON.parse(event.data)
-             console.log("Message received:", jsonMessage);
-    };
+     
+   
 
 
         wss.onclose=(()=>{

@@ -21,6 +21,7 @@ export async function matchingPlayer(currentPlayerId:string){
      return { waitingPlayerId };
 
 }
+
 export async function removePlayerFromQueue(playerId:string) {
 
         await redis.lRem(process.env.MATCHMAKING_KEY as string,0,playerId)
