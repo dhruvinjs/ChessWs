@@ -81,7 +81,8 @@ export class GameManager{
                         type:INIT_GAME,
                         payload:{
                         color:"w",
-                        gameId:newGameId    
+                        gameId:newGameId,
+                        fen:chess.fen()  
                         }
                         
                     }))
@@ -90,7 +91,8 @@ export class GameManager{
                         type:INIT_GAME,
                         payload:{
                             color:"b",
-                            gameId:newGameId
+                            gameId:newGameId,
+                            fen:chess.fen()
                         }
                     }))
                 //   const 
