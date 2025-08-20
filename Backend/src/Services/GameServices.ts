@@ -8,8 +8,10 @@ import {
     GAME_OVER, 
     MOVE, 
     OPP_RECONNECTED, 
+    SERVER_ERROR, 
     STALEMATE, 
     TIME_EXCEEDED, 
+    WRONG_MOVE, 
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
@@ -110,25 +112,30 @@ export async function makeMove(
 
     const board = gameState.board;
 
-    try {
-        board.move({
-            from: move.from,
-            to: move.to,
-            promotion: move.promotion || "q"
-        });
+        try {
+                board.move({
+                    from: move.from,
+                    to: move.to,
+                    promotion: move.promotion || "q"
+                });
 
-        await redis.rPush(`game:${gameId}:moves`, JSON.stringify(move));
-        await redis.hSet(`game:${gameId}`, "fen", gameState.board.fen());
-        await redis.hSet(`game:${gameId}:move-time`, {
-            timeOfMove: timeOfMove,
-            currentPlayerId: playerId
-        });
+            await redis.rPush(`game:${gameId}:moves`, JSON.stringify(move));
+            await redis.hSet(`game:${gameId}`, "fen", gameState.board.fen());
+            await redis.hSet(`game:${gameId}:move-time`, {
+                timeOfMove: timeOfMove,
+                currentPlayerId: playerId
+            });
 
-    } catch (error) {
-        console.log(error);
-        return;
-    }
-
+        } catch (err) {
+            //if illegal moves is attempted direct this block will be executed 
+            console.error("Error processing move:", err);
+            socket.send(JSON.stringify({
+                type: SERVER_ERROR,
+                payload: { message: "Server error while processing move or illegal move attempted" }
+            }));
+            return;
+        }
+            
     if (board.isCheck()) {
         const message = JSON.stringify({
             type: CHECK,
@@ -147,7 +154,7 @@ export async function makeMove(
             payload: {
                 reason: "Game over, its a draw"
             }
-        });
+    });
 
         user1Socket.send(message);
         user2Socket.send(message);
@@ -184,6 +191,8 @@ export async function makeMove(
         user2Socket.send(message);
         return;
     }
+    //stop the timer for the player who has made the move and it has passed all if 
+    //start the timer for player who will now make move
 
     const opponent = playerId === gameState.user1 ? user2Socket : user1Socket;
     opponent.send(JSON.stringify({
@@ -265,4 +274,15 @@ export function flipTurn(fen: string, turn: string) {
     const newFen = part.join(" ");
     console.log(newFen);
     return newFen;
+}
+
+
+export function startTimer(userId:string,socketMap:Map<string,WebSocket>){
+    const timer = 0
+    const userSocket = socketMap.get(userId)
+    
+
+    setInterval(()=>{
+
+    },1000)
 }
