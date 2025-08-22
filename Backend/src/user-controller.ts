@@ -9,7 +9,7 @@ import { authMiddleware } from './middleware';
 const router=express.Router()
 import {nanoid} from "nanoid"
 import { redis } from './redisClient';
-import { GAME_OVER, GAME_STARTED, INIT_GAME } from './messages';
+import { GAME_ACTIVE, GAME_OVER,  INIT_GAME } from './messages';
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
@@ -277,7 +277,7 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
        await redis.multi().hSet(`room:${roomId}`,
        {
         user2:JSON.stringify(user2),
-        status:GAME_STARTED
+        status:GAME_ACTIVE
        })
        .setEx(`user:${userId}:room`,1800,roomId).exec()
 

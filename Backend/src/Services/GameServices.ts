@@ -3,7 +3,6 @@ import { Request } from 'express';
 import { 
     CHECK, 
     GAME_ACTIVE, 
-    GAME_COMPLETED, 
     GAME_FOUND, 
     GAME_NOT_FOUND, 
     GAME_OVER, 
@@ -11,8 +10,6 @@ import {
     OPP_RECONNECTED, 
     SERVER_ERROR, 
     STALEMATE, 
-    TIME_EXCEEDED, 
-    WRONG_MOVE, 
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
@@ -43,7 +40,6 @@ export async function makeMove(
     gameId: string,
     playerId: string,
     socketMap: Map<string, WebSocket>,
-    timeOfMove: number
 ) {
     const gameState = await getGameState(gameId);
 
@@ -127,11 +123,10 @@ export async function makeMove(
         user1Socket.send(message);
         user2Socket.send(message);
 
-        const status = {
-            status: GAME_COMPLETED,
+        await redis.hSet(`game:${gameId}`, {
+            status: GAME_OVER,
             winner: "draw (stalemate)"
-        };
-        await redis.hSet(`game:${gameId}`, status);
+        });
         await redis.expire(`game:${gameId}`, 600);
 
         return;
@@ -148,11 +143,10 @@ export async function makeMove(
             }
         });
 
-        const status = {
-            status: GAME_COMPLETED,
+        await redis.hSet(`game:${gameId}`, {
+            status: GAME_OVER,
             winner: winner
-        };
-        await redis.hSet(`game:${gameId}`, status);
+        });
         await redis.expire(`game:${gameId}`, 600);
 
         user1Socket.send(message);
@@ -176,9 +170,27 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
 
     console.log("reconnection player");
     if (!game) {
-        console.log("Game Not found");
+        const message={
+            type:GAME_NOT_FOUND,
+            payload:{
+                message:"Previous Game Not found Internal Server Error "
+            }
+        }
+        socket.send(JSON.stringify(message))
         return;
     }
+    if (game.status === GAME_OVER) {
+        const message={
+            type:GAME_OVER,
+            payload:{
+                message:"Previous Game Over "
+            }
+        }
+        socket.send(JSON.stringify(message))
+        return;
+    }
+
+   
 
     const color = playerId === game.user1 ? 'w' : 'b';
     const opponentId = playerId === game.user1 ? game.user2 : game.user1;
@@ -196,10 +208,9 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
         }
     }));
 
-    const status = {
-        status: GAME_ACTIVE,
-    };
-    await redis.hSet(`game:${gameId}`, status);
+    await redis.hSet(`game:${gameId}`, {
+        status: GAME_ACTIVE
+    });
 
     const opponentSocket = socketMap.get(opponentId);
     console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
@@ -218,8 +229,40 @@ export async function getGamesCount() {
     return count ? parseInt(count) : 0;
 }
 //todo->leave game functionality 
-export async function playerLeft() {
-}
+export async function playerLeft(playerId:string,gameId:string,socket:WebSocket,socketMap:Map<string,WebSocket>) {
+        const game = await getGameState(gameId);
+        if(!game){
+            console.log("Game Not found")
+            socket.send(JSON.stringify({
+                type:GAME_NOT_FOUND,
+                payload:{
+                    message:"Cannot leave game due to game not found"
+                }
+            }))
+            return
+        }
+        console.log("In player left method")
+        const winner = playerId === game.user1 ?"b" :"w"
+        const opponentId = playerId === game.user1 ? game.user2 : game.user1;
+
+        const user2Socket=socketMap.get(opponentId)
+
+        const message={
+            type:GAME_OVER,
+            payload:{
+                message:"Player Left You Won!"
+            }
+        }
+
+        await redis.hSet(`game:${gameId}`, {
+        status: GAME_OVER,
+        winner: winner
+        });        
+        await redis.expire(`game:${gameId}`, 600);
+//we will only send the message to opp because the other player left
+        user2Socket?.send(JSON.stringify(message))
+
+    }
 
 export function calculateTime(lastMoveTime: number) {
     const currentTime = Date.now();

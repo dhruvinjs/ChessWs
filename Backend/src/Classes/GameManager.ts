@@ -1,8 +1,8 @@
 import {v4 as uuidv4} from "uuid"
 import { redis } from "../redisClient"
 import { WebSocket } from "ws"
-import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE, GAME_COMPLETED, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_NOT_FOUND, RECONNECT, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
-import { getGameState, makeMove, reconnectPlayer } from "../Services/GameServices"
+import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_UNAVAILABLE, RECONNECT, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
+import { getGameState, makeMove, playerLeft, reconnectPlayer } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
 export class GameManager{
@@ -15,7 +15,7 @@ export class GameManager{
 
     const existingGameId = await redis.get(`user:${guestId}:game`);
     if (existingGameId) {
-      console.log(existingGameId)
+      
       // update socketMap for reconnection
       await reconnectPlayer(guestId, existingGameId, socket,this.socketMap);
       
@@ -41,12 +41,11 @@ export class GameManager{
     this.globalSetInterval=setInterval(async()=>{
         const activeGames=await redis.sMembers("active-games") 
         if(!activeGames || activeGames.length === 0){
-            console.log("Timer started");
             if(this.globalSetInterval){
                 clearInterval(this.globalSetInterval)
                 this.globalSetInterval=null
             }
-
+            console.log("Timer not started becuase of no active-games")
             return
         }
 
@@ -57,7 +56,7 @@ export class GameManager{
                 continue
             }
             //removing all the completed games
-            if (game.status === GAME_COMPLETED || game.status === GAME_OVER) {
+            if (game.status === GAME_OVER) {
                 // only clear explicitly ended games
                 await redis.sRem("active-games", gameId);
                 continue
@@ -139,7 +138,7 @@ export class GameManager{
                 const user1socket=this.socketMap.get(user1Id)
                 if(!user1socket){
                     socket.send(JSON.stringify({
-                        type:PLAYER_NOT_FOUND,
+                        type:PLAYER_UNAVAILABLE,
                         payload:{
                             message:"Player not found"
                         }
@@ -196,12 +195,38 @@ export class GameManager{
                 const {payload}=jsonMessage//from and to moves
                 console.log(guestId)
                 const gameId=await redis.get(`user:${guestId}:game`)
-                console.log("GameID: ",gameId)
-                if(!gameId) return;
-                const currentMoveTime=Date.now()
-                makeMove(socket,payload,gameId,guestId,this.socketMap,currentMoveTime)
+                if(!gameId){
+                    const message={
+                        type:SERVER_ERROR,
+                        payload:{
+                            message:"internal server error cannot find game and cannot make move"
+                        }
+                    }
+                    socket.send(JSON.stringify(message))
+                    return
+                }
+                makeMove(socket,payload,gameId,guestId,this.socketMap)
 
             }
+
+            if(type===LEAVE_GAME){
+                const {payload}=jsonMessage
+                  const gameId=await redis.get(`user:${guestId}:game`)
+                if(!gameId){
+                    const message={
+                        type:SERVER_ERROR,
+                        payload:{
+                            message:"internal server error cannot find game and cannot make move"
+                        }
+                    }
+                    socket.send(JSON.stringify(message))
+                    return
+                }
+                console.log("Player Left Block")
+                playerLeft(guestId,gameId,socket,this.socketMap)
+
+            }
+
 
 
 
@@ -222,6 +247,10 @@ export class GameManager{
 
             }
        })   
+
+
+
+
     }
 
 
@@ -262,13 +291,13 @@ export class GameManager{
 
             const winner=connected_user
             const newStatus={
-            status:GAME_COMPLETED,
+            status:GAME_OVER,
             winner:winner
         }
             
             await redis.hSet(`game:${gameId}`,newStatus)
             const message=JSON.stringify({
-                type:GAME_COMPLETED,
+                type:GAME_OVER,
                 payload:{
                     winner:winner,
                     reason:DISCONNECTED
@@ -278,23 +307,6 @@ export class GameManager{
         },60*1000)
     }   
 
-    // async startTimerForPlayer(gameId:string,turn:'w'| 'b',user1Socket:WebSocket,user2Socket:WebSocket) {
-    //         const game = await getGameState(gameId)
-
-    //         if (!game) {
-    //             const message=JSON.stringify({
-    //                 type:GAME_NOT_FOUND,
-    //                 payload:{message:"GAME_NOT_FOUND for starting timer"}
-    //             })
-    //             user1Socket.send(message)
-    //             user2Socket.send(message)
-    //             return 
-    //         }
-
-    //         if(turn === "w"){
-    //             user1Socket.send()
-    //         }
-    // }
 
 
 }
