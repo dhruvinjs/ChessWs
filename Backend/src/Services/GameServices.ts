@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import { Request } from 'express';
 import { 
     CHECK, 
     GAME_ACTIVE, 
@@ -23,14 +24,16 @@ export async function getGameState(gameId: string) {
     if (Object.keys(existingGame).length === 0) return null;
 
     const board = new Chess(existingGame.fen);
-
     return {
         user1: existingGame.user1,
         user2: existingGame.user2,
         board,
         status: existingGame.status,
         fen: existingGame.fen,
-        turn: board.turn()
+        turn: board.turn(),
+        whiteTimer:existingGame.whiteTimer,
+        blackTimer:existingGame.blackTimer
+
     };
 }
 
@@ -67,12 +70,8 @@ export async function makeMove(
         return null;
     }
 
-    const lastMoveTime = await redis.hGet(`game:${gameId}:move-time`, "timeOfMove");
-    const finalLastMovetime = Number(lastMoveTime) || 0;
-
-    const { exceeded, remainingTime } = calculateTime(Number(finalLastMovetime));
-    console.log(`remaining time:${remainingTime}`);
-
+    
+    
     const user1Socket = socketMap.get(gameState.user1);
     const user2Socket = socketMap.get(gameState.user2);
     if (!user1Socket || !user2Socket) {
@@ -80,35 +79,7 @@ export async function makeMove(
         return;
     }
 
-    // Time Exceeded Block
-    if (finalLastMovetime !== 0 && exceeded) {
-        const turn = gameState.turn;
-        const flippedFen = flipTurn(gameState.board.fen(), turn);
-
-        await redis.hSet(`game:${gameId}`, {
-            fen: flippedFen,
-            status: "Active"
-        });
-
-        const timeoutMessage = {
-            type: TIME_EXCEEDED,
-            payload: {
-                reason: "Player execeeded the time limit",
-                currentTurn: turn === "w" ? "b" : "w",
-                fen: flippedFen
-            }
-        };
-        user1Socket.send(JSON.stringify(timeoutMessage));
-        user2Socket.send(JSON.stringify(timeoutMessage));
-
-        await redis.hSet(`game:${gameId}:move-time`, {
-            timeOfMove: Date.now(),
-            currentPlayerId: playerId
-        });
-
-        gameState.board.load(flippedFen);
-        return;
-    }
+    
 
     const board = gameState.board;
 
@@ -121,10 +92,7 @@ export async function makeMove(
 
             await redis.rPush(`game:${gameId}:moves`, JSON.stringify(move));
             await redis.hSet(`game:${gameId}`, "fen", gameState.board.fen());
-            await redis.hSet(`game:${gameId}:move-time`, {
-                timeOfMove: timeOfMove,
-                currentPlayerId: playerId
-            });
+            
 
         } catch (err) {
             //if illegal moves is attempted direct this block will be executed 
@@ -160,7 +128,7 @@ export async function makeMove(
         user2Socket.send(message);
 
         const status = {
-            status: "Completed",
+            status: GAME_COMPLETED,
             winner: "draw (stalemate)"
         };
         await redis.hSet(`game:${gameId}`, status);
@@ -191,8 +159,7 @@ export async function makeMove(
         user2Socket.send(message);
         return;
     }
-    //stop the timer for the player who has made the move and it has passed all if 
-    //start the timer for player who will now make move
+    
 
     const opponent = playerId === gameState.user1 ? user2Socket : user1Socket;
     opponent.send(JSON.stringify({
@@ -250,7 +217,7 @@ export async function getGamesCount() {
     console.log(count);
     return count ? parseInt(count) : 0;
 }
-
+//todo->leave game functionality 
 export async function playerLeft() {
 }
 
@@ -268,21 +235,11 @@ export function calculateTime(lastMoveTime: number) {
     };
 }
 
-export function flipTurn(fen: string, turn: string) {
-    const part = fen.split(" ");
-    part[1] = turn === "w" ? "b" : "w";
-    const newFen = part.join(" ");
-    console.log(newFen);
-    return newFen;
-}
 
+export async function verifyCookie(cookieName:string){
+    // const cookie = req.headers.cookieName
+    const session = await redis.get(`guest:${cookieName}`)
+    if(!session) return null
+    return true
 
-export function startTimer(userId:string,socketMap:Map<string,WebSocket>){
-    const timer = 0
-    const userSocket = socketMap.get(userId)
-    
-
-    setInterval(()=>{
-
-    },1000)
 }

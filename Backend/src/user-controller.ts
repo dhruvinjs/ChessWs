@@ -155,12 +155,13 @@ router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
 })
 
 //This api is used for guest cookie generation which can be used to restore games.
-router.get('/cookie', (req:Request, res:Response) => {
+router.get('/cookie', async(req:Request, res:Response) => {
     try {
         const existingId = req.cookies.guestId;
         
         console.log(existingId)
       if (existingId) {
+        await redis.expire(`guest:${existingId}`,30 * 60)
         res.cookie('guestId', existingId, {
         httpOnly: true,
         secure:true,
@@ -172,6 +173,17 @@ router.get('/cookie', (req:Request, res:Response) => {
       }
     
       const guestCookie = uuidv4();
+
+      await redis.set(`guest:${guestCookie}`,
+        JSON.stringify({
+            createdAt:Date.now(),
+            ip:req.ip,
+            requestFrom:req.headers["user-agent"] || "unknown",
+        }),
+        {EX:30*60} 
+      )
+
+
       res.cookie('guestId', guestCookie, {
         httpOnly: true,
         secure:true,

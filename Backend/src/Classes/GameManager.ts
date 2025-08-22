@@ -1,12 +1,13 @@
 import {v4 as uuidv4} from "uuid"
 import { redis } from "../redisClient"
 import { WebSocket } from "ws"
-import { ASSIGN_ID, DISCONNECTED, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MATCH_NOT_FOUND, MOVE, PLAYER_NOT_FOUND, RECONNECT } from "../messages"
+import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE, GAME_COMPLETED, GAME_NOT_FOUND, GAME_OVER, GAME_STARTED, INIT_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_NOT_FOUND, RECONNECT, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
 import { getGameState, makeMove, reconnectPlayer } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
 export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
+    private globalSetInterval:NodeJS.Timeout | null = null
 
      async addUser(socket: WebSocket, guestId: string) {
      this.socketMap.set(guestId, socket);
@@ -29,6 +30,89 @@ export class GameManager{
     }));
 
   }
+
+  private async startTimer(){
+    // if globalSetInterval is not null means it is already running 
+    //if its running then return so that only one globalSetInterval is 
+    //running all the time
+    console.log("before return in globalSetInterval")
+    if(this.globalSetInterval) return
+
+    this.globalSetInterval=setInterval(async()=>{
+        const activeGames=await redis.sMembers("active-games") 
+        if(!activeGames || activeGames.length === 0){
+            console.log("Timer started");
+            if(this.globalSetInterval){
+                clearInterval(this.globalSetInterval)
+                this.globalSetInterval=null
+            }
+
+            return
+        }
+
+        for(const gameId of activeGames ){
+           const  game=await redis.hGetAll(`game:${gameId}`) as Record<string,string> 
+            if(!game){
+                await redis.sRem(`active-games`,gameId)
+                continue
+            }
+            //removing all the completed games
+            if (game.status === GAME_COMPLETED || game.status === GAME_OVER) {
+                // only clear explicitly ended games
+                await redis.sRem("active-games", gameId);
+                continue
+                }
+        let blackTimer = Number(game.blackTimer)
+        let whiteTimer = Number(game.whiteTimer)
+        const fen=game.fen
+        const turn = fen.split(" ")[1] 
+        console.log(turn);
+
+        if(turn === "w"){
+          const newWhiteTimer= await redis.hIncrBy(`game:${gameId}`,"whiteTimer",-1)
+            whiteTimer=Math.max(0,Number(newWhiteTimer))
+        }else{
+           const newBlackTimer= await redis.hIncrBy(`game:${gameId}`,"blackTimer",-1)
+            blackTimer=Math.max(0, Number(newBlackTimer))
+        }
+
+        const user1Socket = this.socketMap.get(game.user1);
+        const user2Socket = this.socketMap.get(game.user2);
+        console.log(whiteTimer,blackTimer)
+
+        const timerMessage={
+            type:TIMER_UPDATE,
+            payload:{
+                whitetimer:whiteTimer,
+                blackTimer:blackTimer
+            }
+        }
+        user1Socket?.send(JSON.stringify(timerMessage))
+        user2Socket?.send(JSON.stringify(timerMessage))
+
+
+
+            if (whiteTimer <= 0 || blackTimer <= 0) {
+                const winner = whiteTimer <= 0 ? game.user2 : game.user1;
+                await redis.hSet(`game:${gameId}`, { status: GAME_OVER, winner });
+                await redis.sRem("active-games", gameId);
+
+                const message = JSON.stringify({
+                type: GAME_OVER,
+                payload: { reason: TIME_EXCEEDED, winner }
+                });
+
+                user1Socket?.send(message);
+                user2Socket?.send(message);
+        }
+      }
+    },1000)//every 1 second 
+
+
+
+  }
+
+
 
     private addHandler(socket:WebSocket,guestId:string){
        
@@ -68,8 +152,10 @@ export class GameManager{
                 await redis.multi().hSet(`game:${newGameId}`,{
                     user1:user1Id,
                     user2:guestId,
-                    status:GAME_STARTED,
-                    fen:chess.fen()
+                    status:GAME_ACTIVE,
+                    fen:chess.fen(),
+                    whiteTimer:600,
+                    blackTimer:600
 
                 }).setEx(`user:${user1Id}:game`,1800,newGameId)
                   .setEx(`user:${guestId}:game`,1800,newGameId)
@@ -95,9 +181,16 @@ export class GameManager{
                             fen:chess.fen()
                         }
                     }))
-                //   const 
+                //maintaining a set for active games for maintaining 
+                //global timer(setInterval)
+                await redis.sAdd("active-games",newGameId)
                 await redis.incr("guest:games:total")
+                this.startTimer()
             }
+
+        
+
+
 
             if(type===MOVE){
                 const {payload}=jsonMessage//from and to moves
@@ -124,14 +217,17 @@ export class GameManager{
                     }))
                     return
                 }
-                if (gameId) {
                     await reconnectPlayer(guestId, gameId, socket,this.socketMap);
                     return;
-                }
 
             }
        })   
     }
+
+
+
+
+
 
     async handleDisconnection(playerId:string){
         //this is the gameId:string which can be retrieved using the playerId 
@@ -166,13 +262,13 @@ export class GameManager{
 
             const winner=connected_user
             const newStatus={
-            status:DISCONNECTED,
+            status:GAME_COMPLETED,
             winner:winner
         }
             
             await redis.hSet(`game:${gameId}`,newStatus)
             const message=JSON.stringify({
-                type:GAME_OVER,
+                type:GAME_COMPLETED,
                 payload:{
                     winner:winner,
                     reason:DISCONNECTED
@@ -181,4 +277,24 @@ export class GameManager{
             user_socket?.send(message)
         },60*1000)
     }   
+
+    // async startTimerForPlayer(gameId:string,turn:'w'| 'b',user1Socket:WebSocket,user2Socket:WebSocket) {
+    //         const game = await getGameState(gameId)
+
+    //         if (!game) {
+    //             const message=JSON.stringify({
+    //                 type:GAME_NOT_FOUND,
+    //                 payload:{message:"GAME_NOT_FOUND for starting timer"}
+    //             })
+    //             user1Socket.send(message)
+    //             user2Socket.send(message)
+    //             return 
+    //         }
+
+    //         if(turn === "w"){
+    //             user1Socket.send()
+    //         }
+    // }
+
+
 }

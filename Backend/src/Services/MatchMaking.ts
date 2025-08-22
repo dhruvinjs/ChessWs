@@ -17,7 +17,6 @@ export async function matchingPlayer(currentPlayerId:string){
     if(!waitingPlayerId) return null;
     await redis.lRem(process.env.MATCHMAKING_KEY as string,1,waitingPlayerId)
     await redis.lRem(process.env.MATCHMAKING_KEY as string,1,currentPlayerId)
-
      return { waitingPlayerId };
 
 }

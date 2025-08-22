@@ -21,3 +21,7 @@ export const TIME_EXCEEDED="time_exceeded"
 export const GAME_COMPLETED="game_completed"
 export const WRONG_MOVE="illegal_move"
 export const SERVER_ERROR="server_error"
+export const NO_ACTIVE_GAMES="no_active_games"
+export const TIMER_UPDATE="timer_update"
+
+
