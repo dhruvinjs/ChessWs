@@ -7,6 +7,11 @@ import { DropDown } from "./DropDown"
 import { Hero } from "./Hero"
 import { HeroChessBoard } from "./HeroChessBoard"
 import { Testimonials } from "./Testimonials"
+import { ChessBoard } from "./chess/ChessBoard"
+import { GameHeader } from "./chess/GameHeader"
+import { GameStatus } from "./chess/GameStatus"
+import { Square } from "./chess/Square"
+import { MoveHistory } from "./chess/MoveHistory"
 export {
     Button,
     Card,
@@ -16,6 +21,11 @@ export {
     DropDown,
     Hero,
     HeroChessBoard,
-    Testimonials
+    Testimonials,
+    ChessBoard,
+    GameHeader,
+    MoveHistory,
+    GameStatus,
+    Square
 
 }

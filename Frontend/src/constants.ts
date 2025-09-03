@@ -13,3 +13,9 @@ export  enum GameMessages {
   check_move= "check_move",
   TIME_EXCEEDED="time_exceeded"
 }
+
+// Unicode chess pieces
+export const PIECE_SYMBOLS: Record<string, string> = {
+  'wK': '♔', 'wQ': '♕', 'wR': '♖', 'wB': '♗', 'wN': '♘', 'wP': '♙',
+  'bK': '♚', 'bQ': '♛', 'bR': '♜', 'bB': '♝', 'bN': '♞', 'bP': '♟'
+};

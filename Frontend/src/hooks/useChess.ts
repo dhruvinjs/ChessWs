@@ -1,55 +1,83 @@
-import { useState, useRef } from "react";
-import { Chess } from "chess.js";
-import { useGameStore } from "../stores/useGameStore";
-import { useSocket } from "./useSocket";
-import { GameMessages } from "../constants";
+import { useState, useCallback, useMemo } from 'react';
+import { Chess, Move } from 'chess.js';
+import { GameState } from '../types/chess';
 
-export function useChess() {
-  const chess = useRef(new Chess()); 
-  const [fen, setFen] = useState(chess.current.fen()); 
+export function useChess  ()  {
+  const [game] = useState(() => new Chess());
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+  const [gameState, setGameState] = useState<GameState>({
+    board: game.board(),
+    turn: game.turn(),
+    isGameOver: game.isGameOver(),
+    isCheck: game.inCheck(),
+    moveHistory: game.history()
+  });
 
-  const { addMove, gameId } = useGameStore(); 
-  const socket = useSocket();
+  // Memoized valid moves to prevent recalculation
+  const validMoves = useMemo((): Move[] => {
+    if (!selectedSquare) return [];
+    return game.moves({ square: selectedSquare as any, verbose: true }) as Move[];
+  }, [selectedSquare, gameState]);
 
-  const makeMove = (from: string, to: string) => {
-    const move = chess.current.move({ from, to, promotion: "q" });
-    if (move) {
-      setFen(chess.current.fen());
-      addMove({ from, to });
+  // Memoized last move squares
+  const lastMoveSquares = useMemo(() => {
+    const history = game.history({ verbose: true });
+    if (history.length === 0) return [];
+    const lastMove = history[history.length - 1];
+    return [lastMove.from, lastMove.to];
+  }, [gameState.moveHistory]);
 
-  
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-          type: GameMessages.MOVE,
-          payload: {
-            gameId,
-            from,
-            to,
-            promotion: "q",
-          },
-        }));
+  const updateGameState = useCallback(() => {
+    setGameState({
+      board: game.board(),
+      turn: game.turn(),
+      isGameOver: game.isGameOver(),
+      isCheck: game.inCheck(),
+      moveHistory: game.history()
+    });
+  }, [game]);
+
+  const handleSquareClick = useCallback((square: string) => {
+    if (selectedSquare) {
+      try {
+        const move = game.move({
+          from: selectedSquare,
+          to: square,
+          promotion: 'q' // Always promote to queen for simplicity
+        });
+        
+        if (move) {
+          updateGameState();
+          setSelectedSquare(null);
+          return;
+        }
+      } catch (error) {
+        // Invalid move, continue to selection logic
       }
     }
-  };
 
-  const handleSquareClick = (square: string) => {
-    if (!selectedSquare) {
-      setSelectedSquare(square);
+    // Select/deselect square
+    const piece = game.get(square as any);
+    if (piece && piece.color === gameState.turn) {
+      setSelectedSquare(selectedSquare === square ? null : square);
     } else {
-      makeMove(selectedSquare, square);
       setSelectedSquare(null);
     }
-  };
+  }, [selectedSquare, gameState.turn, game, updateGameState]);
+
+  const resetGame = useCallback(() => {
+    game.reset();
+    setSelectedSquare(null);
+    updateGameState();
+  }, [game, updateGameState]);
 
   return {
-    fen,
-    handleSquareClick,
+    gameState,
     selectedSquare,
-    makeMove,
-    reset: () => {
-      chess.current.reset();
-      setFen(chess.current.fen());
-    },
+    validMoves,
+    lastMoveSquares,
+    handleSquareClick,
+    resetGame
   };
-}
+};
+//todo add the tanstack query bascially to add the server side logic and make it fully functional

@@ -3,11 +3,10 @@ import { useEffect } from "react";
 import { useGameStore } from "../stores/useGameStore";
 import { useSocket } from "./useSocket";
 import { GameMessages } from "../constants";
-import { Chess } from "chess.js";
 
 export function useSocketHandlers() {
   const socket = useSocket();
-  const { initGame, endGame, setFen, addMove, reconnect, fen } = useGameStore();
+  const { initGame, endGame, setFen, addMove, reconnect } = useGameStore();
 
   useEffect(() => {
     if (!socket) return;
@@ -18,30 +17,27 @@ export function useSocketHandlers() {
 
       switch (type) {
         case GameMessages.INIT_GAME: {
-          const { color, gameId } = payload;
-          initGame(color, gameId);
+          const { color, gameId,fen } = payload;
+          initGame(color, gameId,fen);
           break;
         }
 
         case GameMessages.GAME_FOUND: {
-          const { fen, color, gameId } = payload;
+          const { fen, color, gameId, moves } = payload;
           setFen(fen);
-          reconnect(color, gameId);
+          reconnect(color, gameId, fen, moves);
           break;
         }
 
         case GameMessages.MOVE: {
-          const { from, to, promotion } = payload;
-          const chess = new Chess(fen);
-          const move = chess.move({ from, to, promotion });
-          if (move) {
-            setFen(chess.fen());
-            addMove(move);
-          }
+          const { fen, move } = payload;
+          setFen(fen);
+          addMove(move);
           break;
         }
 
         case GameMessages.CHECK: {
+          // you can still alert if you want, but server drives this
           alert("Check is there");
           break;
         }
@@ -66,5 +62,5 @@ export function useSocketHandlers() {
 
     socket.addEventListener("message", handleMessage);
     return () => socket.removeEventListener("message", handleMessage);
-  }, [socket, fen]);
+  }, [socket, initGame, endGame, setFen, addMove, reconnect]);
 }
