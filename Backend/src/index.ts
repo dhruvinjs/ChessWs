@@ -4,7 +4,7 @@ dotenv.config({
 })
 import cookieParser from "cookie-parser";
 import { WebSocketServer,WebSocket } from "ws";   
-import { GameManager } from "./Classes/GameManager";
+import { gameManager, GameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
 import { Prisma, PrismaClient } from "@prisma/client";
 import express from 'express'
@@ -35,7 +35,6 @@ app.use(cors({
 
 
 const userRoutes=router
-const gameManager=new GameManager()
 app.use('/api/v1/user',userRoutes)
 app.use('/api/v1/game',gameRouter)
 

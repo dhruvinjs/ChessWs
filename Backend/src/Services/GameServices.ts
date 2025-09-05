@@ -14,6 +14,7 @@ import {
 } from '../messages';
 import { redis } from '../redisClient';
 import { Chess } from 'chess.js';
+import { gameManager, GameManager } from '../Classes/GameManager';
 
 //This Method Will Help To return the gameState to reconnected player
 export async function getGameState(gameId: string) {
@@ -167,7 +168,6 @@ export async function makeMove(
 
 export async function reconnectPlayer(playerId: string, gameId: string, socket: WebSocket, socketMap: Map<string, WebSocket>) {
     const game = await getGameState(gameId);
-
     console.log("reconnection player");
     if (!game) {
         const message={
@@ -200,28 +200,32 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
     socket.send(JSON.stringify({
         type: GAME_FOUND,
         payload: {
-            fen: game.board.fen(),
-            color: color,
-            turn: game.board.turn(),
-            opponentId,
-            gameId
-        }
-    }));
+                fen: game.board.fen(),
+                color: color,
+                turn: game.board.turn(),
+                opponentId,
+                gameId,
+                whiteTimer:game.whiteTimer,
+                blackTimer:game.blackTimer
+            }
+        }));
 
-    await redis.hSet(`game:${gameId}`, {
-        status: GAME_ACTIVE
-    });
+        await redis.hSet(`game:${gameId}`, {
+            status: GAME_ACTIVE
+        });
+        await redis.sAdd("active-games", gameId);
+        const opponentSocket = socketMap.get(opponentId);
+        gameManager.startTimer()
+        console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
 
-    const opponentSocket = socketMap.get(opponentId);
-    console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
+        opponentSocket?.send(JSON.stringify({
+            type: OPP_RECONNECTED,
+            payload: {
+                message: "Opponent reconnected"
+            }
+        }));
 
-    opponentSocket?.send(JSON.stringify({
-        type: OPP_RECONNECTED,
-        payload: {
-            message: "Opponent reconnected"
-        }
-    }));
-}
+    }
 
 export async function getGamesCount() {
     const count = await redis.get("guest:games:total");

@@ -9,6 +9,8 @@ export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
     private globalSetInterval:NodeJS.Timeout | null = null
 
+    
+
      async addUser(socket: WebSocket, guestId: string) {
      this.socketMap.set(guestId, socket);
      this.addHandler(socket, guestId);
@@ -31,7 +33,7 @@ export class GameManager{
 
   }
 
-  private async startTimer(){
+   async startTimer(){
     // if globalSetInterval is not null means it is already running 
     //if its running then return so that only one globalSetInterval is 
     //running all the time
@@ -56,7 +58,7 @@ export class GameManager{
                 continue
             }
             //removing all the completed games
-            if (game.status === GAME_OVER) {
+            if (game.status === GAME_OVER || game.status === DISCONNECTED) {
                 // only clear explicitly ended games
                 await redis.sRem("active-games", gameId);
                 continue
@@ -154,7 +156,8 @@ export class GameManager{
                     status:GAME_ACTIVE,
                     fen:chess.fen(),
                     whiteTimer:600,
-                    blackTimer:600
+                    blackTimer:600,
+
 
                 }).setEx(`user:${user1Id}:game`,1800,newGameId)
                   .setEx(`user:${guestId}:game`,1800,newGameId)
@@ -167,7 +170,11 @@ export class GameManager{
                         payload:{
                         color:"w",
                         gameId:newGameId,
-                        fen:chess.fen()  
+                        fen:chess.fen(),
+                        opponentId:guestId,
+                        turn:chess.turn(),
+                        whiteTimer:600,
+                        blackTimer:600
                         }
                         
                     }))
@@ -177,7 +184,12 @@ export class GameManager{
                         payload:{
                             color:"b",
                             gameId:newGameId,
-                            fen:chess.fen()
+                            fen:chess.fen(),
+                            opponentId:user1Id,
+                            turn:chess.turn(),
+                            whiteTimer:600,
+                            blackTimer:600
+
                         }
                     }))
                 //maintaining a set for active games for maintaining 
@@ -290,12 +302,11 @@ export class GameManager{
             if(latestStatus !== DISCONNECTED) return;
 
             const winner=connected_user
-            const newStatus={
-            status:GAME_OVER,
-            winner:winner
-        }
             
-            await redis.hSet(`game:${gameId}`,newStatus)
+            await redis.hSet(`game:${gameId}`,{
+                status:GAME_OVER,
+                winner:winner
+            })
             const message=JSON.stringify({
                 type:GAME_OVER,
                 payload:{
@@ -310,3 +321,5 @@ export class GameManager{
 
 
 }
+
+export const gameManager=new GameManager()
