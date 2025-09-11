@@ -1,75 +1,104 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Chess, Move } from 'chess.js';
-import { GameState } from '../types/chess';
+import { GameState, ChessBoard as ChessBoardType } from '../types/chess';
 
-export function useChess  ()  {
-  const [game] = useState(() => new Chess());
+export function useChess() {
+  const [chess] = useState(() => new Chess());
+  const [gameVersion, setGameVersion] = useState(0);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-  const [gameState, setGameState] = useState<GameState>({
-    board: game.board(),
-    turn: game.turn(),
-    isGameOver: game.isGameOver(),
-    isCheck: game.inCheck(),
-    moveHistory: game.history()
-  });
+  const [lastMoveSquares, setLastMoveSquares] = useState<string[]>([]);
 
-  // Memoized valid moves to prevent recalculation
-  const validMoves = useMemo((): Move[] => {
-    if (!selectedSquare) return [];
-    return game.moves({ square: selectedSquare as any, verbose: true }) as Move[];
-  }, [selectedSquare, gameState]);
-
-  // Memoized last move squares
-  const lastMoveSquares = useMemo(() => {
-    const history = game.history({ verbose: true });
-    if (history.length === 0) return [];
-    const lastMove = history[history.length - 1];
-    return [lastMove.from, lastMove.to];
-  }, [gameState.moveHistory]);
-
-  const updateGameState = useCallback(() => {
-    setGameState({
-      board: game.board(),
-      turn: game.turn(),
-      isGameOver: game.isGameOver(),
-      isCheck: game.inCheck(),
-      moveHistory: game.history()
-    });
-  }, [game]);
-
-  const handleSquareClick = useCallback((square: string) => {
-    if (selectedSquare) {
-      try {
-        const move = game.move({
-          from: selectedSquare,
-          to: square,
-          promotion: 'q' // Always promote to queen for simplicity
-        });
-        
-        if (move) {
-          updateGameState();
-          setSelectedSquare(null);
-          return;
-        }
-      } catch (error) {
-        // Invalid move, continue to selection logic
+  // Convert chess.js board to our board format
+  const convertBoard = useCallback((): ChessBoardType => {
+    const board: ChessBoardType = [];
+    for (let i = 0; i < 8; i++) {
+      board[i] = [];
+      for (let j = 0; j < 8; j++) {
+        const square = String.fromCharCode(97 + j) + (8 - i);
+        const piece = chess.get(square as any);
+        board[i][j] = piece ? {
+          type: piece.type,
+          color: piece.color,
+          square
+        } : null;
       }
     }
+    return board;
+  }, [chess, gameVersion]);
 
-    // Select/deselect square
-    const piece = game.get(square as any);
-    if (piece && piece.color === gameState.turn) {
-      setSelectedSquare(selectedSquare === square ? null : square);
-    } else {
-      setSelectedSquare(null);
+  // Memoized game state to prevent unnecessary recalculations
+  const gameState = useMemo((): GameState => ({
+    board: convertBoard(),
+    turn: chess.turn(),
+    isGameOver: chess.isGameOver(),
+    isCheck: chess.inCheck(),
+    moveHistory: chess.history()
+  }), [chess, convertBoard, gameVersion]);
+
+  // Get valid moves for selected square
+  const validMoves = useMemo((): Move[] => {
+    if (!selectedSquare) return [];
+    return chess.moves({ square: selectedSquare as any, verbose: true });
+  }, [chess, selectedSquare, gameVersion]);
+
+  // Handle square click with optimized logic
+  const handleSquareClick = useCallback((square: string) => {
+    if (gameState.isGameOver) return;
+
+    // If no square is selected, select this square if it has a piece of current player
+    if (!selectedSquare) {
+      const piece = chess.get(square as any);
+      if (piece && piece.color === chess.turn()) {
+        setSelectedSquare(square);
+      }
+      return;
     }
-  }, [selectedSquare, gameState.turn, game, updateGameState]);
 
+    // If clicking the same square, deselect
+    if (selectedSquare === square) {
+      setSelectedSquare(null);
+      return;
+    }
+
+    // Try to make a move
+    try {
+      const move = chess.move({
+        from: selectedSquare as any,
+        to: square as any,
+        promotion: 'q' // Always promote to queen for simplicity
+      });
+
+      if (move) {
+        setLastMoveSquares([selectedSquare, square]);
+        setSelectedSquare(null);
+        setGameVersion(prev => prev + 1); // Force re-render
+      } else {
+        // If move failed, try selecting the new square
+        const piece = chess.get(square as any);
+        if (piece && piece.color === chess.turn()) {
+          setSelectedSquare(square);
+        } else {
+          setSelectedSquare(null);
+        }
+      }
+    } catch (error) {
+      // If move failed, try selecting the new square
+      const piece = chess.get(square as any);
+      if (piece && piece.color === chess.turn()) {
+        setSelectedSquare(square);
+      } else {
+        setSelectedSquare(null);
+      }
+    }
+  }, [chess, selectedSquare, gameState.isGameOver]);
+
+  // Reset game function
   const resetGame = useCallback(() => {
-    game.reset();
+    chess.reset();
     setSelectedSquare(null);
-    updateGameState();
-  }, [game, updateGameState]);
+    setLastMoveSquares([]);
+    setGameVersion(prev => prev + 1); // Force re-render
+  }, [chess]);
 
   return {
     gameState,
@@ -79,5 +108,4 @@ export function useChess  ()  {
     handleSquareClick,
     resetGame
   };
-};
-//todo add the tanstack query bascially to add the server side logic and make it fully functional
+}

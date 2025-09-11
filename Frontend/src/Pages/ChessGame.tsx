@@ -1,5 +1,8 @@
-import { ChessBoard, GameHeader, GameStatus, MoveHistory } from '../Components';
+import { ChessBoard,GameHeader,MoveHistory,GameStatus } from "../Components"
 import { useChess } from '../hooks/useChess';
+import { useGame } from '../hooks/useGame';
+import { useSocketHandlers } from '../hooks/useSocketHandlers';
+import { useState, useEffect } from 'react';
 
 export function ChessGame() {
   const {
@@ -8,18 +11,38 @@ export function ChessGame() {
     validMoves,
     lastMoveSquares,
     handleSquareClick,
-    resetGame
+    
   } = useChess();
+
+  const { data: gameData } = useGame();
+  const [isWaitingForGame, setIsWaitingForGame] = useState(false);
+  
+  // Initialize socket handlers
+  useSocketHandlers();
+
+  // Handle waiting state
+  useEffect(() => {
+    if (!gameData) {
+      setIsWaitingForGame(false);
+    }
+  }, [gameData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
       <div className="container mx-auto max-w-7xl">
-        <GameHeader 
-          gameState={gameState} 
-          onResetGame={resetGame} 
-        />
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Left Side Control Panel */}
+          <div className="lg:col-span-1">
+            <GameHeader 
+              gameId={gameData?.gameId}
+              gameState={gameState} 
+              playerColor={gameData?.color || null}
+              whiteTimer={gameData?.whiteTimer || 600}
+              blackTimer={gameData?.blackTimer || 600}
+              isWaitingForGame={isWaitingForGame}
+            />
+          </div>
+          
           {/* Chess Board - Takes up most space */}
           <div className="lg:col-span-3 flex justify-center">
             <div className="w-full max-w-2xl">
@@ -35,7 +58,10 @@ export function ChessGame() {
           
           {/* Side Panel */}
           <div className="lg:col-span-1 space-y-6">
-            <GameStatus gameState={gameState} />
+            <GameStatus 
+              gameState={gameState} 
+              gameData={gameData}
+            />
             <MoveHistory gameState={gameState} />
           </div>
         </div>
@@ -43,4 +69,3 @@ export function ChessGame() {
     </div>
   );
 }
-

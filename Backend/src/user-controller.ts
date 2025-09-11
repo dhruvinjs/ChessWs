@@ -10,6 +10,7 @@ const router=express.Router()
 import {nanoid} from "nanoid"
 import { redis } from './redisClient';
 import { GAME_ACTIVE, GAME_OVER,  INIT_GAME } from './messages';
+import { verifyCookie } from './Services/GameServices';
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
@@ -161,16 +162,19 @@ router.get('/cookie', async(req:Request, res:Response) => {
         
         console.log(existingId)
       if (existingId) {
-        await redis.expire(`guest:${existingId}`,30 * 60)
-        res.cookie('guestId', existingId, {
-        httpOnly: true,
-        secure:true,
-        maxAge: 30 * 60 * 1000, // 3
-        path: '/'
-      });
-         res.status(200).json({ guestId: existingId });
-         return
-      }
+        const isValidId=await verifyCookie(existingId)
+        if(isValidId){
+            await redis.expire(`guest:${existingId}`,30 * 60)
+            res.cookie('guestId', existingId, {
+                httpOnly: true,
+                secure:true,
+                maxAge: 30 * 60 * 1000, // 30 min
+                path: '/'
+            });
+            res.status(200).json({ guestId: existingId });
+            return
+        }
+    }
     
       const guestCookie = uuidv4();
 

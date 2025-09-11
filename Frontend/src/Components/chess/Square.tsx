@@ -10,9 +10,9 @@ export const Square= React.memo(({
   onClick 
 }: SquareProps) => {
   const baseClasses = "aspect-square flex items-center justify-center text-3xl lg:text-4xl cursor-pointer transition-all duration-200 relative";
-const colorClasses = isLight
-  ? "bg-sky-100 dark:bg-sky-200/80"
-  : "bg-slate-700 dark:bg-slate-700/80";
+  const colorClasses = isLight
+    ? "bg-amber-100 dark:bg-amber-200/80"
+    : "bg-amber-700 dark:bg-amber-800/80";
   
   const stateClasses = [
     isSelected && "ring-4 ring-blue-400 ring-inset",
@@ -35,6 +35,15 @@ const colorClasses = isLight
         <div className="w-4 h-4 bg-green-500 rounded-full opacity-60" />
       )}
     </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison for better performance
+  return (
+    prevProps.piece === nextProps.piece &&
+    prevProps.isLight === nextProps.isLight &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.isValidMove === nextProps.isValidMove &&
+    prevProps.isLastMove === nextProps.isLastMove
   );
 });
 

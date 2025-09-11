@@ -1,4 +1,4 @@
-import Room from "./Room";
+import {Room} from "./Room";
 import {Landing} from "./Landing";
 import { Auth } from "./Auth";
 import { About } from "./About";

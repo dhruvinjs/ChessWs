@@ -11,7 +11,10 @@ export  enum GameMessages {
   OPP_RECONNECTED = 'opp_reconnected',
   GAME_FOUND = 'existing_game_found',
   check_move= "check_move",
-  TIME_EXCEEDED="time_exceeded"
+  TIME_EXCEEDED="time_exceeded",
+  GAME_ACTIVE="ongoing_game",
+  LEAVE_GAME="leave_game"
+
 }
 
 // Unicode chess pieces

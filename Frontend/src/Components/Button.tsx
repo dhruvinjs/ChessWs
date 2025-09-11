@@ -1,5 +1,5 @@
-import { TbLoader2 } from "react-icons/tb";
-import { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+import { ReactElement } from "react";
 
 type ButtonProps = {
   variant: "primary" | "secondary" | "outline";
@@ -8,24 +8,21 @@ type ButtonProps = {
   text: string;
   className?: string;
   loading?: boolean;
-  icon?: ReactNode;
+  icon?: ReactElement;
 };
+
 const variantDef = {
-  primary:
-    "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all duration-300",
-  secondary:
-    "bg-[#A1887F] text-white hover:bg-[#9c6b5c] disabled:bg-[#d7ccc8]",
-  outline:
-    "group border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-amber-500 dark:hover:border-amber-400 hover:text-amber-700 dark:hover:text-amber-400 font-bold transition-all duration-300 hover:shadow-lg",
-}
+  primary: "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105",
+  secondary: "bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white shadow-md hover:shadow-lg transform hover:scale-105",
+  outline: "border-2 border-amber-600 text-amber-700 bg-transparent hover:bg-amber-50 hover:border-amber-700 hover:text-amber-800 dark:border-amber-400 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:hover:border-amber-300 dark:hover:text-amber-300 shadow-sm hover:shadow-md transform hover:scale-105",
+};
 
+const defaultStyles = "rounded-xl cursor-pointer transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none font-semibold";
 
-const defaultStyles =
-  "rounded-md cursor-pointer transition disabled:cursor-not-allowed";
 const sizeDef = {
-  sm: "px-2 py-1 text-sm rounded-sm",
-  md: "px-4 py-2 text-base rounded-md",
-  lg: "px-6 py-3 text-lg rounded-lg",
+  sm: "px-3 py-2 text-sm",
+  md: "px-6 py-3 text-base",
+  lg: "px-8 py-4 text-lg",
 };
 
 export function Button(props: ButtonProps) {
@@ -45,8 +42,8 @@ export function Button(props: ButtonProps) {
       onClick={onClick}
       disabled={loading}
     >
-      {loading && <TbLoader2 className="animate-spin h-4 w-4" />}
-      {icon && <span className="mr-2">{icon}</span>}
+      {loading && <Loader2 className="animate-spin h-4 w-4" />}
+      {icon}
       {text}
     </button>
   );

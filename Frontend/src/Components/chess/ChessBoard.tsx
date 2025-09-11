@@ -1,7 +1,7 @@
 import { Move } from 'chess.js';
 import { Square } from './Square';
 import { GameState } from '../../types/chess';
-import { getSquareName, getPieceNotation } from '../../utils/chess';
+import { getSquareName, getPieceNotation } from '../../utils/chessUtils';
 
 interface ChessBoardProps {
   gameState: GameState;
@@ -39,7 +39,7 @@ export function ChessBoard  ({
                 isValidMove={isValidMove}
                 isLastMove={isLastMove}
                 onClick={() => onSquareClick(square)}
-              />
+               />
             );
           })
         )}

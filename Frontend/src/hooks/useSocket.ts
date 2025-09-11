@@ -1,7 +1,7 @@
 import { useState,useEffect } from "react";
-import {useUserStore} from "../stores/useUserStore"
+import { useUserStore } from "../stores/useUserStore";
 export const useSocket=()=>{
-    const {user,setGuest} = useUserStore()
+    const {user}=useUserStore()
     const [socket,setSocket]=useState<WebSocket|null>(null)
     const ws_base_url=import.meta.env.VITE_WS_URL
 
@@ -12,7 +12,7 @@ export const useSocket=()=>{
             return
           }
         
-        const ws_url=`${ws_base_url}/ws?guestId=${user?.id}`
+        const ws_url=`${ws_base_url}/ws?guestId=${user.id}`
 
         const wss=new WebSocket(ws_url)
         
@@ -32,6 +32,6 @@ export const useSocket=()=>{
         return()=>{
             wss.close()
         }
-    }, [user?.id, ws_base_url, setGuest]);
+    }, [user?.id, ws_base_url]);
     return socket
 }

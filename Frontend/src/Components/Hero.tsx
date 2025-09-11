@@ -1,13 +1,29 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useMemo } from "react"
 import { Play, UserPlus, Crown } from "lucide-react"
 import { HeroChessBoard } from "./HeroChessBoard"
-import { Button } from "./Button" // ✅ import your reusable button
+import { Button } from "./Button"
+import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
 export function Hero() {
-  const [animatedStats, setAnimatedStats] = useState({ players: 0, games: 0 })
+  
+  const players = useMotionValue(0)
+  const playersRounded = useTransform(players, (val) =>
+    val >= 1_000_000 ? `${(val / 1_000_000).toFixed(1)}M+` : `${Math.floor(val)}`
+  )
 
-  const floatingPieces = useMemo(() => ["♛", "♜", "♝", "♞", "♟"], [])
+  // ✅ Games counter
+  const games = useMotionValue(0)
+  const gamesRounded = useTransform(games, (val) =>
+    val >= 1000 ? `${Math.floor(val / 1000)}K+` : `${Math.floor(val)}`
+  )
 
+  // Run animations once
+  useMemo(() => {
+    animate(players, 2_000_000, { duration: 2 }) // 2M players
+    animate(games, 50_000, { duration: 2.5 }) // 50K games
+  }, [])
+
+  const floatingPieces = ["♛", "♜", "♝", "♞", "♟"]
   const floatingPieceStyles = useMemo(
     () =>
       floatingPieces.map((_, index) => ({
@@ -17,68 +33,6 @@ export function Hero() {
         animationDuration: `${3 + index * 0.5}s`,
       })),
     [floatingPieces]
-  )
-
-  const animateValue = useCallback(
-    (
-      start: number,
-      end: number,
-      duration: number,
-      callback: (value: number) => void
-    ) => {
-      const startTime = Date.now()
-      let animationId: number
-
-      const animate = () => {
-        const elapsed = Date.now() - startTime
-        const progress = Math.min(elapsed / duration, 1)
-        const current = Math.floor(start + (end - start) * progress)
-        callback(current)
-
-        if (progress < 1) {
-          animationId = requestAnimationFrame(animate)
-        }
-      }
-
-      animationId = requestAnimationFrame(animate)
-
-      return () => {
-        if (animationId) cancelAnimationFrame(animationId)
-      }
-    },
-    []
-  )
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const cleanupPlayers = animateValue(0, 2000000, 2000, (value) =>
-        setAnimatedStats((prev) => ({ ...prev, players: value }))
-      )
-      const cleanupGames = animateValue(0, 50000, 2500, (value) =>
-        setAnimatedStats((prev) => ({ ...prev, games: value }))
-      )
-
-      return () => {
-        cleanupPlayers()
-        cleanupGames()
-      }
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [animateValue])
-
-  const formattedStats = useMemo(
-    () => ({
-      players:
-        animatedStats.players > 0
-          ? `${(animatedStats.players / 1000000).toFixed(1)}M+`
-          : "2M+",
-      games:
-        animatedStats.games > 0
-          ? `${Math.floor(animatedStats.games / 1000)}K+`
-          : "50K+",
-    }),
-    [animatedStats.players, animatedStats.games]
   )
 
   return (
@@ -124,22 +78,17 @@ export function Hero() {
                   Chess
                 </span>
                 <span className="text-slate-800 dark:text-slate-200">Like Never</span>
-                <span className="block text-slate-800 dark:text-slate-200">
-                  Before
-                </span>
+                <span className="block text-slate-800 dark:text-slate-200">Before</span>
               </h1>
             </div>
 
             <p className="text-xl lg:text-2xl text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
               Join the world's most advanced chess platform. Play against millions,
-              <span className="font-semibold text-amber-700 dark:text-amber-400">
-                {" "}
-                learn from grandmasters
-              </span>
-              , and dominate the leaderboards with AI-powered insights.
+              <span className="font-semibold text-amber-700 dark:text-amber-400"> learn from grandmasters</span>,
+              and dominate the leaderboards with AI-powered insights.
             </p>
 
-            {/* ✅ Using Button component */}
+            {/* Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button
                 variant="primary"
@@ -157,30 +106,31 @@ export function Hero() {
               />
             </div>
 
+            {/* Stats */}
             <div className="grid grid-cols-3 gap-8 pt-8">
               <div className="text-center group cursor-pointer">
-                <div className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
-                  {formattedStats.players}
-                </div>
-                <div className="text-slate-600 dark:text-slate-400 font-medium">
-                  Active Players
-                </div>
+                <motion.div
+                  className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform"
+                >
+                  {playersRounded}
+                </motion.div>
+                <div className="text-slate-600 dark:text-slate-400 font-medium">Active Players</div>
               </div>
+
               <div className="text-center group cursor-pointer">
-                <div className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
-                  {formattedStats.games}
-                </div>
-                <div className="text-slate-600 dark:text-slate-400 font-medium">
-                  Daily Games
-                </div>
+                <motion.div
+                  className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform"
+                >
+                  {gamesRounded}
+                </motion.div>
+                <div className="text-slate-600 dark:text-slate-400 font-medium">Daily Games</div>
               </div>
+
               <div className="text-center group cursor-pointer">
                 <div className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
                   24/7
                 </div>
-                <div className="text-slate-600 dark:text-slate-400 font-medium">
-                  Live Support
-                </div>
+                <div className="text-slate-600 dark:text-slate-400 font-medium">Live Support</div>
               </div>
             </div>
           </div>

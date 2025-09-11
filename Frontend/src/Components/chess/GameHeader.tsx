@@ -1,19 +1,34 @@
 import { useState } from 'react';
-import { ArrowLeft, RotateCcw, Home } from 'lucide-react';
+import { ArrowLeft, Play, Handshake, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../Button';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { GameState } from '../../types/chess';
+import { useSendSocket } from '../../hooks/useSendSocket';
 
 interface GameHeaderProps {
+  gameId:string | undefined
   gameState: GameState;
-  onResetGame: () => void;
+  playerColor?: 'w' | 'b' | null;
+  whiteTimer?: number;
+  blackTimer?: number;
+  isWaitingForGame?: boolean;
 }
 
-export function GameHeader({ gameState, onResetGame }: GameHeaderProps) {
+export function GameHeader({ 
+  gameId,
+  gameState, 
+  playerColor, 
+  whiteTimer = 600, 
+  blackTimer = 600,
+  isWaitingForGame = false 
+}: GameHeaderProps) {
   const navigate = useNavigate();
+  const { initGame } = useSendSocket();
+
   const [showHomeConfirm, setShowHomeConfirm] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDrawConfirm, setShowDrawConfirm] = useState(false);
+  const [showResignConfirm, setShowResignConfirm] = useState(false);
 
   const handleGoHome = () => {
     if (gameState.moveHistory.length > 0) {
@@ -23,12 +38,12 @@ export function GameHeader({ gameState, onResetGame }: GameHeaderProps) {
     }
   };
 
-  const handleResetGame = () => {
-    if (gameState.moveHistory.length > 0) {
-      setShowResetConfirm(true);
-    } else {
-      onResetGame();
-    }
+  const handleOfferDraw = () => {
+    setShowDrawConfirm(true);
+  };
+
+  const handleResign = () => {
+    setShowResignConfirm(true);
   };
 
   const confirmGoHome = () => {
@@ -36,9 +51,23 @@ export function GameHeader({ gameState, onResetGame }: GameHeaderProps) {
     navigate('/');
   };
 
-  const confirmReset = () => {
-    setShowResetConfirm(false);
-    onResetGame();
+  const confirmDraw = () => {
+    setShowDrawConfirm(false);
+    // TODO: Implement draw offer logic
+  };
+
+  const confirmResign = () => {
+    setShowResignConfirm(false);
+  };
+
+  const handlePlayGame = () => {
+    initGame();
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const turnText = gameState.isGameOver
@@ -47,99 +76,140 @@ export function GameHeader({ gameState, onResetGame }: GameHeaderProps) {
 
   return (
     <>
-      <header className="w-full bg-white dark:bg-slate-800 shadow-lg rounded-2xl mb-6 sm:mb-8 overflow-hidden">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          {/* Mobile Layout */}
-          <div className="flex flex-col space-y-4 sm:hidden">
-            {/* Title and Status */}
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                Chess Game
-              </h1>
-              <div className="flex items-center justify-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${gameState.turn === 'w' ? 'bg-white border-2 border-slate-400' : 'bg-slate-800'}`} />
-                <p className="text-base text-slate-600 dark:text-slate-300 font-medium">
-                  {turnText}
-                </p>
-              </div>
-              {gameState.isCheck && !gameState.isGameOver && (
-                <p className="text-red-600 dark:text-red-400 font-semibold mt-1 text-sm">
-                  Check!
-                </p>
-              )}
+      {/* Left Side Control Panel */}
+      <div className="bg-white dark:bg-slate-800 shadow-lg rounded-2xl p-6 mb-6">
+        {/* Player Info */}
+        {playerColor && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-700 dark:to-amber-900/20 rounded-xl">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+              You are playing as
+            </h3>
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-6 h-6 rounded-full ${
+                  playerColor === 'w'
+                    ? 'bg-white border-2 border-slate-400'
+                    : 'bg-slate-800'
+                }`}
+              />
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {playerColor === 'w' ? 'White' : 'Black'}
+              </span>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex justify-center space-x-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGoHome}
-                text="Home"
-                icon={<Home className="w-4 h-4" />}
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleResetGame}
-                text="Reset"
-                icon={<RotateCcw className="w-4 h-4" />}
-              />
+          </div>
+        )}
+
+        {/* Timer Display */}
+          <div className="mb-6 space-y-3">
+            {/* White Timer */}
+            <div className="relative w-full p-3 bg-white dark:bg-slate-700 rounded-xl shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+              <div className="flex items-center space-x-2 w-full sm:w-auto justify-between">
+                <div className="w-5 h-5 bg-white border-2 border-slate-400 rounded-full shadow-sm" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300">White</span>
+              </div>
+              <div className="flex-1 h-4 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden mx-0 sm:mx-4">
+                <div
+                  className="h-4 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(whiteTimer / 600) * 100}%`,
+                  }}
+                />
+              </div>
+              <span className="font-mono text-sm sm:text-lg font-bold text-slate-900 dark:text-white w-full sm:w-auto text-right sm:text-left">
+                {formatTime(whiteTimer)}
+              </span>
+            </div>
+
+            {/* Black Timer */}
+            <div className="relative w-full p-3 bg-slate-100 dark:bg-slate-600 rounded-xl shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+              <div className="flex items-center space-x-2 w-full sm:w-auto justify-between">
+                <div className="w-5 h-5 bg-slate-800 rounded-full shadow-sm" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Black</span>
+              </div>
+              <div className="flex-1 h-4 bg-slate-300 dark:bg-slate-500 rounded-full overflow-hidden mx-0 sm:mx-4">
+                <div
+                  className="h-4 bg-gradient-to-r from-slate-700 to-slate-900 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(blackTimer / 600) * 100}%`,
+                  }}
+                />
+              </div>
+              <span className="font-mono text-sm sm:text-lg font-bold text-slate-900 dark:text-white w-full sm:w-auto text-right sm:text-left">
+                {formatTime(blackTimer)}
+              </span>
             </div>
           </div>
 
-          {/* Desktop Layout */}
-          <div className="hidden sm:flex items-center justify-between">
-            {/* Left: Home Button */}
-            <div className="flex-shrink-0">
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleGoHome}
-                text="Back to Home"
-                icon={<ArrowLeft className="w-4 h-4" />}
-              />
-            </div>
 
-            {/* Center: Title and Status */}
-            <div className="flex-1 text-center mx-8">
-              <h1 className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white mb-2">
-                Chess Game
-              </h1>
-              <div className="flex items-center justify-center space-x-3">
-                <div className={`w-4 h-4 rounded-full ${gameState.turn === 'w' ? 'bg-white border-2 border-slate-400' : 'bg-slate-800'}`} />
-                <p className="text-lg text-slate-600 dark:text-slate-300 font-semibold">
-                  {turnText}
-                </p>
-              </div>
-              {gameState.isCheck && !gameState.isGameOver && (
-                <p className="text-red-600 dark:text-red-400 font-bold mt-2 text-lg">
-                  Check!
-                </p>
-              )}
-            </div>
-
-            {/* Right: Reset Button */}
-            <div className="flex-shrink-0">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={handleResetGame}
-                text="Reset Game"
-                icon={<RotateCcw className="w-4 h-4" />}
-              />
-            </div>
+        {/* Game Status */}
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            Game Controls
+          </h2>
+          <div className="flex items-center space-x-2 mb-2">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                gameState.turn === 'w'
+                  ? 'bg-white border-2 border-slate-400'
+                  : 'bg-slate-800'
+              }`}
+            />
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
+              {turnText}
+            </p>
           </div>
+          {isWaitingForGame && (
+            <p className="text-amber-600 dark:text-amber-400 font-semibold text-sm animate-pulse">
+              Searching for opponent...
+            </p>
+          )}
+          {gameState.isCheck && !gameState.isGameOver && (
+            <p className="text-red-600 dark:text-red-400 font-semibold text-sm">
+              Check!
+            </p>
+          )}
         </div>
 
-        {/* Game Progress Bar */}
-        <div className="h-1 bg-slate-200 dark:bg-slate-700">
-          <div 
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
-            style={{ width: `${Math.min((gameState.moveHistory.length / 50) * 100, 100)}%` }}
+        {/* Control Buttons */}
+        <div className="space-y-3">
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleGoHome}
+            text="Back to Home"
+            icon={<ArrowLeft className="w-4 h-4" />}
+            className="w-full"
+          />
+
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handlePlayGame}
+            text={isWaitingForGame ? 'Searching...' : 'Play Game'}
+            icon={<Play className="w-4 h-4" />}
+            className="w-full"
+            loading={isWaitingForGame}
+          />
+
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleOfferDraw}
+            text="Offer Draw"
+            icon={<Handshake className="w-4 h-4" />}
+            className="w-full"
+          />
+
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleResign}
+            text="Resign"
+            icon={<Flag className="w-4 h-4" />}
+            className="w-full"
           />
         </div>
-      </header>
+      </div>
 
       {/* Confirmation Dialogs */}
       <ConfirmDialog
@@ -153,12 +223,22 @@ export function GameHeader({ gameState, onResetGame }: GameHeaderProps) {
       />
 
       <ConfirmDialog
-        isOpen={showResetConfirm}
-        onClose={() => setShowResetConfirm(false)}
-        onConfirm={confirmReset}
-        title="Reset Game?"
-        message="Are you sure you want to reset the game? All progress will be lost and you'll start a new game."
-        confirmText="Yes, Reset"
+        isOpen={showDrawConfirm}
+        onClose={() => setShowDrawConfirm(false)}
+        onConfirm={confirmDraw}
+        title="Offer Draw?"
+        message="Are you sure you want to offer a draw to your opponent?"
+        confirmText="Yes, Offer Draw"
+        cancelText="Cancel"
+      />
+
+      <ConfirmDialog
+        isOpen={showResignConfirm}
+        onClose={() => setShowResignConfirm(false)}
+        onConfirm={confirmResign}
+        title="Resign Game?"
+        message="Are you sure you want to resign? Your opponent will be declared the winner."
+        confirmText="Yes, Resign"
         cancelText="Cancel"
       />
     </>
