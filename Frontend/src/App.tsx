@@ -33,14 +33,15 @@ export function App() {
       </Routes>
 
         <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: "#333",
-              color: "#fff",
-            },
-          }}
-        />
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: "#333",
+                color: "#fff",
+              }
+            }}
+          />
+
     </BrowserRouter>
   );
 }

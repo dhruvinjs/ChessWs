@@ -84,7 +84,7 @@ export class GameManager{
         const timerMessage={
             type:TIMER_UPDATE,
             payload:{
-                whitetimer:whiteTimer,
+                whiteTimer:whiteTimer,
                 blackTimer:blackTimer
             }
         }
@@ -222,8 +222,7 @@ export class GameManager{
             }
 
             if(type===LEAVE_GAME){
-                const {payload}=jsonMessage
-                  const gameId=await redis.get(`user:${guestId}:game`)
+                const gameId=await redis.get(`user:${guestId}:game`)
                 if(!gameId){
                     const message={
                         type:SERVER_ERROR,

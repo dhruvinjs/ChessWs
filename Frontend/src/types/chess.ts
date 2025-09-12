@@ -1,4 +1,5 @@
-import { Move } from "chess.js";
+import { Move, Square } from "chess.js";
+
 export type PieceColor = 'w' | 'b';
 export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
 
@@ -22,6 +23,19 @@ export interface GameState{
 }
 
 export type{Move}
+
+// Move payload for socket communication
+export interface MovePayload {
+  from: Square;
+  to: Square;
+  promotion?: string;
+}
+
+// Enhanced Move with game context
+export interface GameMove extends Move {
+  gameId: string;
+}
+
 export interface SquareProps{
     piece:string |  null,
     isLight:boolean,
@@ -30,6 +44,5 @@ export interface SquareProps{
     isValidMove:boolean,
     onClick:()=>void
 }
-
 
 

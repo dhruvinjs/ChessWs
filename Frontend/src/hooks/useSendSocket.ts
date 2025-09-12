@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useSocket } from "./useSocket";
 import { GameMessages } from "../constants";
 import toast from "react-hot-toast";
+import { MovePayload } from "../types/chess";
 
 export function useSendSocket() {
   const socket = useSocket();
@@ -27,14 +28,14 @@ export function useSendSocket() {
 
     },
 
-    move: (gameId: string, move: any, fen: string) =>
-      send(GameMessages.MOVE, { gameId, move, fen }),
+    move: (move:MovePayload) =>
+      send(GameMessages.MOVE, {  move }),
 
     // offerDraw: (gameId: string) =>
     //   send(GameMessages.OFFER_DRAW, { gameId }),
 
-    resign: (gameId: string) =>
-      send(GameMessages.LEAVE_GAME, { gameId }),
+    resign: () =>
+      send(GameMessages.LEAVE_GAME)
 
     // acceptDraw: (gameId: string) =>
     //   send(GameMessages.ACCEPT_DRAW, { gameId }),

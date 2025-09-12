@@ -11,14 +11,15 @@ export function ChessGame() {
     validMoves,
     lastMoveSquares,
     handleSquareClick,
-    
+    applyOpponentMove,
+    syncGameState
   } = useChess();
 
   const { data: gameData } = useGame();
   const [isWaitingForGame, setIsWaitingForGame] = useState(false);
   
   // Initialize socket handlers
-  useSocketHandlers();
+  useSocketHandlers(applyOpponentMove, syncGameState);
 
   // Handle waiting state
   useEffect(() => {
@@ -34,7 +35,6 @@ export function ChessGame() {
           {/* Left Side Control Panel */}
           <div className="lg:col-span-1">
             <GameHeader 
-              gameId={gameData?.gameId}
               gameState={gameState} 
               playerColor={gameData?.color || null}
               whiteTimer={gameData?.whiteTimer || 600}
@@ -47,6 +47,7 @@ export function ChessGame() {
           <div className="lg:col-span-3 flex justify-center">
             <div className="w-full max-w-2xl">
               <ChessBoard
+                color={gameData?.color}
                 gameState={gameState}
                 selectedSquare={selectedSquare}
                 validMoves={validMoves}
