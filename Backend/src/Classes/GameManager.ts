@@ -1,8 +1,8 @@
 import {v4 as uuidv4} from "uuid"
 import { redis } from "../redisClient"
 import { WebSocket } from "ws"
-import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_UNAVAILABLE, RECONNECT, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
-import { getGameState, makeMove, playerLeft, reconnectPlayer } from "../Services/GameServices"
+import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_UNAVAILABLE, RECONNECT, REQUEST_VALID_MOVES, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
+import { getGameState, makeMove, playerLeft, provideValidMoves, reconnectPlayer } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
 export class GameManager{
@@ -196,7 +196,7 @@ export class GameManager{
                 //global timer(setInterval)
                 await redis.sAdd("active-games",newGameId)
                 await redis.incr("guest:games:total")
-                this.startTimer()
+                // this.startTimer()
             }
 
         
@@ -205,9 +205,11 @@ export class GameManager{
 
             if(type===MOVE){
                 const {payload}=jsonMessage//from and to moves
-                console.log(guestId)
+                console.log("IN make move testing")
+                console.log(guestId);
                 const gameId=await redis.get(`user:${guestId}:game`)
                 if(!gameId){
+
                     const message={
                         type:SERVER_ERROR,
                         payload:{
@@ -257,6 +259,25 @@ export class GameManager{
                     return;
 
             }
+
+            if(type===REQUEST_VALID_MOVES){
+                const {square}=jsonMessage
+                const gameId=await redis.get(`user:${guestId}:game`)
+                if(!gameId){
+                    socket.send(JSON.stringify({
+                        type:GAME_NOT_FOUND,
+                        payload:{
+                            message:"Game Not found"
+                        }
+                    }))
+                    return
+                }
+                provideValidMoves(square,gameId,socket)
+                return
+            }
+
+
+
        })   
 
 

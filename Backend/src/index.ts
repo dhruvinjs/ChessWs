@@ -44,7 +44,7 @@ wss.on("connection",async(socket,req:Request)=>{
      const {query}=parse(req.url,true)
    //This guestId is basically is the cookie which I am generating 
    //and will be used for reconvery mechanism
-   const guestId=typeof query.guestId==="string" ? query.guestId :undefined  ;
+   const guestId=typeof query.guestId==="string" ? query.guestId :undefined  
 
    if(!guestId){
       //if cookie not provided the websocket connection will not start

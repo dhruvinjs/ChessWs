@@ -14,7 +14,6 @@ export function useSendSocket() {
         return;
       }
 
-      // If payload is not needed, just send type
       const message = payload ? { type, payload } : { type };
       socket.send(JSON.stringify(message));
     },
@@ -23,25 +22,17 @@ export function useSendSocket() {
 
   return {
     initGame: () => {
-        send(GameMessages.INIT_GAME)
-        toast.success("added in queue!");
-
+      send(GameMessages.INIT_GAME);
+      toast.success("added in queue!");
     },
 
-    move: (move:MovePayload) =>
-      send(GameMessages.MOVE, {  move }),
+    move: (move: MovePayload) =>
+      send(GameMessages.MOVE, move),
 
-    // offerDraw: (gameId: string) =>
-    //   send(GameMessages.OFFER_DRAW, { gameId }),
+    requestValidMoves: (square: string) =>
+      send(GameMessages.REQUEST_VALID_MOVES, { square }),
 
     resign: () =>
-      send(GameMessages.LEAVE_GAME)
-
-    // acceptDraw: (gameId: string) =>
-    //   send(GameMessages.ACCEPT_DRAW, { gameId }),
-
-    // declineDraw: (gameId: string) =>
-    //   send(GameMessages.DECLINE_DRAW, { gameId }),
+      send(GameMessages.LEAVE_GAME),
   };
 }
-    

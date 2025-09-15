@@ -4,3 +4,4 @@ export { Square } from './Square';
 export { GameHeader } from './GameHeader';
 export { GameStatus } from './GameStatus';
 export { MoveHistory } from './MoveHistory';
+export { ChessGameMessage } from './ChessGameMessage';

@@ -10,17 +10,17 @@ import {
     OPP_RECONNECTED, 
     SERVER_ERROR, 
     STALEMATE, 
+    VALID_MOVE, 
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { gameManager, GameManager } from '../Classes/GameManager';
 
 //This Method Will Help To return the gameState to reconnected player
 export async function getGameState(gameId: string) {
     const existingGame = await redis.hGetAll(`game:${gameId}`) as Record<string, string>;
     if (Object.keys(existingGame).length === 0) return null;
-
     const board = new Chess(existingGame.fen);
     return {
         user1: existingGame.user1,
@@ -88,7 +88,7 @@ export async function makeMove(
                 });
 
             await redis.rPush(`game:${gameId}:moves`, JSON.stringify(move));
-            await redis.hSet(`game:${gameId}`, "fen", gameState.board.fen());
+            await redis.hSet(`game:${gameId}`, "fen", board.fen());
             
 
         } catch (err) {
@@ -160,7 +160,9 @@ export async function makeMove(
     opponent.send(JSON.stringify({
         type: MOVE,
         payload: {
-            move
+            move,
+            turn:board.turn(),
+            fen:board.fen()
         }
     }));
 }
@@ -215,7 +217,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
         });
         await redis.sAdd("active-games", gameId);
         const opponentSocket = socketMap.get(opponentId);
-        gameManager.startTimer()
+        // gameManager.startTimer()
         console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
 
         opponentSocket?.send(JSON.stringify({
@@ -289,4 +291,30 @@ export async function verifyCookie(cookieName:string){
     if(!session) return null
     return true
 
+}
+
+export async function provideValidMoves(square : Square,gameId:string,socket:WebSocket) {
+        const gameState=await getGameState(gameId)
+        if(!gameState?.fen){
+            console.log("Fen Missing in Game State IN provideMove")
+            return
+        }   
+        const chess=new Chess(gameState.fen)
+
+        const moves=chess.moves({ square, verbose: true }); 
+        const validMoves=moves.map(m=>({
+            from:m.from,
+            to:m.to,
+            promotion:m.promotion ?? null
+        }))
+
+
+        const message=JSON.stringify({
+                    type: VALID_MOVE,
+                    payload: {
+                    square,
+                    moves: validMoves
+                    }
+        });
+        socket.send(message)
 }

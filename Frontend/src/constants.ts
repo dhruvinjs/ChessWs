@@ -14,7 +14,9 @@ export  const  GameMessages= {
   GAME_ACTIVE:"ongoing_game",
   LEAVE_GAME:"leave_game",
   TIMER_UPDATE:"timer_update",
-   SERVER_ERROR:"server_error"
+  SERVER_ERROR:"server_error",
+  REQUEST_VALID_MOVES:"request_valid_moves",
+  VALID_MOVES:"valid_moves"
 } 
 
 // Unicode chess pieces

@@ -4,7 +4,7 @@ import { GameState } from "../../types/chess";
 import { getSquareName, getPieceNotation } from "../../utils/chessUtils";
 
 interface ChessBoardProps {
-  color: "w" | "b" | undefined;
+  color?: "w" | "b" | null;
   gameState: GameState;
   selectedSquare: string | null;
   validMoves: Move[];
@@ -13,13 +13,14 @@ interface ChessBoardProps {
 }
 
 export function ChessBoard({
-  color = "w",
+  color,
   gameState,
   selectedSquare,
   validMoves,
   lastMoveSquares,
   onSquareClick,
 }: ChessBoardProps) {
+  // Only flip the board if we have a valid color and it's black
   const isFlipped = color === "b";
 
   // Flip rows if black
