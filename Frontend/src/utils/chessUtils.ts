@@ -1,8 +1,11 @@
 import { ChessPiece } from '../types/chess';
 
-export function getSquareName  (row: number, col: number) {
-  return String.fromCharCode(97 + col) + (8 - row);
+export const getSquare = (row: number, col: number, playerColor: 'w' | 'b'): string => {
+  const file = String.fromCharCode('a'.charCodeAt(0) + (playerColor === 'w' ? col : 7 - col));
+  const rank = playerColor === 'w' ? 8 - row : row + 1;
+  return `${file}${rank}`;
 };
+
 
 export function getPieceNotation (piece: ChessPiece | null) {
   if (!piece) return null;
@@ -15,3 +18,7 @@ export function getSquareCoordinates(square: string): [number, number] {
   const row = 8 - parseInt(square[1]); // '8' = 0, '7' = 1, etc.
   return [row, col];
 }
+
+export const getSquareColor = (row: number, col: number): 'light' | 'dark' => {
+  return (row + col) % 2 === 0 ? 'light' : 'dark';
+};

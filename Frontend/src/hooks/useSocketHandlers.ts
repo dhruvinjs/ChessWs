@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useSocket } from "./useSocket";
-import { GameMessages } from "../constants";
 import { useQueryClient } from "@tanstack/react-query";
 import { showGameMessage } from "../Components/chess/ChessGameMessage";
+import { GameMessages } from "../constants";
 
-export function useSocketHandlers(syncGameState?: (fen: string) => void) {
+// The callback now accepts the full move details
+export function useSocketHandlers(syncGameState?: (fen: string, from?: string, to?: string) => void) {
   const socket = useSocket();
   const queryClient = useQueryClient();
 
@@ -18,92 +19,83 @@ export function useSocketHandlers(syncGameState?: (fen: string) => void) {
 
         console.log("📥 Received message:", type, payload);
 
+        // Invalidate the main game query for most events to keep data fresh
+        if (payload?.gameId) {
+            queryClient.invalidateQueries({ queryKey: ["game", payload.gameId] });
+        }
+
         switch (type) {
-          case GameMessages.INIT_GAME:
-            showGameMessage(
-              `🎮 Game started! You are ${
-                payload.color === "w" ? "White" : "Black"
-              }`
-            );
-            queryClient.setQueryData(["game"], payload);
-            if (syncGameState && payload.fen) syncGameState(payload.fen);
-            break;
 
-          case GameMessages.GAME_FOUND:
-            showGameMessage("🔄 Reconnected to existing game!");
-            queryClient.setQueryData(["game"], payload);
-            if (syncGameState && payload.fen) syncGameState(payload.fen);
-            break;
-
+          // Handle moves and state synchronization
           case GameMessages.MOVE:
-            console.log("♟️ Move received:", payload);
             if (syncGameState && payload.fen) {
-              // Backend FEN is always the source of truth
-              syncGameState(payload.fen);
+              syncGameState(payload.fen, payload.from, payload.to);
             }
-            break;
-
-          case GameMessages.VALID_MOVES:
-            console.log("🎯 Valid moves received:", payload);
-            if (payload.square && Array.isArray(payload.moves)) {
-              queryClient.setQueryData(["validMoves"], payload.moves);
-            } else {
-              queryClient.setQueryData(["validMoves"], []);
-            }
-            break;
-
-          case GameMessages.CHECK:
-            showGameMessage("⚠️ Check!");
-            break;
-
-          case GameMessages.TIMER_UPDATE:
-            queryClient.setQueryData(["game"], (old: any) => ({
-              ...old,
-              whiteTimer: payload.whiteTimer ?? payload.whitetimer,
-              blackTimer: payload.blackTimer,
-            }));
-            break;
-
-          case GameMessages.TIME_EXCEEDED:
-            showGameMessage("⏰ Time exceeded!");
             break;
 
           case GameMessages.GAME_OVER:
-            const winnerText =
-              payload.winner === "w"
-                ? "White"
-                : payload.winner === "b"
-                ? "Black"
-                : "Draw";
-            showGameMessage(`🏁 Game Over! Winner: ${winnerText}`);
+            if (syncGameState && payload.fen) {
+              syncGameState(payload.fen);
+            }
+            showGameMessage("Game Over", payload.message || "The game has ended.", { type: "info" });
+            break;
+            
+          case GameMessages.GAME_FOUND:
+          case GameMessages.GAME_ACTIVE:
+            showGameMessage("Game Ready", "A game is ready to start!", { type: "success" });
             break;
 
-          case GameMessages.DISCONNECTED:
-            showGameMessage("❌ Opponent disconnected");
+          case GameMessages.CHECK:
+            showGameMessage("Check!", "You are in check.", { type: "warning" });
+            break;
+
+          case GameMessages.STALEMATE:
+            showGameMessage("Stalemate", "The game is a draw.", { type: "info" });
             break;
 
           case GameMessages.OPP_RECONNECTED:
-            showGameMessage("✅ Opponent reconnected!");
+            showGameMessage("Opponent Reconnected", "Your opponent is back online.", { type: "info" });
             break;
 
-          case GameMessages.WRONG_PLAYER_MOVE:
-            showGameMessage("🚫 Not your turn!");
+          case GameMessages.DISCONNECTED:
+            showGameMessage("Opponent Disconnected", "Your opponent has disconnected.", { type: "warning" });
+            break;
+
+          case GameMessages.TIME_EXCEEDED:
+            showGameMessage("Time's Up!", payload.message || "You ran out of time.", { type: "error" });
             break;
 
           case GameMessages.SERVER_ERROR:
-            showGameMessage(payload.message || "⚠️ Server error occurred");
+            showGameMessage("Server Error", payload.message || "A server error occurred.", { type: "error" });
+            break;
+
+          case GameMessages.WRONG_PLAYER_MOVE:
+            showGameMessage("Invalid Move", "It's not your turn to move.", { type: "error" });
+            break;
+
+          // Update valid moves in React Query store
+          case GameMessages.VALID_MOVES:
+             queryClient.setQueryData(['validMoves'], payload.moves);
+             break;
+
+          // Silent handlers (no message toast)
+          case GameMessages.INIT_GAME:
+          case GameMessages.TIMER_UPDATE:
             break;
 
           default:
-            console.log("❓ Unknown message type:", type, payload);
+            console.warn(`Unknown message type: ${type}`);
         }
       } catch (error) {
-        console.error("❌ Error parsing socket message:", error);
+        console.error("Error handling message:", error);
+        showGameMessage("Error", "There was a problem processing a message from the server.", { type: "error" });
       }
     };
 
-    socket.addEventListener("message", handleMessage
-);
-    return () => socket.removeEventListener("message", handleMessage);
+    socket.addEventListener("message", handleMessage);
+
+    return () => {
+      socket.removeEventListener("message", handleMessage);
+    };
   }, [socket, queryClient, syncGameState]);
 }

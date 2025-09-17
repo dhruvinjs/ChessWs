@@ -1,38 +1,80 @@
 import { useCallback } from "react";
 import { useSocket } from "./useSocket";
 import { GameMessages } from "../constants";
-import toast from "react-hot-toast";
-import { MovePayload } from "../types/chess";
-
+import type { MovePayload, Square } from "../types/chess";
+import { useGame } from "./useGame";
+import { showGameMessage } from "../Components/chess";
 export function useSendSocket() {
   const socket = useSocket();
+  const gameData = useGame();
 
-  const send = useCallback(
-    (type: string, payload?: any) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        console.warn("⚠️ Socket not ready, cannot send:", type, payload);
-        return;
+  const initGame = useCallback(() => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      console.log("🚀 Sending INIT_GAME");
+      socket.send(JSON.stringify({ type: GameMessages.INIT_GAME }));
+
+      showGameMessage(
+        "Game Started",
+        "Initializing a new chess game...",
+        { type: "info" }
+      );
+    }
+  }, [socket]);
+
+  const move = useCallback(
+    (payload: MovePayload) => {
+      if (socket?.readyState === WebSocket.OPEN && gameData?.gameId) {
+        console.log("🚀 Sending MOVE:", payload);
+        socket.send(
+          JSON.stringify({
+            type: GameMessages.MOVE,
+            payload,
+          })
+        );
+
+        showGameMessage(
+          "Move Sent",
+          `You moved from ${payload.from} to ${payload.to}`,
+          { type: "success" }
+        );
       }
-
-      const message = payload ? { type, payload } : { type };
-      socket.send(JSON.stringify(message));
     },
-    [socket]
+    [socket, gameData?.gameId]
   );
 
-  return {
-    initGame: () => {
-      send(GameMessages.INIT_GAME);
-      toast.success("added in queue!");
+  const requestValidMoves = useCallback(
+    (square: Square) => {
+      if (socket?.readyState === WebSocket.OPEN && gameData?.gameId) {
+        console.log("🚀 Sending REQUEST_VALID_MOVES for square:", square);
+        socket.send(
+          JSON.stringify({
+            type: GameMessages.REQUEST_VALID_MOVES,
+            square,
+          })
+        );
+
+        showGameMessage(
+          "Fetching Moves",
+          `Getting valid moves for ${square}`,
+          { type: "info" }
+        );
+      }
     },
+    [socket, gameData?.gameId]
+  );
 
-    move: (move: MovePayload) =>
-      send(GameMessages.MOVE, move),
+  const resign = useCallback(() => {
+    if (socket?.readyState === WebSocket.OPEN && gameData?.gameId) {
+      console.log("🚀 Sending LEAVE_GAME");
+      // socket.send(JSON.stringify({ type: GameMessages.LEAVE_GAME }));
 
-    requestValidMoves: (square: string) =>
-      send(GameMessages.REQUEST_VALID_MOVES, { square }),
+      showGameMessage(
+        "Game Ended",
+        "You have resigned the game.",
+        { type: "warning" }
+      );
+    }
+  }, [socket, gameData?.gameId]);
 
-    resign: () =>
-      send(GameMessages.LEAVE_GAME),
-  };
+  return { initGame, move, resign, requestValidMoves };
 }

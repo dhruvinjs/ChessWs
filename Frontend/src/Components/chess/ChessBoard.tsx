@@ -1,66 +1,75 @@
-import { Move, Square } from "chess.js"; // keep Square type
-import { Square as SquareCell } from "./Square"; // rename component
-import { GameState } from "../../types/chess";
-import { getSquareName, getPieceNotation } from "../../utils/chessUtils";
+import { useMemo } from "react";
+import { Chess, Move, Square as SquareType } from "chess.js";
+import { getSquare, getSquareColor } from "../../utils/chessUtils";
+import { Square } from "./Square";
 
 interface ChessBoardProps {
-  color?: "w" | "b" | null;
-  gameState: GameState;
+  color: "w" | "b" | undefined | null;
+  gameState?: string; // optional FEN
   selectedSquare: string | null;
-  validMoves: Move[];
-  lastMoveSquares: string[];
-  onSquareClick: (square: Square) => void;
+  validMoves?: (Move | string)[];
+  lastMoveSquares?: { from: string; to: string } | null;
+  onSquareClick: (square: SquareType) => void;
 }
 
-export function ChessBoard({
+export const ChessBoard = ({
   color,
   gameState,
   selectedSquare,
-  validMoves,
-  lastMoveSquares,
+  validMoves = [],
+  lastMoveSquares = null,
   onSquareClick,
-}: ChessBoardProps) {
-  // Only flip the board if we have a valid color and it's black
-  const isFlipped = color === "b";
+}: ChessBoardProps) => {
+  const playerColor = color || "w";
 
-  // Flip rows if black
-  const boardRows = isFlipped ? [...gameState.board].reverse() : gameState.board;
+  // SAFE: check if gameState is a valid FEN (must have 6 space-delimited fields)
+  const safeFEN = useMemo(() => {
+    if (gameState && gameState.trim().split(" ").length === 6) {
+      return gameState;
+    }
+    return undefined; // Chess.js will default to starting position
+  }, [gameState]);
+
+  const game = useMemo(() => new Chess(safeFEN), [safeFEN]);
+
+  // Handle validMoves as either string[] or Move[]
+  const validMovesSet = useMemo(() => {
+    if (!validMoves || validMoves.length === 0) return new Set<string>();
+
+    const firstEl = validMoves[0];
+    if (typeof firstEl === "string") return new Set(validMoves as string[]);
+    if (typeof firstEl === "object" && firstEl !== null && "to" in firstEl) {
+      return new Set((validMoves as Move[]).map((m) => m.to));
+    }
+    return new Set<string>();
+  }, [validMoves]);
 
   return (
-    <div className="dark:bg-slate-800 p-6 rounded-2xl shadow-xl">
-      <div className="grid grid-cols-8 gap-0.5 aspect-square rounded-xl overflow-hidden">
-        {boardRows.map((row, rowIndex) =>
-          row.map((piece, colIndex) => {
-            // Flip columns if black
-            const colIdx = isFlipped ? 7 - colIndex : colIndex;
+    <div className="grid grid-cols-8 aspect-square shadow-xl rounded-md overflow-hidden">
+      {Array.from({ length: 8 }, (_, row) =>
+        Array.from({ length: 8 }, (_, col) => {
+          const square = getSquare(row, col, playerColor) as SquareType;
+          const piece = game.get(square);
+          const pieceString = piece ? `${piece.color}${piece.type.toUpperCase()}` : undefined;
 
-            // Compute square name for chess.js
-            const square = getSquareName(isFlipped ? 7 - rowIndex : rowIndex, colIdx) as Square;
+          const isLight = getSquareColor(row, col) === "light";
+          const isSelected = square === selectedSquare;
+          const isLastMove = lastMoveSquares?.from === square || lastMoveSquares?.to === square;
+          const isValidMove = validMovesSet.has(square);
 
-            // Determine square color
-            const isLight = (rowIndex + colIdx) % 2 === 0;
-
-            // Determine if selected or highlighted
-            const isSelected = selectedSquare === square;
-            const isValidMove = validMoves.some((move) => move.to === square);
-            const isLastMove = lastMoveSquares.includes(square);
-
-            const pieceNotation = getPieceNotation(piece);
-
-            return (
-              <SquareCell
-                key={square}
-                piece={pieceNotation}
-                isLight={isLight}
-                isSelected={isSelected}
-                isValidMove={isValidMove}
-                isLastMove={isLastMove}
-                onClick={() => onSquareClick(square)}
-              />
-            );
-          })
-        )}
-      </div>
+          return (
+            <Square
+              key={square}
+              piece={pieceString}
+              isLight={isLight}
+              isSelected={isSelected}
+              isLastMove={!!isLastMove}
+              isValidMove={isValidMove}
+              onClick={() => onSquareClick(square)}
+            />
+          );
+        })
+      ).flat()}
     </div>
   );
-}
+};

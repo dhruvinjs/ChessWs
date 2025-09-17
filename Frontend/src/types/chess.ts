@@ -1,4 +1,4 @@
-import { Move, Square } from "chess.js";
+import { Move, Square, Piece } from "chess.js";
 
 export type PieceColor = 'w' | 'b';
 export type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
@@ -22,7 +22,7 @@ export interface GameState{
     moveHistory:string[],
 }
 
-export type{Move}
+export type{Move,Square,Piece}
 
 // Move payload for socket communication
 export interface MovePayload {
@@ -37,7 +37,7 @@ export interface GameMove extends Move {
 }
 
 export interface SquareProps{
-    piece:string |  null,
+    piece:string |  undefined,
     isLight:boolean,
     isSelected:boolean,
     isLastMove:boolean,

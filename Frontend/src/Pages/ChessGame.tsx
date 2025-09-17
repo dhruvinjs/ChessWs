@@ -12,45 +12,30 @@ export function ChessGame() {
     selectedSquare,
     handleSquareClick,
     syncGameState,
+    lastMoveSquares,
   } = useChess();
 
   const gameData = useGame();
   const [isWaitingForGame, setIsWaitingForGame] = useState(false);
 
-  // Track last move squares from backend for highlighting
-  const [lastMoveSquares, setLastMoveSquares] = useState<string[]>([]);
-
-  // React Query store for valid moves (socket updates this)
-  const { data: validMoves = [] } = useQuery<Move[]>({
+  const { data: validMoves = [] } = useQuery<Move[]>({ // This query is manually updated
     queryKey: ["validMoves"],
-    enabled: false, 
+    enabled: false,
   });
 
-  // Initialize socket handlers
-  useSocketHandlers(
-    (fen: string, from?: string, to?: string) => {
-      // Sync chess state from backend
-      syncGameState(fen);
+  useSocketHandlers(syncGameState);
 
-      // Optionally highlight last move
-      if (from && to) {
-        setLastMoveSquares([from, to]);
-      }
-    }
-  );
-
-  // Handle waiting state
   useEffect(() => {
+    // If gameData is null, it means we are not in a game or waiting for one.
     if (!gameData) {
       setIsWaitingForGame(false);
     }
   }, [gameData]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 p-4 transition-colors duration-300">
       <div className="container mx-auto max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left Panel */}
           <div className="lg:col-span-1">
             <GameHeader
               gameState={gameState}
@@ -61,21 +46,17 @@ export function ChessGame() {
             />
           </div>
 
-          {/* Chess Board */}
           <div className="lg:col-span-3 flex justify-center">
             <div className="w-full max-w-2xl">
               <ChessBoard
                 color={gameData?.color}
-                gameState={gameState}
                 selectedSquare={selectedSquare}
                 validMoves={validMoves}
-                lastMoveSquares={lastMoveSquares}
                 onSquareClick={handleSquareClick}
               />
             </div>
           </div>
 
-          {/* Right Panel */}
           <div className="lg:col-span-1 space-y-6">
             <GameStatus gameState={gameState} gameData={gameData} />
             <MoveHistory gameState={gameState} />
