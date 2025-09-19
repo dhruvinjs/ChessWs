@@ -1,5 +1,6 @@
 import React from "react";
 import { SquareProps } from "../../types/chess";
+import { Piece } from "./Piece";
 
 export const Square = React.memo(
   ({
@@ -17,10 +18,10 @@ export const Square = React.memo(
       : "bg-amber-700 dark:bg-amber-800/80";
 
     const stateClasses = [
-      isSelected && "ring-4 ring-blue-400 ring-inset",
-      isValidMove && "ring-4 ring-green-400 ring-inset",
-      isLastMove && "ring-4 ring-yellow-400 ring-inset",
-      "hover:brightness-110",
+      isSelected && "ring-4 ring-blue-500 ring-inset shadow-lg",
+      isValidMove && "ring-4 ring-green-500 ring-inset shadow-md",
+      isLastMove && "ring-4 ring-yellow-500 ring-inset",
+      "hover:brightness-110 hover:shadow-md",
     ]
       .filter(Boolean)
       .join(" ");
@@ -31,18 +32,16 @@ export const Square = React.memo(
         onClick={onClick}
       >
         {/* Piece SVG */}
-        {piece && (
-          <img
-            src={`/pieces/${piece}.svg`}
-            alt={piece}
-            className="w-4/5 h-4/5 select-none drop-shadow-sm"
-            draggable={false}
-          />
-        )}
+        {piece && <Piece piece={piece} className="w-4/5 h-4/5 drop-shadow-md" />}
 
         {/* Dot for empty-square valid moves */}
         {isValidMove && !piece && (
-          <div className="w-4 h-4 bg-green-500 rounded-full opacity-60" />
+          <div className="w-4 h-4 bg-green-500 rounded-full opacity-70 shadow-lg" />
+        )}
+
+        {/* Highlight circle for valid moves with pieces */}
+        {isValidMove && piece && (
+          <div className="absolute inset-0 border-2 border-green-500 rounded-full opacity-70" />
         )}
       </div>
     );

@@ -1,12 +1,5 @@
-import {Room} from "./Room";
-import {Landing} from "./Landing";
-import { Auth } from "./Auth";
-import { About } from "./About";
-import { ChessGame } from "./ChessGame";
-export{
-    Room,
-    About,
-    ChessGame,
-    Landing,
-    Auth
-}
+export { Room } from "./Room";
+export { Landing } from "./Landing";
+export { Auth } from "./Auth";
+export { About } from "./About";
+export { ChessGame } from "./ChessGame";

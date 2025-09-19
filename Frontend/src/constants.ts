@@ -16,7 +16,7 @@ export  const  GameMessages= {
   TIMER_UPDATE:"timer_update",
   SERVER_ERROR:"server_error",
   REQUEST_VALID_MOVES:"request_valid_moves",
-  VALID_MOVES:"valid_moves"
+  VALID_MOVE:"valid_move"
 } 
 
 // Unicode chess pieces

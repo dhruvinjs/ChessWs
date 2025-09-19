@@ -1,28 +1,29 @@
-import { useCallback, useMemo, useState } from "react";
-import { Chess, Move, Square } from "chess.js";
+import { useCallback, useMemo } from "react";
+import { Chess, Square } from "chess.js";
 import type { GameState, ChessBoard as ChessBoardType, MovePayload } from "../types/chess";
 import { useSendSocket } from "./useSendSocket";
-import { useGame } from "./useGame";
-import { useQueryClient } from "@tanstack/react-query";
+import { useGameStore } from "../stores/useGameStore";
 import toast from "react-hot-toast";
-import { useValidMoves } from "./useValidMoves"; // ✅ import your hook
 
 export function useChess() {
-  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
-
   const { move, requestValidMoves } = useSendSocket();
-  const gameData = useGame();
-  const queryClient = useQueryClient();
+  const { 
+    validMoves, 
+    fen, 
+    selectedSquare, 
+    setSelectedSquare,
+    color,
+    turn,
+    gameStarted,
+    moves 
+  } = useGameStore();
 
-  // ✅ use the custom hook for valid moves
-  const { validMoves, clearValidMoves } = useValidMoves();
-
-  // Always rebuild chess.js from backend-provided FEN
+  // Always rebuild chess.js from Zustand FEN
   const chess = useMemo(() => {
     const c = new Chess();
-    if (gameData?.fen) c.load(gameData.fen);
+    if (fen) c.load(fen);
     return c;
-  }, [gameData?.fen]);
+  }, [fen]);
 
   // Convert board for UI
   const convertBoard = useCallback((): ChessBoardType => {
@@ -55,83 +56,76 @@ export function useChess() {
   // Handle square clicks
   const handleSquareClick = useCallback(
     (square: Square) => {
-      if (gameState.isGameOver) {
-        toast.error("Game is already over!");
+      // Ensure valid game state
+      if (!gameStarted || chess.isGameOver()) {
+        toast.error("Game is not active!");
         return;
       }
 
-      if (gameData?.color !== gameState.turn) {
-        toast.error("It's not your turn!");
+      // Check if it's player's turn
+      if (color !== turn) {
+        toast.error("Not your turn!");
         return;
       }
 
+      console.log("Click handler state:", {
+        gameStarted,
+        color,
+        turn,
+        selectedSquare,
+        validMoves
+      });
+
+      // If a square is already selected
       if (selectedSquare) {
-        // Try to make a move
-        const movePayload: MovePayload = { from: selectedSquare, to: square };
+        const movePayload: MovePayload = {
+          from: selectedSquare as Square,
+          to: square
+        };
 
-        // Check backend-provided valid moves
-        const isMoveValid = validMoves.some(
+        // Check if move is valid (using validMoves from Zustand)
+        const isValidMove = validMoves.some(
           (m) => m.from === selectedSquare && m.to === square
         );
 
-        if (isMoveValid) {
-          // Handle promotion
-          const piece = chess.get(selectedSquare);
+        if (isValidMove) {
+          // Check for pawn promotion
+          const piece = chess.get(selectedSquare as Square);
           if (
             piece?.type === "p" &&
-            (square.endsWith("1") || square.endsWith("8"))
+            ((piece.color === "w" && square[1] === "8") ||
+              (piece.color === "b" && square[1] === "1"))
           ) {
-            movePayload.promotion = "q";
+            movePayload.promotion = "q"; // Auto-promote to queen
           }
+
+          console.log("Making move:", movePayload);
           move(movePayload);
-        }
-
-        // Clear selection + valid moves
-        setSelectedSquare(null);
-        clearValidMoves(); // ✅ use hook instead of direct queryClient
-      } else {
-        // Select a piece (only if it's yours)
-        const piece = chess.get(square);
-        if (piece && piece.color === gameState.turn) {
-          setSelectedSquare(square);
+          setSelectedSquare(null);
+        } else {
+          // Not a valid destination - select new square and request its moves
+          console.log("Not a valid destination, selecting new square:", square);
           requestValidMoves(square);
+          setSelectedSquare(square);
         }
+      } else {
+        // No square selected - first request valid moves, then update selection based on response
+        console.log("Requesting valid moves for square:", square);
+        requestValidMoves(square);
+        setSelectedSquare(square);  // Select the square immediately for better UX
       }
     },
-    [selectedSquare, gameState, gameData, validMoves, move, requestValidMoves, clearValidMoves, chess]
+    [selectedSquare, validMoves, move, requestValidMoves, setSelectedSquare, chess, color, turn, gameStarted]
   );
 
-  // Sync state from backend
-  const syncGameState = useCallback(
-    (fen: string, from?: string, to?: string) => {
-      try {
-        chess.load(fen);
-        queryClient.invalidateQueries({ queryKey: ["game"] });
-
-        // Always clear highlights on sync
-        clearValidMoves();
-
-        // Update last move highlight
-        if (from && to) {
-          return { from, to };
-        }
-      } catch (error) {
-        console.error("Error syncing game state:", error);
-      }
-      return null;
-    },
-    [chess, queryClient, clearValidMoves]
-  );
-
-  // Last move highlight
-  const lastMove = chess.history({ verbose: true }).pop();
+  // Get last move for highlighting
+  const lastMove = moves.length > 0 ? moves[moves.length - 1] : null;
 
   return {
     gameState,
     selectedSquare,
     handleSquareClick,
-    lastMoveSquares: lastMove ? [lastMove.from, lastMove.to] : [],
-    syncGameState,
+    lastMoveSquares: lastMove ? { from: lastMove.from, to: lastMove.to } : null
   };
 }
 

@@ -37,7 +37,7 @@ export interface GameMove extends Move {
 }
 
 export interface SquareProps{
-    piece:string |  undefined,
+    piece:string |  null,
     isLight:boolean,
     isSelected:boolean,
     isLastMove:boolean,

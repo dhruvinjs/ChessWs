@@ -14,7 +14,7 @@ import {
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
-import { Chess, Square } from 'chess.js';
+import { Chess, PieceSymbol, Square } from 'chess.js';
 import { gameManager, GameManager } from '../Classes/GameManager';
 
 //This Method Will Help To return the gameState to reconnected player
@@ -29,9 +29,9 @@ export async function getGameState(gameId: string) {
         status: existingGame.status,
         fen: existingGame.fen,
         turn: board.turn(),
-        whiteTimer:existingGame.whiteTimer,
-        blackTimer:existingGame.blackTimer
-
+        whiteTimer: existingGame.whiteTimer,
+        blackTimer: existingGame.blackTimer,
+        gameStarted: existingGame.status === GAME_ACTIVE
     };
 }
 
@@ -155,7 +155,7 @@ export async function makeMove(
         return;
     }
     
-
+    const validMoves= await provideValidMoves(gameId)
     const opponent = playerId === gameState.user1 ? user2Socket : user1Socket;
     opponent.send(JSON.stringify({
         type: MOVE,
@@ -165,6 +165,15 @@ export async function makeMove(
             fen:board.fen()
         }
     }));
+    
+  const validMovesPayload = {
+    type: VALID_MOVE,
+    payload: {
+      validMoves: validMoves,
+    },
+  };
+  opponent.send(JSON.stringify(validMovesPayload))
+
 }
 
 
@@ -292,16 +301,21 @@ export async function verifyCookie(cookieName:string){
     return true
 
 }
-
-export async function provideValidMoves(square : Square,gameId:string,socket:WebSocket) {
+interface Move{
+    to:Square,from:Square,promotion?:PieceSymbol|null
+}
+export type Moves=Move[]
+export async function provideValidMoves(gameId:string):Promise<Moves | null> {
         const gameState=await getGameState(gameId)
+      
         if(!gameState?.fen){
             console.log("Fen Missing in Game State IN provideMove")
-            return
+            return null
         }   
         const chess=new Chess(gameState.fen)
 
-        const moves=chess.moves({ square, verbose: true }); 
+        const moves=chess.moves({ verbose: true }); 
+        console.log(moves)
         const validMoves=moves.map(m=>({
             from:m.from,
             to:m.to,
@@ -309,12 +323,6 @@ export async function provideValidMoves(square : Square,gameId:string,socket:Web
         }))
 
 
-        const message=JSON.stringify({
-                    type: VALID_MOVE,
-                    payload: {
-                    square,
-                    moves: validMoves
-                    }
-        });
-        socket.send(message)
+        return validMoves
+
 }

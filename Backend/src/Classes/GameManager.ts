@@ -123,81 +123,100 @@ export class GameManager{
             const {type}=jsonMessage
             
             //New Game Block
-            if(type===INIT_GAME){
-                await insertPlayerInQueue(guestId)
-                const match = await matchingPlayer(guestId)
-                
-                if(!match){   
-                    socket.send(JSON.stringify({
-                        type:MATCH_NOT_FOUND,
-                        payload:{
-                            message:"No opponent available right now"
-                        }
-                    }))
-                    return
-                }
-                const user1Id=match.waitingPlayerId
-                const user1socket=this.socketMap.get(user1Id)
-                if(!user1socket){
-                    socket.send(JSON.stringify({
-                        type:PLAYER_UNAVAILABLE,
-                        payload:{
-                            message:"Player not found"
-                        }
-                    }))
-                    return
-                }
-               
-                const newGameId=uuidv4()
-                const chess=new Chess()
-                await redis.multi().hSet(`game:${newGameId}`,{
-                    user1:user1Id,
-                    user2:guestId,
-                    status:GAME_ACTIVE,
-                    fen:chess.fen(),
-                    whiteTimer:600,
-                    blackTimer:600,
+            if (type === INIT_GAME) {
+            await insertPlayerInQueue(guestId);
+            const match = await matchingPlayer(guestId);
 
-
-                }).setEx(`user:${user1Id}:game`,1800,newGameId)
-                  .setEx(`user:${guestId}:game`,1800,newGameId)
-                  .exec();
-                
-
-                console.log("New game started:",newGameId)
-                    user1socket.send(JSON.stringify({
-                        type:INIT_GAME,
-                        payload:{
-                        color:"w",
-                        gameId:newGameId,
-                        fen:chess.fen(),
-                        opponentId:guestId,
-                        turn:chess.turn(),
-                        whiteTimer:600,
-                        blackTimer:600
-                        }
-                        
-                    }))
-                  const user2socket=this.socketMap.get(guestId)
-                    user2socket?.send(JSON.stringify({
-                        type:INIT_GAME,
-                        payload:{
-                            color:"b",
-                            gameId:newGameId,
-                            fen:chess.fen(),
-                            opponentId:user1Id,
-                            turn:chess.turn(),
-                            whiteTimer:600,
-                            blackTimer:600
-
-                        }
-                    }))
-                //maintaining a set for active games for maintaining 
-                //global timer(setInterval)
-                await redis.sAdd("active-games",newGameId)
-                await redis.incr("guest:games:total")
-                // this.startTimer()
+            if (!match) {
+                socket.send(
+                JSON.stringify({
+                    type: MATCH_NOT_FOUND,
+                    payload: {
+                    message: "No opponent available right now",
+                    },
+                })
+                );
+                return;
             }
+
+            const user1Id = match.waitingPlayerId;
+            const user1socket = this.socketMap.get(user1Id);
+
+            if (!user1socket) {
+                socket.send(
+                JSON.stringify({
+                    type: PLAYER_UNAVAILABLE,
+                    payload: {
+                    message: "Player not found",
+                    },
+                })
+                );
+                return;
+            }
+
+            const newGameId = uuidv4();
+            const chess = new Chess();
+
+            // Save game state in Redis
+            await redis
+                .multi()
+                .hSet(`game:${newGameId}`, {
+                user1: user1Id,
+                user2: guestId,
+                status: GAME_ACTIVE,
+                fen: chess.fen(),
+                whiteTimer: 600,
+                blackTimer: 600,
+                })
+                .setEx(`user:${user1Id}:game`, 1800, newGameId)
+                .setEx(`user:${guestId}:game`, 1800, newGameId)
+                .exec();
+
+            // Precompute valid moves
+            const moves = await provideValidMoves(newGameId);
+
+            console.log("New game started:", newGameId);
+
+            // Notify user1 (white)
+            user1socket.send(
+                JSON.stringify({
+                type: INIT_GAME,
+                payload: {
+                    color: "w",
+                    gameId: newGameId,
+                    fen: chess.fen(),
+                    opponentId: guestId,
+                    turn: chess.turn(),
+                    whiteTimer: 600,
+                    blackTimer: 600,
+                    moves, // include valid moves if you want
+                },
+                })
+            );
+
+            // Notify user2 (black)
+            const user2socket = this.socketMap.get(guestId);
+            user2socket?.send(
+                JSON.stringify({
+                type: INIT_GAME,
+                payload: {
+                    color: "b",
+                    gameId: newGameId,
+                    fen: chess.fen(),
+                    opponentId: user1Id,
+                    turn: chess.turn(),
+                    whiteTimer: 600,
+                    blackTimer: 600,
+                    moves,
+                },
+                })
+            );
+
+            // Add to active games for global timer handling
+            await redis.sAdd("active-games", newGameId);
+            await redis.incr("guest:games:total");
+            }
+
 
         
 
@@ -220,7 +239,8 @@ export class GameManager{
                     return
                 }
                 makeMove(socket,payload,gameId,guestId,this.socketMap)
-
+                // provideValidMoves(gameId,socket)
+               
             }
 
             if(type===LEAVE_GAME){
@@ -261,7 +281,6 @@ export class GameManager{
             }
 
             if(type===REQUEST_VALID_MOVES){
-                const {square}=jsonMessage
                 const gameId=await redis.get(`user:${guestId}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
@@ -272,7 +291,7 @@ export class GameManager{
                     }))
                     return
                 }
-                provideValidMoves(square,gameId,socket)
+                // provideValidMoves(gameId,socket)
                 return
             }
 

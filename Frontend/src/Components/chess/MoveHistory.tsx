@@ -1,23 +1,21 @@
-import { GameState } from '../../types/chess';
+import { useGameStore } from '../../stores/useGameStore';
 
-interface MoveHistoryProps {
-  gameState: GameState;
-}
+export function MoveHistory() {
+  const { moves } = useGameStore();
 
-export function MoveHistory ({ gameState }:MoveHistoryProps)  {
   return (
     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl">
       <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
         Move History
       </h3>
       <div className="max-h-64 overflow-y-auto">
-        {gameState.moveHistory.length === 0 ? (
+        {moves.length === 0 ? (
           <p className="text-slate-500 dark:text-slate-400 text-center py-4">
             No moves yet
           </p>
         ) : (
           <div className="space-y-1">
-            {gameState.moveHistory.map((move, index) => {
+            {moves.map((move, index) => {
               const moveNumber = Math.floor(index / 2) + 1;
               const color = index % 2 === 0 ? "White" : "Black";
 
@@ -30,7 +28,7 @@ export function MoveHistory ({ gameState }:MoveHistoryProps)  {
                     {moveNumber}.
                   </span>
                   <span className="font-mono text-slate-900 dark:text-white">
-                    {color}: {move}
+                    {color}: {move.from} → {move.to} {move.promotion ? `(Promote: ${move.promotion})` : ""}
                   </span>
                 </div>
               );
@@ -40,4 +38,4 @@ export function MoveHistory ({ gameState }:MoveHistoryProps)  {
       </div>
     </div>
   );
-};
+}

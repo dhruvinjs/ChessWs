@@ -1,5 +1,7 @@
 // useGameStore.ts
 import { create } from "zustand";
+import { GameMessages } from "../constants";
+import { useSocket } from "../hooks/useSocket"; // ✅ singleton WebSocket
 
 interface Move {
   from: string;
@@ -7,94 +9,196 @@ interface Move {
   promotion?: string;
 }
 
-type GameStatus = "idle" | "active" | "reconnecting" | "ended" | "waiting";
 type Color = "w" | "b" | null;
 
 interface GameState {
   guestId: string;
   color: Color;
   moves: Move[];
-  winner: Color;
-  loser: Color;
+  winner: Color | "draw" | null;
+  loser: Color | null;
   gameId: string | null;
   oppConnected: boolean;
-  gameStatus: GameStatus;
+  gameStatus: string;
+  gameStarted: boolean;
   fen: string;
-  gamestarted: boolean;
+  validMoves: Move[];
+  turn: Color;
+  whiteTimer: number;
+  blackTimer: number;
+  selectedSquare: string | null;
 
-  addMove: (move: Move) => void;
+  // actions
   setGuestId: (guestId: string) => void;
-  initGame: (color: Color, gameId: string, fen: string) => void;
-  setOppStatus: (status: boolean) => void;
-  endGame: (winner: Color, loser: Color) => void;
-  resetGame: () => void;
+  initGame: (payload: {
+    color: Color;
+    gameId: string;
+    fen: string;
+    whiteTimer?: number;
+    blackTimer?: number;
+    turn?: Color;
+  }) => void;
+  addMove: (move: Move) => void;
   setFen: (fen: string) => void;
-  reconnect: (color: Color, gameId: string, fen?: string, moves?: Move[]) => void;
+  setValidMoves: (moves: Move[]) => void;
+  clearValidMoves: () => void;
+  setOppStatus: (status: boolean) => void;
+  updateTimers: (white: number, black: number) => void;
+  endGame: (winner: Color | "draw", loser: Color | null) => void;
+  resetGame: () => void;
+  reconnect: (payload: {
+    color: Color;
+    gameId: string;
+    fen: string;
+    moves?: Move[];
+    turn?: Color;
+    whiteTimer?: number;
+    blackTimer?: number;
+  }) => void;
+  setSelectedSquare: (square: string | null) => void;
+
+  // socket actions
+  move: (move: Move) => void;
+  initGameRequest: () => void;
+  resign: () => void;
 }
 
-export const useGameStore = create<GameState>((set) => ({
-  guestId: "",
-  color: null,
-  moves: [],
-  winner: null,
-  loser: null,
-  gameId: null,
-  oppConnected: true,
-  gameStatus: "waiting",
-  fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-  gamestarted: false,
+export const useGameStore = create<GameState>((set, get) => {
+  const socket = useSocket();
 
-  setFen: (fen) => set({ fen }),
-  setGuestId: (id) => set({ guestId: id }),
+  return {
+    guestId: "",
+    color: null,
+    moves: [],
+    winner: null,
+    loser: null,
+    gameId: null,
+    oppConnected: true,
+    gameStarted: false,
+    gameStatus: GameMessages.INIT_GAME,
+    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    validMoves: [],
+    turn: "w",
+    whiteTimer: 600,
+    blackTimer: 600,
+    selectedSquare: null,
 
-  initGame: (color, gameId, fen) =>
-    set({
-      color,
-      gameId,
-      gameStatus: "active",
-      moves: [],
-      fen,
-      gamestarted: true,
-      winner: null,
-      loser: null,
-    }),
+    setGuestId: (guestId) => set({ guestId }),
 
-  setOppStatus: (status) => set({ oppConnected: status }),
+    initGame: ({ color, gameId, fen, whiteTimer = 600, blackTimer = 600, turn = "w" }) =>
+      set({
+        color,
+        gameId,
+        gameStatus: GameMessages.GAME_ACTIVE,
+        gameStarted: true,
+        moves: [],
+        fen,
+        validMoves: [],
+        winner: null,
+        loser: null,
+        turn,
+        whiteTimer,
+        blackTimer,
+      }),
 
-  addMove: (move) =>
-    set((state) => ({
-      moves: [...state.moves, move],
-    })),
+    addMove: (move) =>
+      set((state) => ({
+        moves: [...state.moves, move],
+        selectedSquare: null,
+      })),
 
-  endGame: (winner, loser) =>
-    set({
-      gameStatus: "ended",
-      winner,
-      loser,
-      gamestarted: false,
-    }),
+    setFen: (fen) => set({ fen }),
 
-  resetGame: () =>
-    set({
-      guestId: "",
-      color: null,
-      moves: [],
-      winner: null,
-      loser: null,
-      gameId: null,
-      oppConnected: true,
-      gameStatus: "waiting",
-    fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      
-    gamestarted: false,
-    }),
+    setValidMoves: (moves) => set({ validMoves: moves }),
+    clearValidMoves: () => set({ validMoves: [] }),
 
-  reconnect: (color, gameId, fen, moves) =>
-    set((state) => ({
-      color,
-      gameId,
-      gameStatus: "active",
-      gamestarted: true,
-      fen: fen ?? state.fen,
-      moves: moves ?? state.moves,
-    })),
-}));
+    setOppStatus: (status) => set({ oppConnected: status }),
+
+    updateTimers: (white, black) => set({ whiteTimer: white, blackTimer: black }),
+
+    endGame: (winner, loser) =>
+      set({
+        gameStatus: GameMessages.GAME_OVER,
+        winner,
+        loser,
+        selectedSquare: null,
+      }),
+
+    resetGame: () =>
+      set({
+        guestId: "",
+        color: null,
+        moves: [],
+        winner: null,
+        loser: null,
+        gameId: null,
+        oppConnected: true,
+        gameStarted: false,
+        gameStatus: GameMessages.INIT_GAME,
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        validMoves: [],
+        turn: "w",
+        whiteTimer: 600,
+        blackTimer: 600,
+        selectedSquare: null,
+      }),
+
+    reconnect: ({ color, gameId, fen, moves = [], turn = "w", whiteTimer = 600, blackTimer = 600 }) =>
+      set({
+        color,
+        gameId,
+        gameStatus: GameMessages.GAME_ACTIVE,
+        gameStarted: true,
+        fen,
+        moves,
+        turn,
+        whiteTimer,
+        blackTimer,
+        oppConnected: true,
+      }),
+
+    setSelectedSquare: (square) => set({ selectedSquare: square }),
+
+    // ✅ WebSocket actions
+    move: (move) => {
+      const { gameId } = get();
+      if (!gameId) return;
+
+      socket?.send(JSON.stringify({ type: GameMessages.MOVE, payload: move }));
+
+      set((state) => ({
+        moves: [...state.moves, move],
+        selectedSquare: null,
+      }));
+    },
+
+    initGameRequest: () => {
+      console.log("🎮 Requesting new game");
+      socket?.send(JSON.stringify({ type: GameMessages.INIT_GAME }));
+      set({ 
+        gameStatus: GameMessages.INIT_GAME, 
+        gameStarted: false, 
+        moves: [],
+        validMoves: [],
+        selectedSquare: null,
+        color: null,
+        turn: "w",
+        winner: null,
+        loser: null
+      });
+    },
+
+    resign: () => {
+      const { gameId, color } = get();
+      if (!gameId) return;
+
+      socket?.send(JSON.stringify({ type: GameMessages.LEAVE_GAME, payload: { gameId } }));
+
+      set({
+        gameStatus: GameMessages.GAME_OVER,
+        winner: color === "w" ? "b" : "w",
+        loser: color,
+      });
+    },
+  };
+});

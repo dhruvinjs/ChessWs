@@ -1,31 +1,16 @@
-import {Button} from "./Button"
-import { Card } from "./Card"
-import { Navbar } from "./Navbar"
-import { Footer } from "./Footer"
-import { Input } from "./InputField"
-import { DropDown } from "./DropDown"
-import { Hero } from "./Hero"
-import { HeroChessBoard } from "./HeroChessBoard"
-import { Testimonials } from "./Testimonials"
-import { ChessBoard } from "./chess/ChessBoard"
-import { GameHeader } from "./chess/GameHeader"
-import { GameStatus } from "./chess/GameStatus"
-import { Square } from "./chess/Square"
-import { MoveHistory } from "./chess/MoveHistory"
-export {
-    Button,
-    Card,
-    Navbar,
-    Footer,
-    Input,
-    DropDown,
-    Hero,
-    HeroChessBoard,
-    Testimonials,
-    ChessBoard,
-    GameHeader,
-    MoveHistory,
-    GameStatus,
-    Square
+export { Button } from "./Button";
+export { DropDown } from "./DropDown";
+export { Footer } from "./Footer";
+export { Hero } from "./Hero";
+export { HeroChessBoard } from "./HeroChessBoard";
+export { Input } from "./InputField";
+export { Navbar } from "./Navbar";
+export { Testimonials } from "./Testimonials";
+export { Card } from "./Card";
 
-}
+// Chess components
+export { ChessBoard } from "./chess/ChessBoard";
+export { GameHeader } from "./chess/GameHeader";
+export { GameStatus } from "./chess/GameStatus";
+export { MoveHistory } from "./chess/MoveHistory";
+export { Square } from "./chess/Square";

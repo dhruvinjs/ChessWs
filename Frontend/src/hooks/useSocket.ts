@@ -1,37 +1,40 @@
-import { useState,useEffect } from "react";
+// useSocket.ts
 import { useUserStore } from "../stores/useUserStore";
-export const useSocket=()=>{
-    const {user}=useUserStore()
-    const [socket,setSocket]=useState<WebSocket|null>(null)
-    const ws_base_url=import.meta.env.VITE_WS_URL
 
-    useEffect(() => {
+let socket: WebSocket | null = null;
 
-          if(!user?.id){
-            console.log("no guest id")
-            return
-          }
-        
-        const ws_url=`${ws_base_url}/ws?guestId=${user.id}`
+/**
+ * Returns a singleton WebSocket instance.
+ * Call this only from places like useGameStore or a top-level effect.
+ */
+export function useSocket(): WebSocket | null {
+  const { user } = useUserStore.getState(); // ✅ get user without a React hook
+  const ws_base_url = import.meta.env.VITE_WS_URL;
 
-        const wss=new WebSocket(ws_url)
-        
-        wss.onopen=(()=>{ 
-            console.log("Socket Connected")   
-            setSocket(wss)
-        })
-     
-   
+  if (!user?.id) {
+    console.warn("⚠️ No user id available, cannot create WebSocket.");
+    return null;
+  }
 
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    return socket;
+  }
 
-        wss.onclose=(()=>{
-            console.log("Socket Disconnected")
-            setSocket(null)
-        })
+  const ws_url = `${ws_base_url}/ws?guestId=${user.id}`;
+  socket = new WebSocket(ws_url);
 
-        return()=>{
-            wss.close()
-        }
-    }, [user?.id, ws_base_url]);
-    return socket
+  socket.onopen = () => {
+    console.log("✅ WebSocket connected:", ws_url);
+  };
+
+  socket.onclose = () => {
+    console.log("🔌 WebSocket disconnected");
+    socket = null; // allow reconnection later
+  };
+
+  socket.onerror = (err) => {
+    console.error("❌ WebSocket error:", err);
+  };
+
+  return socket;
 }

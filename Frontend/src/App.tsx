@@ -1,29 +1,32 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-// import { useGuestInit } from "./hooks/useReactQuery";
 import { Landing, Auth, Room, About, ChessGame } from "./Pages";
 import { Toaster } from "react-hot-toast";
-import { useGuestInit } from "./hooks/useReactQuery";
+import { useUserStore } from "./stores/useUserStore";
+import { useEffect } from "react";
 
 export function App() {
-  const { isLoading, isError } = useGuestInit();
+  const { isLoading, error, checkAndInitGuest } = useUserStore();
+
+  useEffect(() => {
+    checkAndInitGuest();
+  }, [checkAndInitGuest]);
 
   // Loading / error handling
   if (isLoading) return <p>Loading guest and connecting...</p>;
-  if (isError) return <p>Error fetching guest. Refresh the page.</p>;
+  if (error) return <p>Error fetching guest. Refresh the page.</p>;
 
   // At this point, guestId is already in Zustand
   // socket is already initialized elsewhere via your singleton
-
+ 
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/room" element={<Room />} />
         <Route
           path="/game"
           element={
             <div className="dark">
-              <ChessGame />
+            <ChessGame />
             </div>
           }
         />
