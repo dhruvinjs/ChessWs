@@ -1,9 +1,10 @@
 import { ChessPiece } from '../types/chess';
+import { Square } from 'chess.js';
 
-export const getSquare = (row: number, col: number, playerColor: 'w' | 'b'): string => {
+export const getSquare = (row: number, col: number, playerColor: 'w' | 'b'): Square => {
   const file = String.fromCharCode('a'.charCodeAt(0) + (playerColor === 'w' ? col : 7 - col));
   const rank = playerColor === 'w' ? 8 - row : row + 1;
-  return `${file}${rank}`;
+  return `${file}${rank}` as Square;
 };
 
 

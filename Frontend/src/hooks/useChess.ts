@@ -1,131 +1,94 @@
-import { useCallback, useMemo } from "react";
-import { Chess, Square } from "chess.js";
-import type { GameState, ChessBoard as ChessBoardType, MovePayload } from "../types/chess";
-import { useSendSocket } from "./useSendSocket";
+import { useState, useCallback } from "react";
 import { useGameStore } from "../stores/useGameStore";
-import toast from "react-hot-toast";
+import { Chess, Square } from "chess.js";
 
+/**
+ * A hook to manage the chessboard interaction logic.
+ * This hook encapsulates the state and behavior of the chessboard,
+ * including piece selection, move validation, and game state synchronization.
+ */
 export function useChess() {
-  const { move, requestValidMoves } = useSendSocket();
-  const { 
-    validMoves, 
-    fen, 
-    selectedSquare, 
-    setSelectedSquare,
-    color,
-    turn,
-    gameStarted,
-    moves 
+  const {
+    fen,
+    move: sendMove,
+    color: playerColor,
+    validMoves,
+    setSelectedSquare: setGlobalSelectedSquare,
+    getValidMoves, // Get the action from the store
+    clearValidMoves, // Get the action from the store
   } = useGameStore();
 
-  // Always rebuild chess.js from Zustand FEN
-  const chess = useMemo(() => {
-    const c = new Chess();
-    if (fen) c.load(fen);
-    return c;
-  }, [fen]);
-
-  // Convert board for UI
-  const convertBoard = useCallback((): ChessBoardType => {
-    return chess.board().map((row, rowIdx) =>
-      row.map((piece, colIdx) =>
-        piece
-          ? {
-              type: piece.type,
-              color: piece.color,
-              square: `${"abcdefgh"[colIdx]}${8 - rowIdx}`,
-            }
-          : null
-      )
-    );
-  }, [chess]);
-
-  // UI game state
-  const gameState: GameState = useMemo(
-    () => ({
-      board: convertBoard(),
-      turn: chess.turn(),
-      isGameOver: chess.isGameOver(),
-      isCheck: chess.inCheck(),
-      moveHistory: chess.history(),
-      fen: chess.fen(),
-    }),
-    [chess, convertBoard]
+  const [localSelectedSquare, setLocalSelectedSquare] = useState<Square | null>(
+    null
   );
 
-  // Handle square clicks
   const handleSquareClick = useCallback(
     (square: Square) => {
-      // Ensure valid game state
-      if (!gameStarted || chess.isGameOver()) {
-        toast.error("Game is not active!");
+      const chess = new Chess(fen);
+      if (chess.turn() !== playerColor) return; // Not our turn
+
+      // If clicking the same square, deselect it
+      if (localSelectedSquare === square) {
+        setLocalSelectedSquare(null);
+        setGlobalSelectedSquare(null);
+        clearValidMoves();
         return;
       }
 
-      // Check if it's player's turn
-      if (color !== turn) {
-        toast.error("Not your turn!");
-        return;
-      }
-
-      console.log("Click handler state:", {
-        gameStarted,
-        color,
-        turn,
-        selectedSquare,
-        validMoves
-      });
-
-      // If a square is already selected
-      if (selectedSquare) {
-        const movePayload: MovePayload = {
-          from: selectedSquare as Square,
-          to: square
-        };
-
-        // Check if move is valid (using validMoves from Zustand)
-        const isValidMove = validMoves.some(
-          (m) => m.from === selectedSquare && m.to === square
+      // If a piece is already selected, check if the new square is a valid move
+      if (localSelectedSquare) {
+        const isMoveValid = validMoves.some(
+          (move) => move.from === localSelectedSquare && move.to === square
         );
 
-        if (isValidMove) {
-          // Check for pawn promotion
-          const piece = chess.get(selectedSquare as Square);
+        if (isMoveValid) {
+          const piece = chess.get(localSelectedSquare);
+          // Handle promotion
           if (
             piece?.type === "p" &&
-            ((piece.color === "w" && square[1] === "8") ||
-              (piece.color === "b" && square[1] === "1"))
+            ((playerColor === "w" && square.endsWith("8")) ||
+              (playerColor === "b" && square.endsWith("1")))
           ) {
-            movePayload.promotion = "q"; // Auto-promote to queen
+            // Auto-promote to queen for now
+            sendMove({ from: localSelectedSquare, to: square, promotion: "q" });
+          } else {
+            sendMove({ from: localSelectedSquare, to: square });
           }
-
-          console.log("Making move:", movePayload);
-          move(movePayload);
-          setSelectedSquare(null);
-        } else {
-          // Not a valid destination - select new square and request its moves
-          console.log("Not a valid destination, selecting new square:", square);
-          requestValidMoves(square);
-          setSelectedSquare(square);
+          // Clear selection after move
+          setLocalSelectedSquare(null);
+          setGlobalSelectedSquare(null);
+          clearValidMoves();
+          return;
         }
+      }
+
+      // If the clicked square has one of the player's pieces, select it
+      const piece = chess.get(square);
+      if (piece && piece.color === playerColor) {
+        setLocalSelectedSquare(square);
+        setGlobalSelectedSquare(square);
+        getValidMoves(square); // Fetch valid moves for the selected piece
       } else {
-        // No square selected - first request valid moves, then update selection based on response
-        console.log("Requesting valid moves for square:", square);
-        requestValidMoves(square);
-        setSelectedSquare(square);  // Select the square immediately for better UX
+        // Otherwise, clear the selection
+        setLocalSelectedSquare(null);
+        setGlobalSelectedSquare(null);
+        clearValidMoves();
       }
     },
-    [selectedSquare, validMoves, move, requestValidMoves, setSelectedSquare, chess, color, turn, gameStarted]
+    [
+      fen,
+      playerColor,
+      localSelectedSquare,
+      validMoves,
+      sendMove,
+      setGlobalSelectedSquare,
+      getValidMoves,
+      clearValidMoves,
+    ]
   );
 
-  // Get last move for highlighting
-  const lastMove = moves.length > 0 ? moves[moves.length - 1] : null;
-
   return {
-    gameState,
-    selectedSquare,
+    selectedSquare: localSelectedSquare,
     handleSquareClick,
-    lastMoveSquares: lastMove ? { from: lastMove.from, to: lastMove.to } : null
   };
 }
-

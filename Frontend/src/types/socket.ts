@@ -42,3 +42,7 @@ export type ServerMessage =
   | { type: typeof GameMessages.GAME_OVER; payload: GameOverPayload }
   | { type: typeof GameMessages.TIME_EXCEEDED; payload: TimeExceededPayload }
   | { type: typeof GameMessages.TIMER_UPDATE; payload: TimerUpdatePayload }; // <-- added
+export interface SocketMessage {
+  type: string;
+  payload?: any; // Use `unknown` for type safety
+}

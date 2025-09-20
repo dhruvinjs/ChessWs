@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSocket } from "./useSocket";
+import { SocketManager } from "../lib/socket"; // Import the SocketManager
 import { useGameStore } from "../stores/useGameStore";
 import { showGameMessage } from "../Components/chess/ChessGameMessage";
 import { GameMessages } from "../constants";
@@ -7,8 +7,6 @@ import { GameMessages } from "../constants";
 export function useSocketHandlers(
   syncGameState?: (fen: string, from?: string, to?: string) => void
 ) {
-  const socket = useSocket();
-
   const gameStore = useGameStore();
   const {
     addMove,
@@ -17,12 +15,12 @@ export function useSocketHandlers(
     clearValidMoves,
     updateTimers,
     endGame,
-    resetGame,
     reconnect,
     setSelectedSquare,
   } = gameStore;
 
   useEffect(() => {
+    const socket = SocketManager.getInstance().getSocket(); // Get the socket from the manager
     if (!socket) return;
 
     const handleMessage = (event: MessageEvent) => {
@@ -36,17 +34,21 @@ export function useSocketHandlers(
           // Move made by any player
           case GameMessages.MOVE:
             if (payload.fen) {
-              addMove(payload);          // update moves
-              setFen(payload.fen);       // update FEN
-              setSelectedSquare(null);   // clear selection
+              // The server is the source of truth, so we update the board from its message
+              setFen(payload.fen);
+
+              // Update timers from the server
               if (
                 payload.whiteTimer !== undefined &&
                 payload.blackTimer !== undefined
               ) {
                 updateTimers(payload.whiteTimer, payload.blackTimer);
               }
-              if (syncGameState)
+
+              // Sync the visual board
+              if (syncGameState) {
                 syncGameState(payload.fen, payload.from, payload.to);
+              }
             }
             break;
 
@@ -64,31 +66,31 @@ export function useSocketHandlers(
             break;
 
           // Game initialization (new game or reconnection)
-         case GameMessages.INIT_GAME:
-                resetGame();
+          case GameMessages.INIT_GAME:
+            if (payload.fen && payload.gameId && payload.color) {
+              gameStore.initGame({
+                color: payload.color,
+                gameId: payload.gameId,
+                fen: payload.fen,
+                turn: payload.turn || "w",
+                whiteTimer: payload.whiteTimer,
+                blackTimer: payload.blackTimer,
+              });
 
-                if (payload.fen && payload.gameId && payload.color) {
-                  gameStore.initGame({
-                    color: payload.color,
-                    gameId: payload.gameId,
-                    fen: payload.fen,
-                    turn: payload.turn || "w",
-                    whiteTimer: payload.whiteTimer,
-                    blackTimer: payload.blackTimer,
-                  });
+              setFen(payload.fen);
+              setValidMoves(payload.validMoves);
 
-                  setFen(payload.fen);
+              if (syncGameState) syncGameState(payload.fen);
 
-                  if (syncGameState) syncGameState(payload.fen);
-
-                  showGameMessage(
-                    "Game Started",
-                    `You are playing as ${payload.color === "w" ? "White" : "Black"}`,
-                    { type: "success" }
-                  );
-                }
-                break;
-
+              showGameMessage(
+                "Game Started",
+                `You are playing as ${
+                  payload.color === "w" ? "White" : "Black"
+                }`,
+                { type: "success" }
+              );
+            }
+            break;
 
           // Game active/ready state
           case GameMessages.GAME_ACTIVE:
@@ -110,9 +112,8 @@ export function useSocketHandlers(
 
           // Valid moves update
           case GameMessages.VALID_MOVE:
-            console.log("Received valid moves:", payload.moves);
-            if (payload.moves) {
-              setValidMoves(payload.moves);
+            if (payload.validMoves) {
+              setValidMoves(payload.validMoves);
             } else {
               clearValidMoves();
             }
@@ -205,16 +206,15 @@ export function useSocketHandlers(
       socket.removeEventListener("message", handleMessage);
     };
   }, [
-    socket,
     addMove,
     setFen,
     setValidMoves,
     clearValidMoves,
     updateTimers,
     endGame,
-    resetGame,
     reconnect,
     setSelectedSquare,
     syncGameState,
+    gameStore,
   ]);
 }

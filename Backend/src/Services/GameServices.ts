@@ -315,7 +315,7 @@ export async function provideValidMoves(gameId:string):Promise<Moves | null> {
         const chess=new Chess(gameState.fen)
 
         const moves=chess.moves({ verbose: true }); 
-        console.log(moves)
+        // console.log(moves)
         const validMoves=moves.map(m=>({
             from:m.from,
             to:m.to,

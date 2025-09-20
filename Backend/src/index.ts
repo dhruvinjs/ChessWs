@@ -61,7 +61,7 @@ wss.on("connection",async(socket,req:Request)=>{
       return
    }
 
-   console.log(`Guest verified: ${guestId}`);
+   // console.log(`Guest verified: ${guestId}`);
    gameManager.addUser(socket,guestId)
    socket.on("close",()=>
    gameManager.handleDisconnection(guestId)

@@ -3,21 +3,28 @@ import { Landing, Auth, Room, About, ChessGame } from "./Pages";
 import { Toaster } from "react-hot-toast";
 import { useUserStore } from "./stores/useUserStore";
 import { useEffect } from "react";
+import { SocketManager } from "./lib/socket"; // Import the SocketManager
 
 export function App() {
-  const { isLoading, error, checkAndInitGuest } = useUserStore();
+  // const { isLoading, error, checkAndInitGuest, user } = useUserStore();
 
-  useEffect(() => {
-    checkAndInitGuest();
-  }, [checkAndInitGuest]);
+  // useEffect(() => {
+  //   checkAndInitGuest();
+  // }, [checkAndInitGuest]);
 
-  // Loading / error handling
-  if (isLoading) return <p>Loading guest and connecting...</p>;
-  if (error) return <p>Error fetching guest. Refresh the page.</p>;
+  // // Initialize socket connection once the user is available
+  // useEffect(() => {
+  //   // The user object from useUserStore likely has the guest ID.
+  //   // We'll assume it's on a property like `id` or `guestId`.
+  //   if (user && user.id) {
+  //     SocketManager.getInstance().init(user.id);
+  //   }
+  // }, [user]);
 
-  // At this point, guestId is already in Zustand
-  // socket is already initialized elsewhere via your singleton
- 
+  // // Loading / error handling
+  // if (isLoading) return <p>Loading guest and connecting...</p>;
+  // if (error) return <p>Error fetching guest. Refresh the page.</p>;
+
   return (
     <BrowserRouter>
       <Routes>
@@ -26,7 +33,7 @@ export function App() {
           path="/game"
           element={
             <div className="dark">
-            <ChessGame />
+              <ChessGame />
             </div>
           }
         />
@@ -35,17 +42,15 @@ export function App() {
         <Route path="/room" element={<Room />} />
       </Routes>
 
-        <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: "#333",
-                color: "#fff",
-              }
-            }}
-          />
-
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#333",
+            color: "#fff",
+          },
+        }}
+      />
     </BrowserRouter>
   );
 }
-
