@@ -3,27 +3,32 @@ import { Landing, Auth, Room, About, ChessGame } from "./Pages";
 import { Toaster } from "react-hot-toast";
 import { useUserStore } from "./stores/useUserStore";
 import { useEffect } from "react";
-import { SocketManager } from "./lib/socket"; // Import the SocketManager
+import { SocketManager } from "./lib/socketManager"; // Import the SocketManager
 
 export function App() {
-  // const { isLoading, error, checkAndInitGuest, user } = useUserStore();
+  const { isLoading, error, checkAndInitGuest, user } = useUserStore();
 
-  // useEffect(() => {
-  //   checkAndInitGuest();
-  // }, [checkAndInitGuest]);
+  useEffect(() => {
+    checkAndInitGuest();
+  }, [checkAndInitGuest]);
 
-  // // Initialize socket connection once the user is available
-  // useEffect(() => {
-  //   // The user object from useUserStore likely has the guest ID.
-  //   // We'll assume it's on a property like `id` or `guestId`.
-  //   if (user && user.id) {
-  //     SocketManager.getInstance().init(user.id);
-  //   }
-  // }, [user]);
+  // Initialize socket connection once the user is available
+  useEffect(() => {
+    // The user object from useUserStore likely has the guest ID.
+    // We'll assume it's on a property like `id` or `guestId`.
+    if (user && user.id) {
+      SocketManager.getInstance().init(user.id);
+    }
+
+
+     return () => {
+      SocketManager.getInstance().closeSocket();
+    };
+  }, [user]);
 
   // // Loading / error handling
-  // if (isLoading) return <p>Loading guest and connecting...</p>;
-  // if (error) return <p>Error fetching guest. Refresh the page.</p>;
+  if (isLoading) return <p>Loading guest and connecting...</p>;
+  if (error) return <p>Error fetching guest. Refresh the page.</p>;
 
   return (
     <BrowserRouter>

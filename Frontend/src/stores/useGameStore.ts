@@ -1,8 +1,8 @@
-// useGameStore.ts
 import { create } from "zustand";
+// --- THIS IS THE FIX: A simple, direct import for chess.js as requested. ---
+import { Chess } from "chess.js";
 import { GameMessages } from "../constants";
-import { SocketManager } from "../lib/socket"; // Import the SocketManager
-import { SocketMessage } from "../types/socket"; // Import the SocketMessage type
+import { SocketManager } from "../lib/socketManager";
 
 interface Move {
   from: string;
@@ -30,41 +30,20 @@ interface GameState {
   selectedSquare: string | null;
 
   // actions
-  setGuestId: (guestId: string) => void;
-  initGame: (payload: {
-    color: Color;
-    gameId: string;
-    fen: string;
-    validMoves?: Move[]; // <--- Add validMoves to the payload
-    whiteTimer?: number;
-    blackTimer?: number;
-    turn?: Color;
-  }) => void;
-  addMove: (move: Move) => void;
+  initGame: (payload: any) => void;
+  processServerMove: (payload: any) => void;
   setFen: (fen: string) => void;
-  setValidMoves: (moves: Move[]) => void;
-  clearValidMoves: () => void;
   setOppStatus: (status: boolean) => void;
   updateTimers: (white: number, black: number) => void;
   endGame: (winner: Color | "draw", loser: Color | null) => void;
   resetGame: () => void;
-  reconnect: (payload: {
-    color: Color;
-    gameId: string;
-    fen: string;
-    moves?: Move[];
-    turn?: Color;
-    whiteTimer?: number;
-    blackTimer?: number;
-  }) => void;
+  reconnect: (payload: any) => void;
   setSelectedSquare: (square: string | null) => void;
 
   // socket actions
   move: (move: Move) => void;
   initGameRequest: () => void;
   resign: () => void;
-  sendSocketMessage: (message: SocketMessage) => void; // <--- Use SocketMessage type
-  getValidMoves: (square: string) => void; // <--- Add getValidMoves action
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -84,42 +63,41 @@ export const useGameStore = create<GameState>((set, get) => ({
   blackTimer: 600,
   selectedSquare: null,
 
-  setGuestId: (guestId) => set({ guestId }),
-
-  initGame: ({
-    color,
-    gameId,
-    fen,
-    validMoves = [], // <--- Default to empty array
-    whiteTimer = 600,
-    blackTimer = 600,
-    turn = "w",
-  }) =>
-    set({
-      color,
-      gameId,
+  initGame: (payload) =>
+    set((state) => ({
+      ...state,
+      ...payload,
+      validMoves: payload.validMoves || [],
       gameStatus: GameMessages.GAME_ACTIVE,
       gameStarted: true,
       moves: [],
-      fen,
-      validMoves, // <--- Set validMoves
       winner: null,
       loser: null,
-      turn,
-      whiteTimer,
-      blackTimer,
-    }),
+    })),
 
-  addMove: (move) =>
+  processServerMove: (payload) =>
     set((state) => ({
-      moves: [...state.moves, move],
+      ...state,
+      fen: payload.fen,
+      turn: payload.turn,
+      validMoves: payload.validMoves || [],
+      moves: [...state.moves, payload.move],
+      whiteTimer: payload.whiteTimer ?? state.whiteTimer,
+      blackTimer: payload.blackTimer ?? state.blackTimer,
       selectedSquare: null,
     })),
 
-  setFen: (fen) => set({ fen }),
+  reconnect: (payload) =>
+    set((state) => ({
+      ...state,
+      ...payload,
+      validMoves: payload.validMoves || [],
+      gameStatus: GameMessages.GAME_ACTIVE,
+      gameStarted: true,
+      oppConnected: true,
+    })),
 
-  setValidMoves: (moves) => set({ validMoves: moves }),
-  clearValidMoves: () => set({ validMoves: [] }),
+  setFen: (fen) => set({ fen }),
 
   setOppStatus: (status) => set({ oppConnected: status }),
 
@@ -131,6 +109,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       winner,
       loser,
       selectedSquare: null,
+      validMoves: [],
     }),
 
   resetGame: () =>
@@ -152,57 +131,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedSquare: null,
     }),
 
-  reconnect: ({
-    color,
-    gameId,
-    fen,
-    moves = [],
-    turn = "w",
-    whiteTimer = 600,
-    blackTimer = 600,
-  }) =>
-    set({
-      color,
-      gameId,
-      gameStatus: GameMessages.GAME_ACTIVE,
-      gameStarted: true,
-      fen,
-      moves,
-      turn,
-      whiteTimer,
-      blackTimer,
-      oppConnected: true,
-    }),
-
   setSelectedSquare: (square) => set({ selectedSquare: square }),
 
-  // ✅ WebSocket actions
-  sendSocketMessage: (message) => {
-    SocketManager.getInstance().send(message); // <--- No more 'as any'
-  },
-
-  getValidMoves: (square) => {
-    const { gameId } = get();
-    if (!gameId) return;
-    get().sendSocketMessage({
-      type: GameMessages.VALID_MOVE,
-      payload: { square, gameId },
-    });
-  },
-
   move: (move) => {
-    const { gameId } = get();
+    const { gameId, fen } = get();
     if (!gameId) return;
 
-    get().sendSocketMessage({ type: GameMessages.MOVE, payload: { ...move, gameId } });
+    const chess = new Chess(fen);
+    const result = chess.move(move);
 
-    // We will no longer update the state optimistically.
-    // The server will send a MOVE message back to us with the new state.
+    if (result) {
+      set({
+        fen: chess.fen(),
+        turn: chess.turn(),
+        selectedSquare: null,
+        validMoves: [], 
+      });
+    }
+
+    SocketManager.getInstance().send({ type: GameMessages.MOVE, payload: { ...move, gameId } });
   },
 
   initGameRequest: () => {
-    console.log("🎮 Requesting new game");
-    get().sendSocketMessage({ type: GameMessages.INIT_GAME, payload: {} });
+    SocketManager.getInstance().send({ type: GameMessages.INIT_GAME, payload: {} });
     set({
       gameStatus: GameMessages.SEARCHING,
       gameStarted: false,
@@ -219,9 +170,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   resign: () => {
     const { gameId, color } = get();
     if (!gameId) return;
-
-    get().sendSocketMessage({ type: GameMessages.LEAVE_GAME, payload: { gameId } });
-
+    SocketManager.getInstance().send({ type: GameMessages.LEAVE_GAME, payload: { gameId } });
     set({
       gameStatus: GameMessages.GAME_OVER,
       winner: color === "w" ? "b" : "w",

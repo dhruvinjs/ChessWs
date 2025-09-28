@@ -1,26 +1,19 @@
 import { useEffect } from "react";
-import { SocketManager } from "../lib/socket"; // Import the SocketManager
+import { SocketManager } from "../lib/socketManager";
 import { useGameStore } from "../stores/useGameStore";
 import { showGameMessage } from "../Components/chess/ChessGameMessage";
 import { GameMessages } from "../constants";
 
+// This hook is responsible for setting up and tearing down the global WebSocket
+// event listener. It uses `useGameStore.getState()` to interact with the Zustand
+// store, ensuring that actions are always dispatched against the latest state,
+// preventing issues with stale closures in the event handler.
+
 export function useSocketHandlers(
   syncGameState?: (fen: string, from?: string, to?: string) => void
 ) {
-  const gameStore = useGameStore();
-  const {
-    addMove,
-    setFen,
-    setValidMoves,
-    clearValidMoves,
-    updateTimers,
-    endGame,
-    reconnect,
-    setSelectedSquare,
-  } = gameStore;
-
   useEffect(() => {
-    const socket = SocketManager.getInstance().getSocket(); // Get the socket from the manager
+    const socket = SocketManager.getInstance().getSocket();
     if (!socket) return;
 
     const handleMessage = (event: MessageEvent) => {
@@ -30,29 +23,28 @@ export function useSocketHandlers(
 
         console.log("📥 Received message:", type, payload);
 
+        // --- THIS IS THE FIX ---
+        // Access the store's methods via `getState()` inside the event handler.
+        // This ensures that we are always using the latest version of the state
+        // and its associated functions, avoiding stale state issues that can
+        // occur in long-lived event listeners.
+        const {
+          processServerMove,
+          setFen,
+          endGame,
+          reconnect,
+          setOppStatus,
+          updateTimers,
+        } = useGameStore.getState();
+
         switch (type) {
-          // Move made by any player
           case GameMessages.MOVE:
-            if (payload.fen) {
-              // The server is the source of truth, so we update the board from its message
-              setFen(payload.fen);
-
-              // Update timers from the server
-              if (
-                payload.whiteTimer !== undefined &&
-                payload.blackTimer !== undefined
-              ) {
-                updateTimers(payload.whiteTimer, payload.blackTimer);
-              }
-
-              // Sync the visual board
-              if (syncGameState) {
-                syncGameState(payload.fen, payload.from, payload.to);
-              }
+            processServerMove(payload);
+            if (syncGameState) {
+              syncGameState(payload.fen, payload.move.from, payload.move.to);
             }
             break;
 
-          // Game over
           case GameMessages.GAME_OVER:
             if (payload.fen) {
               setFen(payload.fen);
@@ -65,23 +57,17 @@ export function useSocketHandlers(
             );
             break;
 
-          // Game initialization (new game or reconnection)
           case GameMessages.INIT_GAME:
-            if (payload.fen && payload.gameId && payload.color) {
-              gameStore.initGame({
-                color: payload.color,
-                gameId: payload.gameId,
-                fen: payload.fen,
-                turn: payload.turn || "w",
-                whiteTimer: payload.whiteTimer,
-                blackTimer: payload.blackTimer,
-              });
+            reconnect(payload);
+            if (syncGameState) syncGameState(payload.fen);
 
-              setFen(payload.fen);
-              setValidMoves(payload.validMoves);
-
-              if (syncGameState) syncGameState(payload.fen);
-
+            if (payload.moves && payload.moves.length > 0) {
+              showGameMessage(
+                "Rejoined Game",
+                "Welcome back! The game is in progress.",
+                { type: "info" }
+              );
+            } else {
               showGameMessage(
                 "Game Started",
                 `You are playing as ${
@@ -92,44 +78,28 @@ export function useSocketHandlers(
             }
             break;
 
-          // Game active/ready state
           case GameMessages.GAME_ACTIVE:
             showGameMessage("Game Ready", "A game is ready to start!", {
               type: "success",
             });
             break;
 
-          // Notifications
           case GameMessages.CHECK:
-            showGameMessage("Check!", "You are in check.", { type: "warning" });
+            showGameMessage("Check!", payload.message || "You are in check.", {
+              type: "warning",
+            });
             break;
 
           case GameMessages.STALEMATE:
-            showGameMessage("Stalemate", "The game is a draw.", {
-              type: "info",
-            });
+            showGameMessage(
+              "Stalemate",
+              payload.message || "The game is a draw.",
+              { type: "info" }
+            );
             break;
 
-          // Valid moves update
-          case GameMessages.VALID_MOVE:
-            if (payload.validMoves) {
-              setValidMoves(payload.validMoves);
-            } else {
-              clearValidMoves();
-            }
-            break;
-
-          // Opponent reconnect
           case GameMessages.OPP_RECONNECTED:
-            reconnect({
-              color: payload.color,
-              gameId: payload.gameId,
-              fen: payload.fen,
-              moves: payload.moves,
-              turn: payload.turn,
-              whiteTimer: payload.whiteTimer,
-              blackTimer: payload.blackTimer,
-            });
+            reconnect(payload);
             if (syncGameState && payload.fen) {
               syncGameState(payload.fen);
             }
@@ -140,25 +110,22 @@ export function useSocketHandlers(
             );
             break;
 
-          // Opponent disconnected
           case GameMessages.DISCONNECTED:
+            setOppStatus(false);
             showGameMessage(
               "Opponent Disconnected",
-              "Your opponent has disconnected.",
+              payload.message || "Your opponent has disconnected.",
               { type: "warning" }
             );
             break;
 
-          // Timer exceeded
           case GameMessages.TIME_EXCEEDED:
-            showGameMessage(
-              "Time's Up!",
-              payload.message || "You ran out of time.",
-              { type: "error" }
-            );
+            endGame(payload.winner, payload.loser);
+            showGameMessage("Time's Up!", payload.message || "You ran out of time.", {
+              type: "error",
+            });
             break;
 
-          // Server error
           case GameMessages.SERVER_ERROR:
             showGameMessage(
               "Server Error",
@@ -167,16 +134,14 @@ export function useSocketHandlers(
             );
             break;
 
-          // Wrong player tried to move
           case GameMessages.WRONG_PLAYER_MOVE:
             showGameMessage(
               "Invalid Move",
-              "It's not your turn to move.",
+              payload.message || "It's not your turn to move.",
               { type: "error" }
             );
             break;
 
-          // Timer updates
           case GameMessages.TIMER_UPDATE:
             if (
               payload.whiteTimer !== undefined &&
@@ -186,7 +151,6 @@ export function useSocketHandlers(
             }
             break;
 
-          // Silent handlers or unknown events
           default:
             console.warn(`Unknown message type: ${type}`);
         }
@@ -205,16 +169,7 @@ export function useSocketHandlers(
     return () => {
       socket.removeEventListener("message", handleMessage);
     };
-  }, [
-    addMove,
-    setFen,
-    setValidMoves,
-    clearValidMoves,
-    updateTimers,
-    endGame,
-    reconnect,
-    setSelectedSquare,
-    syncGameState,
-    gameStore,
-  ]);
+    // The dependency array is now just [syncGameState]. The effect will only re-run
+    // if this specific prop changes, which is the correct and intended behavior.
+  }, [syncGameState]);
 }

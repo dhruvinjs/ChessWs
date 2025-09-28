@@ -21,6 +21,5 @@ export const TIMER_UPDATE="timer_update"
 export const DISCONNECTED="player_left"
 export const LEAVE_GAME="leave_game"
 export const REQUEST_VALID_MOVES="request_valid_moves"
-export const VALID_MOVE="valid_move"
 
 

@@ -1,14 +1,11 @@
 import { GameHeader, GameStatus, MoveHistory, ChessBoard } from "../Components";
 import { GameMessages } from "../constants";
 import { useGameStore } from "../stores/useGameStore";
-import { useSocketHandlers } from "../hooks/useSocketHandlers";
 
 export function ChessGame() {
-  // Activate the socket message handlers
-  useSocketHandlers();
+  const color = useGameStore((state) => state.color);
+  const gameStatus = useGameStore((state) => state.gameStatus);
 
-  const { color, gameStatus } = useGameStore();
-  // Only show the "Searching..." message when the game status is "searching"
   const isWaitingForGame = gameStatus === GameMessages.SEARCHING;
 
   return (

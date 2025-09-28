@@ -1,63 +1,62 @@
-"use client"
-
-import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { SquareProps } from "../../types/chess"
 import { Piece } from "./Piece"
 
-export const Square = React.memo(
-  ({ piece, isLight, isSelected, isValidMove, isLastMove, onClick }: SquareProps) => {
-    const baseClasses = "aspect-square flex items-center justify-center cursor-pointer relative overflow-hidden"
-    const colorClasses = isLight ? "bg-amber-100 dark:bg-amber-200/80" : "bg-amber-700 dark:bg-amber-800/80"
+// --- THIS IS THE FIX ---
+// The `React.memo` wrapper has been completely REMOVED.
+// This was the root cause of the stale state bug.
+// It was preventing the component from re-rendering with the new `onClick` handler,
+// causing all clicks to use an old version of the function with stale `validMoves`.
+// By removing it, we ensure the square always has the correct props.
+export const Square = (
+  { piece, isLight, isSelected, isValidMove, isLastMove, onClick }: SquareProps
+) => {
+  const baseClasses = "aspect-square flex items-center justify-center cursor-pointer relative overflow-hidden"
+  const colorClasses = isLight ? "bg-amber-100 dark:bg-amber-200/80" : "bg-amber-700 dark:bg-amber-800/80"
 
-    return (
-      <motion.div
-        className={`${baseClasses} ${colorClasses}`}
-        onClick={onClick}
-        whileHover={{ scale: 1.02, filter: "brightness(1.1)" }}
-        whileTap={{ scale: 0.98 }}
-        layout
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-      >
-        {/* Selection / Valid / Last Move rings */}
-        <AnimatePresence>
-          {isSelected && <HighlightRing color="blue" />}
-          {isValidMove && <HighlightRing color="green" />}
-          {isLastMove && <HighlightRing color="yellow" />}
-        </AnimatePresence>
+  return (
+    <motion.div
+      className={`${baseClasses} ${colorClasses}`}
+      onClick={onClick}
+      whileHover={{ scale: 1.02, filter: "brightness(1.1)" }}
+      whileTap={{ scale: 0.98 }}
+      layout
+      transition={{ duration: 0.3, ease: "easeInOut" }}
+    >
+      {/* Selection / Valid / Last Move rings */}
+      <AnimatePresence>
+        {isSelected && <HighlightRing color="blue" />}
+        {isValidMove && <HighlightRing color="green" />}
+        {isLastMove && <HighlightRing color="yellow" />}
+      </AnimatePresence>
 
-        {/* Piece */}
-        <AnimatePresence mode="wait">
-          {piece && (
-            <motion.div
-              className="w-4/5 h-4/5 drop-shadow-md"
-              initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              exit={{ opacity: 0, scale: 0.5, rotate: 10 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              whileHover={{ scale: 1.1, rotate: 2 }}
-              layout
-            >
-              <Piece piece={piece} className="w-full h-full" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Piece */}
+      <AnimatePresence mode="wait">
+        {piece && (
+          <motion.div
+          key={piece}
+            className="w-4/5 h-4/5 drop-shadow-md"
+            initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.5, rotate: 10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            whileHover={{ scale: 1.1, rotate: 2 }}
+            layout
+          >
+            <Piece piece={piece} className="w-full h-full" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Valid move indicators */}
-        <AnimatePresence>
-          {isValidMove && !piece && <ValidMoveDot />}
-          {isValidMove && piece && <ValidMoveBorder />}
-        </AnimatePresence>
-      </motion.div>
-    )
-  },
-  (prev, next) =>
-    prev.piece === next.piece &&
-    prev.isLight === next.isLight &&
-    prev.isSelected === next.isSelected &&
-    prev.isValidMove === next.isValidMove &&
-    prev.isLastMove === next.isLastMove
-)
+      {/* Valid move indicators */}
+      <AnimatePresence>
+        {isValidMove && !piece && <ValidMoveDot />}
+        {isValidMove && piece && <ValidMoveBorder />}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+// --- END OF FIX ---
 
 Square.displayName = "Square"
 

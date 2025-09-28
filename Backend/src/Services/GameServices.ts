@@ -10,7 +10,6 @@ import {
     OPP_RECONNECTED, 
     SERVER_ERROR, 
     STALEMATE, 
-    VALID_MOVE, 
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
@@ -162,17 +161,11 @@ export async function makeMove(
         payload: {
             move,
             turn:board.turn(),
-            fen:board.fen()
+            fen:board.fen(),
+            validMoves:validMoves
         }
     }));
     
-  const validMovesPayload = {
-    type: VALID_MOVE,
-    payload: {
-      validMoves: validMoves,
-    },
-  };
-  opponent.send(JSON.stringify(validMovesPayload))
 
 }
 

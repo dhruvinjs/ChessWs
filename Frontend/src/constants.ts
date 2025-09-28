@@ -15,8 +15,6 @@ export  const  GameMessages= {
   LEAVE_GAME:"leave_game",
   TIMER_UPDATE:"timer_update",
   SERVER_ERROR:"server_error",
-  REQUEST_VALID_MOVES:"request_valid_moves",
-  VALID_MOVE:"valid_move",
   SEARCHING: "searching"
 } 
 

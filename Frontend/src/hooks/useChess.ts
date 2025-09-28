@@ -2,79 +2,68 @@ import { useState, useCallback } from "react";
 import { useGameStore } from "../stores/useGameStore";
 import { Chess, Square } from "chess.js";
 
-/**
- * A hook to manage the chessboard interaction logic.
- * This hook encapsulates the state and behavior of the chessboard,
- * including piece selection, move validation, and game state synchronization.
- */
 export function useChess() {
-  const {
-    fen,
-    move: sendMove,
-    color: playerColor,
-    validMoves,
-    setSelectedSquare: setGlobalSelectedSquare,
-    getValidMoves, // Get the action from the store
-    clearValidMoves, // Get the action from the store
-  } = useGameStore();
+  // Subscribing to state slices individually. This is the correct pattern.
+  const fen = useGameStore((state) => state.fen);
+  const sendMove = useGameStore((state) => state.move);
+  const playerColor = useGameStore((state) => state.color);
+  const validMoves = useGameStore((state) => state.validMoves);
+  const setGlobalSelectedSquare = useGameStore(
+    (state) => state.setSelectedSquare
+  );
 
+  // Local state is used for immediate UI feedback.
   const [localSelectedSquare, setLocalSelectedSquare] = useState<Square | null>(
     null
   );
 
   const handleSquareClick = useCallback(
-    (square: Square) => {
+    (square: Square, piece: string | null) => {
       const chess = new Chess(fen);
-      if (chess.turn() !== playerColor) return; // Not our turn
-
-      // If clicking the same square, deselect it
-      if (localSelectedSquare === square) {
-        setLocalSelectedSquare(null);
-        setGlobalSelectedSquare(null);
-        clearValidMoves();
+      console.log(chess.turn(),playerColor);
+      if (chess.turn() !== playerColor) {
         return;
       }
-
-      // If a piece is already selected, check if the new square is a valid move
+      console.log(localSelectedSquare)
       if (localSelectedSquare) {
         const isMoveValid = validMoves.some(
           (move) => move.from === localSelectedSquare && move.to === square
         );
-
+        console.log(validMoves)
+        console.log(isMoveValid);
         if (isMoveValid) {
-          const piece = chess.get(localSelectedSquare);
-          // Handle promotion
+          const fromPiece = chess.get(localSelectedSquare);
+
           if (
-            piece?.type === "p" &&
-            ((playerColor === "w" && square.endsWith("8")) ||
-              (playerColor === "b" && square.endsWith("1")))
+            fromPiece?.type === "p" &&
+            ((fromPiece.color === "w" && square.endsWith("8")) ||
+              (fromPiece.color === "b" && square.endsWith("1")))
           ) {
-            // Auto-promote to queen for now
             sendMove({ from: localSelectedSquare, to: square, promotion: "q" });
           } else {
             sendMove({ from: localSelectedSquare, to: square });
           }
-          // Clear selection after move
           setLocalSelectedSquare(null);
           setGlobalSelectedSquare(null);
-          clearValidMoves();
           return;
         }
       }
 
-      // If the clicked square has one of the player's pieces, select it
-      const piece = chess.get(square);
-      if (piece && piece.color === playerColor) {
-        setLocalSelectedSquare(square);
-        setGlobalSelectedSquare(square);
-        getValidMoves(square); // Fetch valid moves for the selected piece
-      } else {
-        // Otherwise, clear the selection
+      if (localSelectedSquare === square) {
         setLocalSelectedSquare(null);
         setGlobalSelectedSquare(null);
-        clearValidMoves();
+        return;
+      }
+
+      if (piece && piece.startsWith(playerColor || "")) {
+        setLocalSelectedSquare(square);
+        setGlobalSelectedSquare(square);
+      } else {
+        setLocalSelectedSquare(null);
+        setGlobalSelectedSquare(null);
       }
     },
+    // Dependencies are correct and include all necessary state slices.
     [
       fen,
       playerColor,
@@ -82,8 +71,6 @@ export function useChess() {
       validMoves,
       sendMove,
       setGlobalSelectedSquare,
-      getValidMoves,
-      clearValidMoves,
     ]
   );
 

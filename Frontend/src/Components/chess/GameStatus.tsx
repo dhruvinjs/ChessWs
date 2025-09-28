@@ -3,13 +3,15 @@ import { useGameStore } from '../../stores/useGameStore';
 import { GameMessages } from '../../constants';
 
 export function GameStatus() {
-  const {
-    gameId,
-    color,
-    moves,
-    turn,
-    gameStatus,
-  } = useGameStore();
+  // --- THIS IS THE FIX ---
+  // Subscribing to state slices individually to ensure the component re-renders
+  // when these specific values change. This is the correct pattern for Zustand.
+  const gameId = useGameStore((state) => state.gameId);
+  const color = useGameStore((state) => state.color);
+  const moves = useGameStore((state) => state.moves);
+  const turn = useGameStore((state) => state.turn);
+  const gameStatus = useGameStore((state) => state.gameStatus);
+  // --- END OF FIX ---
 
   return (
     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl">
