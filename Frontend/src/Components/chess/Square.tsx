@@ -1,98 +1,118 @@
-import { motion, AnimatePresence } from "framer-motion"
-import type { SquareProps } from "../../types/chess"
-import { Piece } from "./Piece"
+import { memo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import type { SquareProps } from "../../types/chess";
+import { Piece } from "./Piece";
 
-// --- THIS IS THE FIX ---
-// The `React.memo` wrapper has been completely REMOVED.
-// This was the root cause of the stale state bug.
-// It was preventing the component from re-rendering with the new `onClick` handler,
-// causing all clicks to use an old version of the function with stale `validMoves`.
-// By removing it, we ensure the square always has the correct props.
-export const Square = (
-  { piece, isLight, isSelected, isValidMove, isLastMove, onClick }: SquareProps
-) => {
-  const baseClasses = "aspect-square flex items-center justify-center cursor-pointer relative overflow-hidden"
-  const colorClasses = isLight ? "bg-amber-100 dark:bg-amber-200/80" : "bg-amber-700 dark:bg-amber-800/80"
+const SquareComponent = ({
+  piece,
+  isLight,
+  isSelected,
+  isValidMove,
+  isLastMove,
+  onClick,
+}: SquareProps) => {
+  const baseClasses =
+    "aspect-square flex items-center justify-center relative";
+  const colorClasses = isLight
+    ? "bg-amber-100 dark:bg-amber-200/80"
+    : "bg-amber-700 dark:bg-amber-800/80";
 
   return (
-    <motion.div
-      className={`${baseClasses} ${colorClasses}`}
-      onClick={onClick}
-      whileHover={{ scale: 1.02, filter: "brightness(1.1)" }}
-      whileTap={{ scale: 0.98 }}
-      layout
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-    >
-      {/* Selection / Valid / Last Move rings */}
+    <div className={`${baseClasses} ${colorClasses}`} onClick={onClick}>
+      {/* --- Overlay Rings for selection, valid moves, etc. --- */}
       <AnimatePresence>
         {isSelected && <HighlightRing color="blue" />}
-        {isValidMove && <HighlightRing color="green" />}
         {isLastMove && <HighlightRing color="yellow" />}
       </AnimatePresence>
 
-      {/* Piece */}
-      <AnimatePresence mode="wait">
+      {/* --- Chess Piece with pointer cursor --- */}
+      <AnimatePresence>
         {piece && (
           <motion.div
-          key={piece}
-            className="w-4/5 h-4/5 drop-shadow-md"
-            initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, scale: 0.5, rotate: 10 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            whileHover={{ scale: 1.1, rotate: 2 }}
+            key={piece}
+            className="w-full h-full p-1 cursor-pointer" // Replaced cursor-grab with cursor-pointer
+            initial={{ opacity: 0, y: -15, scale: 0.8 }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: { type: "spring", stiffness: 250, damping: 25 },
+            }}
+            exit={{
+              opacity: 0,
+              y: 15,
+              scale: 0.8,
+              transition: { duration: 0.15 },
+            }}
+            whileHover={{
+              scale: 1.1,
+              y: -5,
+              filter: "brightness(1.2)",
+            }}
             layout
           >
-            <Piece piece={piece} className="w-full h-full" />
+            <Piece piece={piece} className="w-full h-full drop-shadow-md" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Valid move indicators */}
+      {/* --- Valid Move Indicators --- */}
       <AnimatePresence>
         {isValidMove && !piece && <ValidMoveDot />}
         {isValidMove && piece && <ValidMoveBorder />}
       </AnimatePresence>
-    </motion.div>
-  )
-}
-// --- END OF FIX ---
+    </div>
+  );
+};
 
-Square.displayName = "Square"
+export const Square = memo(SquareComponent, (prev, next) => {
+  return (
+    prev.piece === next.piece &&
+    prev.isLight === next.isLight &&
+    prev.isSelected === next.isSelected &&
+    prev.isValidMove === next.isValidMove &&
+    prev.isLastMove === next.isLastMove
+  );
+});
 
-// Helper subcomponents
+Square.displayName = "Square";
+
+// --- Helper Components ---
+
 const ringColors: Record<string, string> = {
-  blue: "ring-blue-500",
-  green: "ring-green-500",
-  yellow: "ring-yellow-500",
-}
+  blue: "border-blue-500/80",
+  yellow: "border-yellow-500/70",
+  green: "border-green-600/70",
+};
 
-const HighlightRing = ({ color }: { color: "blue" | "green" | "yellow" }) => (
+const HighlightRing = memo(({ color }: { color: "blue" | "yellow" }) => (
   <motion.div
-    className={`absolute inset-0 ring-4 ring-inset rounded-sm ${ringColors[color]}`}
-    initial={{ opacity: 0, scale: 0.8 }}
+    className={`absolute inset-0 border-4 rounded-sm ${ringColors[color]}`}
+    initial={{ opacity: 0, scale: 1.1 }}
     animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.8 }}
-    transition={{ duration: 0.2 }}
+    exit={{ opacity: 0, scale: 1.1 }}
+    transition={{ duration: 0.2, ease: "easeInOut" }}
   />
-)
+));
+HighlightRing.displayName = "HighlightRing";
 
-const ValidMoveDot = () => (
+const ValidMoveDot = memo(() => (
   <motion.div
-    className="w-4 h-4 bg-green-500 rounded-full shadow-lg"
+    className="w-1/4 h-1/4 bg-green-600/50 rounded-full"
     initial={{ opacity: 0, scale: 0 }}
-    animate={{ opacity: 0.7, scale: 1 }}
+    animate={{ opacity: 1, scale: 1 }}
     exit={{ opacity: 0, scale: 0 }}
-    transition={{ type: "spring", stiffness: 400, damping: 25 }}
   />
-)
+));
+ValidMoveDot.displayName = "ValidMoveDot";
 
-const ValidMoveBorder = () => (
+const ValidMoveBorder = memo(() => (
   <motion.div
-    className="absolute inset-0 border-2 border-green-500 rounded-full"
-    initial={{ opacity: 0, scale: 0.5 }}
-    animate={{ opacity: 0.7, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.5 }}
-    transition={{ duration: 0.2 }}
+    className={`absolute inset-0 rounded-full border-[6px] ${ringColors["green"]}`}
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    exit={{ opacity: 0, scale: 0.9 }}
+    transition={{ duration: 0.15, ease: "circOut" }}
   />
-)
+));
+ValidMoveBorder.displayName = "ValidMoveBorder";

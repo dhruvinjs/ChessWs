@@ -1,81 +1,119 @@
-import { useState, useCallback } from "react";
-import { useGameStore } from "../stores/useGameStore";
-import { Chess, Square } from "chess.js";
+import { useCallback } from 'react';
+import { useGameStore } from '../stores/useGameStore';
 
-export function useChess() {
-  // Subscribing to state slices individually. This is the correct pattern.
-  const fen = useGameStore((state) => state.fen);
-  const sendMove = useGameStore((state) => state.move);
+export const useChess = () => {
+  // These trigger re-renders when they change
+  const selectedSquare = useGameStore((state) => state.selectedSquare);
   const playerColor = useGameStore((state) => state.color);
   const validMoves = useGameStore((state) => state.validMoves);
-  const setGlobalSelectedSquare = useGameStore(
-    (state) => state.setSelectedSquare
-  );
 
-  // Local state is used for immediate UI feedback.
-  const [localSelectedSquare, setLocalSelectedSquare] = useState<Square | null>(
-    null
-  );
+  // Stable references (won’t change between renders)
+  const { setSelectedSquare, move } = useGameStore.getState();
 
   const handleSquareClick = useCallback(
-    (square: Square, piece: string | null) => {
-      const chess = new Chess(fen);
-      console.log(chess.turn(),playerColor);
-      if (chess.turn() !== playerColor) {
+    (square: string, piece: string | null) => {
+      const state = useGameStore.getState();
+      const fenNow = state.fen;
+      const turn = fenNow.split(' ')[1] as 'w' | 'b';
+
+      console.log('🖱️ Square clicked:', {
+        square,
+        piece,
+        selectedSquare,
+        myColor: playerColor,
+        currentTurn: turn,
+        isMyTurn: turn === playerColor,
+      });
+
+      // 🚫 Not your turn
+      if (turn !== playerColor) {
+        console.warn('⛔ Not your turn!', { currentTurn: turn, yourColor: playerColor });
         return;
       }
-      console.log(localSelectedSquare)
-      if (localSelectedSquare) {
-        const isMoveValid = validMoves.some(
-          (move) => move.from === localSelectedSquare && move.to === square
-        );
-        console.log(validMoves)
-        console.log(isMoveValid);
-        if (isMoveValid) {
-          const fromPiece = chess.get(localSelectedSquare);
 
-          if (
-            fromPiece?.type === "p" &&
-            ((fromPiece.color === "w" && square.endsWith("8")) ||
-              (fromPiece.color === "b" && square.endsWith("1")))
-          ) {
-            sendMove({ from: localSelectedSquare, to: square, promotion: "q" });
-          } else {
-            sendMove({ from: localSelectedSquare, to: square });
+      // ✅ Case 1: Piece already selected
+      if (selectedSquare) {
+        const validMove = validMoves.find(
+          (m) => m.from === selectedSquare && m.to === square
+        );
+
+        console.log('✅ Valid move check:', {
+          from: selectedSquare,
+          to: square,
+          isValid: !!validMove,
+          validMovesCount: validMoves.length,
+        });
+
+        if (validMove) {
+          // --- Promotion detection ---
+          const fenBoard = fenNow.split(' ')[0];
+          const rows = fenBoard.split('/');
+
+          const col = selectedSquare.charCodeAt(0) - 'a'.charCodeAt(0);
+          const row = 8 - parseInt(selectedSquare[1]);
+          const fenRow = rows[row];
+          let colIndex = 0;
+          let fenPiece: string | null = null;
+
+          for (const char of fenRow) {
+            if (!isNaN(Number(char))) {
+              colIndex += Number(char);
+            } else {
+              if (colIndex === col) {
+                fenPiece = char;
+                break;
+              }
+              colIndex++;
+            }
           }
-          setLocalSelectedSquare(null);
-          setGlobalSelectedSquare(null);
+
+          const isPawn = fenPiece?.toLowerCase() === 'p';
+          const isPromotionRank =
+            (playerColor === 'w' && square[1] === '8') ||
+            (playerColor === 'b' && square[1] === '1');
+
+          if (isPawn && isPromotionRank) {
+            console.log('👑 Pawn promotion! Promoting to Queen');
+            move({ from: selectedSquare, to: square, promotion: 'q' });
+          } else {
+            console.log('♟️ Regular move');
+            move({ from: selectedSquare, to: square });
+          }
+
           return;
         }
-      }
 
-      if (localSelectedSquare === square) {
-        setLocalSelectedSquare(null);
-        setGlobalSelectedSquare(null);
+        // --- Invalid move fallbacks ---
+        if (selectedSquare === square) {
+          console.log('🔄 Deselecting same square');
+          setSelectedSquare(null);
+          return;
+        }
+
+        if (piece && piece[0] === playerColor) {
+          console.log('🔀 Selecting different piece:', square);
+          setSelectedSquare(square);
+          return;
+        }
+
+        console.log('❌ Invalid move, deselecting');
+        setSelectedSquare(null);
         return;
       }
 
-      if (piece && piece.startsWith(playerColor || "")) {
-        setLocalSelectedSquare(square);
-        setGlobalSelectedSquare(square);
+      // ✅ Case 2: No piece selected
+      if (piece && piece[0] === playerColor) {
+        console.log('✨ Selecting piece:', square, piece);
+        setSelectedSquare(square);
       } else {
-        setLocalSelectedSquare(null);
-        setGlobalSelectedSquare(null);
+        console.log('⚠️ Cannot select:', piece ? 'opponent piece' : 'empty square');
       }
     },
-    // Dependencies are correct and include all necessary state slices.
-    [
-      fen,
-      playerColor,
-      localSelectedSquare,
-      validMoves,
-      sendMove,
-      setGlobalSelectedSquare,
-    ]
+    [selectedSquare, playerColor, validMoves]
   );
 
   return {
-    selectedSquare: localSelectedSquare,
+    selectedSquare,
     handleSquareClick,
   };
-}
+};

@@ -6,3 +6,4 @@ export { GameStatus } from './GameStatus';
 export { MoveHistory } from './MoveHistory';
 export { Piece} from './Piece';
 export {showGameMessage} from './ChessGameMessage'
+export {GameControls} from './GameControls'

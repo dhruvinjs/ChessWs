@@ -1,5 +1,4 @@
 export { Button } from "./Button";
-export { DropDown } from "./DropDown";
 export { Footer } from "./Footer";
 export { Hero } from "./Hero";
 export { HeroChessBoard } from "./HeroChessBoard";

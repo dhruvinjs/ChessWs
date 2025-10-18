@@ -26,7 +26,7 @@ export function App() {
     };
   }, [user]);
 
-  // // Loading / error handling
+  // Loading / error handling
   if (isLoading) return <p>Loading guest and connecting...</p>;
   if (error) return <p>Error fetching guest. Refresh the page.</p>;
 

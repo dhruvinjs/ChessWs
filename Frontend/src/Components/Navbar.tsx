@@ -2,14 +2,25 @@ import { useState, useEffect } from "react";
 import { Menu, X, Crown, Moon, Sun } from "lucide-react";
 import { Button } from "../Components/Button";
 import { useThemeStore } from "../stores/useThemeStore";
+import {  useNavigate } from "react-router-dom";
 
-export function Navbar() {
+export function Navbar({ variant = "default" }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isDarkMode, initTheme, toggleDarkMode } = useThemeStore();
+  const nav = useNavigate();
+  const scrollToFooter = () => {
+  const footer = document.getElementById("contact");
+  if (footer) {
+    footer.scrollIntoView({ behavior: "smooth" });
+    setIsMenuOpen(false); // close mobile menu after clicking
+  }
+};
 
   useEffect(() => {
-    initTheme(); // check localStorage + system preference
+    initTheme(); // initialize theme on mount
   }, [initTheme]);
+
+  const isAboutVariant = variant === "about";
 
   return (
     <header className="fixed top-0 w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-amber-100 dark:border-amber-800 z-50 transition-colors duration-300">
@@ -23,56 +34,93 @@ export function Navbar() {
             </span>
           </div>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="nav-link">Features</a>
-            <a href="#about" className="nav-link">About</a>
-            <a href="#contact" className="nav-link">Contact</a>
-          </nav>
+          {/* Desktop Nav (hidden in about variant) */}
+          {!isAboutVariant && (
+            <nav className="hidden md:flex items-center space-x-8">
+              <a href="#features" className="nav-link">
+                Features
+              </a>
+               <a href="/about" className="nav-link px-4">
+                About
+              </a>
+              <a onClick={scrollToFooter} className="nav-link cursor-pointer">
+                Contact
+              </a>
+            </nav>
+          )}
 
-          {/* Desktop CTA + Dark Mode Toggle */}
+          {/* Desktop Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             <Button
               variant="outline"
               size="sm"
               onClick={toggleDarkMode}
               text=""
-              icon={isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              icon={
+                isDarkMode ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )
+              }
             />
-            <Button variant="outline" size="sm" onClick={() => {}} text="Sign In" />
-            <Button variant="primary" size="sm" onClick={() => {}} text="Start Playing" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => nav('/login')}
+              text="Sign In"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => nav("/game")}
+              text="Quick Match"
+            />
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile Menu Buttons */}
           <div className="md:hidden flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
               onClick={toggleDarkMode}
               text=""
-              icon={isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              icon={
+                isDarkMode ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )
+              }
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              text=""
-              icon={isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            />
+            {!isAboutVariant && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                text=""
+                icon={isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              />
+            )}
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
+        {/* Mobile Nav Menu (only if not About variant) */}
+        {!isAboutVariant && isMenuOpen && (
           <div className="md:hidden bg-white dark:bg-gray-900 border-t border-amber-100 dark:border-amber-800 py-4 transition-colors duration-300">
             <div className="flex flex-col space-y-4">
-              <a href="#features" className="nav-link px-4">Features</a>
-              <a href="#pricing" className="nav-link px-4">Pricing</a>
-              <a href="#about" className="nav-link px-4">About</a>
-              <a href="#contact" className="nav-link px-4">Contact</a>
+              <a href="#features" className="nav-link px-4">
+                Features
+              </a> 
+             <a href="/about" className="nav-link px-4">
+                About
+              </a>
+               <a onClick={scrollToFooter} className="nav-link px-4 cursor-pointer">
+                Contact
+              </a>
               <div className="flex flex-col space-y-2 px-4 pt-4 border-t border-amber-100 dark:border-amber-800">
-                <Button variant="outline" size="sm" onClick={() => {}} text="Sign In" />
-                <Button variant="primary" size="sm" onClick={() => {}} text="Start Playing" />
+                <Button variant="outline" size="sm" text="Sign In" onClick={()=>nav('/login')}/>
+                <Button variant="primary" size="sm" text="Start Playing" onClick={()=>nav('/game')} />
               </div>
             </div>
           </div>

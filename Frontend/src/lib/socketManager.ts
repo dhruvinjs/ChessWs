@@ -3,7 +3,7 @@ import { useGameStore } from "../stores/useGameStore";
 import { showGameMessage } from "../Components/chess/ChessGameMessage";
 import { GameMessages } from "../constants";
 import { SocketMessage } from "../types/socket";
-
+import { launchConfetti } from "./confetti";
 export class SocketManager {
   private static instance: SocketManager;
   private socket: WebSocket | null = null;
@@ -38,92 +38,118 @@ export class SocketManager {
       } = useGameStore.getState();
 
       switch (type) {
-        case GameMessages.MOVE:
-          processServerMove(payload);
-          break;
-        case GameMessages.GAME_OVER:
-          if (payload.fen) setFen(payload.fen);
-          endGame(payload.winner, payload.loser);
-          showGameMessage("Game Over", payload.message || "The game has ended.", { type: "info" });
-          break;
-        case GameMessages.INIT_GAME:
-          reconnect(payload);
-          if (payload.moves && payload.moves.length > 0) {
-            showGameMessage("Rejoined Game", "Welcome back!", { type: "info" });
-          } else {
-            showGameMessage("Game Started", `You are playing as ${payload.color === "w" ? "White" : "Black"}`, { type: "success" });
+            case GameMessages.MOVE:
+              processServerMove(payload);
+              break;
+
+            case GameMessages.GAME_OVER:
+              if (payload.fen) setFen(payload.fen);
+              endGame(payload.winner, payload.loser);
+
+              // Check if the current player is the winner
+              const { color } = useGameStore.getState(); // user's color
+              if (color === payload.winner) {
+                // Winner animation
+                showGameMessage(
+                  "🏆 You Won!",
+                  payload.message || "Congratulations! You won the match.",
+                  { type: "success" }
+                );
+                launchConfetti(); // confetti only for winner
+              } else {
+                // Loser animation / message
+                showGameMessage(
+                  "💀 You Lost!",
+                  payload.message || "Better luck next time!",
+                  { type: "error" }
+                );
+                // Optional: you can trigger a "losing" animation here
+                // e.g., shake board, fade out pieces, etc.
+              }
+              break;
+
+
+            case GameMessages.INIT_GAME:
+              reconnect(payload);
+              if (payload.moves && payload.moves.length > 0) {
+                showGameMessage("🔄 Reconnected", "Welcome back to your game!", {
+                  type: "info",
+                });
+              } else {
+                showGameMessage(
+                  "🎯 Match Started",
+                  `You are playing as ${payload.color === "w" ? "⚪ White" : "⚫ Black"}.`,
+                  { type: "success" }
+                );
+              }
+              break;
+
+            case GameMessages.GAME_ACTIVE:
+              showGameMessage("✅ Game Ready", "A new match is ready to begin!", {
+                type: "success",
+              });
+              break;
+
+            case GameMessages.CHECK:
+              showGameMessage("⚠️ Check!", payload.message || "Your king is under attack!", {
+                type: "warning",
+              });
+              break;
+
+            case GameMessages.STALEMATE:
+              showGameMessage("🤝 Stalemate", payload.message || "It’s a draw!", {
+                type: "info",
+              });
+              break;
+
+            case GameMessages.OPP_RECONNECTED:
+              reconnect(payload);
+              showGameMessage("🔌 Opponent Reconnected", "Your opponent is back online.", {
+                type: "info",
+              });
+              break;
+
+            case GameMessages.DISCONNECTED:
+              setOppStatus(false);
+              showGameMessage("📴 Opponent Disconnected", "They’ve left the game.", {
+                type: "warning",
+              });
+              break;
+
+            case GameMessages.TIME_EXCEEDED:
+              endGame(payload.winner, payload.loser);
+              showGameMessage("⏰ Time’s Up!", payload.message || "Time ran out!", {
+                type: "error",
+              });
+              break;
+
+            case GameMessages.SERVER_ERROR:
+              showGameMessage("💥 Server Error", "Something went wrong on the server.", {
+                type: "error",
+              });
+              break;
+
+            case GameMessages.WRONG_PLAYER_MOVE:
+              showGameMessage(
+                "🚫 Not Your Turn",
+                payload.message || "Please wait for your opponent to move.",
+                { type: "error" }
+              );
+              break;
+
+            case GameMessages.TIMER_UPDATE:
+              if (
+                payload.whiteTimer !== undefined &&
+                payload.blackTimer !== undefined
+              ) {
+                updateTimers(payload.whiteTimer, payload.blackTimer);
+              }
+              break;
+
+            default:
+              console.warn(`Unknown message type: ${type}`);
           }
-          break;
-        case GameMessages.GAME_ACTIVE:
-            showGameMessage("Game Ready", "A game is ready to start!", {
-              type: "success",
-            });
-            break;
 
-          case GameMessages.CHECK:
-            showGameMessage("Check!", payload.message || "You are in check.", { type: "warning" });
-            break;
-
-          case GameMessages.STALEMATE:
-            showGameMessage(
-              "Stalemate",
-              payload.message || "The game is a draw.",
-              { type: "info" }
-            );
-            break;
-
-          case GameMessages.OPP_RECONNECTED:
-            reconnect(payload);
-            showGameMessage(
-              "Opponent Reconnected",
-              "Your opponent is back online.",
-              { type: "info" }
-            );
-            break;
-
-          case GameMessages.DISCONNECTED:
-            setOppStatus(false);
-            showGameMessage(
-              "Opponent Disconnected",
-              payload.message || "Your opponent has disconnected.",
-              { type: "warning" }
-            );
-            break;
-
-          case GameMessages.TIME_EXCEEDED:
-            endGame(payload.winner, payload.loser);
-            showGameMessage("Time's Up!", payload.message || "You ran out of time.", {
-              type: "error",
-            });
-            break;
-
-          case GameMessages.SERVER_ERROR:
-            showGameMessage(
-              "Server Error",
-              payload.message || "A server error occurred.",
-              { type: "error" }
-            );
-            break;
-
-          case GameMessages.WRONG_PLAYER_MOVE:
-            showGameMessage(
-              "Invalid Move",
-              payload.message || "It's not your turn to move.",
-              { type: "error" }
-            );
-            break;
-
-          case GameMessages.TIMER_UPDATE:
-            if (
-              payload.whiteTimer !== undefined &&
-              payload.blackTimer !== undefined
-            ) {
-              updateTimers(payload.whiteTimer, payload.blackTimer);
-            }
-            break;
-        default:
-          console.warn(`Unknown message type: ${type}`);
-      }
     } catch (error) {
       console.error("Error handling message:", error);
       showGameMessage("Error", "There was a problem processing a server message.", { type: "error" });

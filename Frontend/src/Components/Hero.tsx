@@ -3,6 +3,7 @@ import { Play, UserPlus, Crown } from "lucide-react"
 import { HeroChessBoard } from "./HeroChessBoard"
 import { Button } from "./Button"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
+import { useNavigate } from "react-router-dom"
 
 export function Hero() {
   
@@ -22,7 +23,7 @@ export function Hero() {
     animate(players, 2_000_000, { duration: 2 }) // 2M players
     animate(games, 50_000, { duration: 2.5 }) // 50K games
   }, [])
-
+  const nav=useNavigate()
   const floatingPieces = ["♛", "♜", "♝", "♞", "♟"]
   const floatingPieceStyles = useMemo(
     () =>
@@ -93,8 +94,8 @@ export function Hero() {
               <Button
                 variant="primary"
                 size="lg"
-                text="Start Playing Free"
-                onClick={() => console.log("Play clicked")}
+                text="Quick Match"
+                onClick={() =>nav('/game')}
                 icon={<Play className="h-6 w-6" />}
               />
               <Button

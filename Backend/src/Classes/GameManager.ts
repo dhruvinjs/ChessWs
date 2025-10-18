@@ -5,6 +5,7 @@ import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT
 import { getGameState, makeMove, playerLeft, provideValidMoves, reconnectPlayer } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
+import { RecordType } from "zod"
 export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
     private globalSetInterval:NodeJS.Timeout | null = null
@@ -36,84 +37,137 @@ export class GameManager{
    async startTimer(){
     // if globalSetInterval is not null means it is already running 
     //if its running then return so that only one globalSetInterval is 
+     if (this.globalSetInterval) {
+    console.log("Timer already running");
+    return;
+  }
+
+  console.log("⏰ Starting global timer");
+
+    
     //running all the time
-    console.log("before return in globalSetInterval")
-    if(this.globalSetInterval) return
+    this.globalSetInterval = setInterval(async () => {
+    try {
+      // Get all active games
+      const activeGames = await redis.sMembers("active-games");
 
-    this.globalSetInterval=setInterval(async()=>{
-        const activeGames=await redis.sMembers("active-games") 
-        if(!activeGames || activeGames.length === 0){
-            if(this.globalSetInterval){
-                clearInterval(this.globalSetInterval)
-                this.globalSetInterval=null
-            }
-            console.log("Timer not started becuase of no active-games")
-            return
+      // If no games, stop the timer
+      if (!activeGames || activeGames.length === 0) {
+        console.log("No active games, stopping timer");
+        if (this.globalSetInterval) {
+          clearInterval(this.globalSetInterval);
+          this.globalSetInterval = null;
+        }
+        return;
+      }
+
+      // Process each game
+      for (const gameId of activeGames) {
+        const game = await redis.hGetAll(`game:${gameId}`) as Record<string,string>;
+
+        // Skip if game not found
+        if (!game || Object.keys(game).length === 0) {
+          await redis.sRem("active-games", gameId);
+          continue;
         }
 
-        for(const gameId of activeGames ){
-           const  game=await redis.hGetAll(`game:${gameId}`) as Record<string,string> 
-            if(!game){
-                await redis.sRem(`active-games`,gameId)
-                continue
-            }
-            //removing all the completed games
-            if (game.status === GAME_OVER || game.status === DISCONNECTED) {
-                // only clear explicitly ended games
-                await redis.sRem("active-games", gameId);
-                continue
-                }
-        let blackTimer = Number(game.blackTimer)
-        let whiteTimer = Number(game.whiteTimer)
-        const fen=game.fen
-        const turn = fen.split(" ")[1] 
-        console.log(turn);
-
-        if(turn === "w"){
-          const newWhiteTimer= await redis.hIncrBy(`game:${gameId}`,"whiteTimer",-1)
-            whiteTimer=Math.max(0,Number(newWhiteTimer))
-        }else{
-           const newBlackTimer= await redis.hIncrBy(`game:${gameId}`,"blackTimer",-1)
-            blackTimer=Math.max(0, Number(newBlackTimer))
+        // Skip if game already over
+        if (game.status === GAME_OVER || game.status === DISCONNECTED) {
+          await redis.sRem("active-games", gameId);
+          continue;
         }
 
+        // Get current timers and turn
+        let blackTimer = Number(game.blackTimer);
+        let whiteTimer = Number(game.whiteTimer);
+        const fen = game.fen;
+        const turn = fen.split(" ")[1]; // 'w' or 'b'
+
+        // Decrement the timer for current player
+        if (turn === "w") {
+          const newWhiteTimer = await redis.hIncrBy(`game:${gameId}`, "whiteTimer", -1);
+          whiteTimer = Math.max(0, Number(newWhiteTimer));
+        } else {
+          const newBlackTimer = await redis.hIncrBy(`game:${gameId}`, "blackTimer", -1);
+          blackTimer = Math.max(0, Number(newBlackTimer));
+        }
+
+        // Get sockets
         const user1Socket = this.socketMap.get(game.user1);
         const user2Socket = this.socketMap.get(game.user2);
-        console.log(whiteTimer,blackTimer)
 
-        const timerMessage={
-            type:TIMER_UPDATE,
-            payload:{
-                whiteTimer:whiteTimer,
-                blackTimer:blackTimer
-            }
+        // Send timer update to both players
+        if (user1Socket && user2Socket) {
+          const timerMessage = {
+            type: TIMER_UPDATE,
+            payload: {
+              whiteTimer: whiteTimer,
+              blackTimer: blackTimer,
+            },
+          };
+
+          user1Socket.send(JSON.stringify(timerMessage));
+          user2Socket.send(JSON.stringify(timerMessage));
         }
-        user1Socket?.send(JSON.stringify(timerMessage))
-        user2Socket?.send(JSON.stringify(timerMessage))
 
-
-
-            if (whiteTimer <= 0 || blackTimer <= 0) {
-                const winner = whiteTimer <= 0 ? game.user2 : game.user1;
-                await redis.hSet(`game:${gameId}`, { status: GAME_OVER, winner });
-                await redis.sRem("active-games", gameId);
-
-                const message = JSON.stringify({
-                type: GAME_OVER,
-                payload: { reason: TIME_EXCEEDED, winner }
-                });
-
-                user1Socket?.send(message);
-                user2Socket?.send(message);
+        // Check if time ran out
+        if (whiteTimer <= 0 || blackTimer <= 0) {
+          await this.handleTimeExpired(game, gameId, whiteTimer, blackTimer);
         }
       }
-    },1000)//every 1 second 
+    } catch (error) {
+      console.error("Error in timer:", error);
+    }
+  }, 1000); // Run every 1 second
 
 
 
   }
 
+  async handleTimeExpired(game:Record<string,string>,gameId:string,whiteTimer:number,blackTimer:number) {
+    try {
+        const winnerId=whiteTimer <= 0 ? game.user2 :game.user1 
+        const loserId=whiteTimer <= 0 ? game.user1 :game.user2 
+        const winnerColor= winnerId === game.user1 ? "w" : "b"
 
+        await redis.hSet(`game:${gameId}`,{
+            status:GAME_OVER,
+            winner:winnerId,
+        })
+        await redis.sRem('active-games',gameId)
+        await redis.expire(`game:${gameId}`,600)
+        
+        const winnerSocket=this.socketMap.get(winnerId)
+        const loserSocket=this.socketMap.get(loserId)
+         const winnerMessage = JSON.stringify({
+      type: GAME_OVER,
+      payload: {
+        result: "win",
+        reason: TIME_EXCEEDED,
+        winner: winnerColor,
+        message: "🎉 You won! Your opponent ran out of time.",
+      },
+    });
+
+    // Send loser message
+    const loserMessage = JSON.stringify({
+      type: GAME_OVER,
+      payload: {
+        result: "lose",
+        reason: TIME_EXCEEDED,
+        winner: winnerColor,
+        message: "⏱️ Time's up! You lost on time.",
+      },
+    });
+
+    winnerSocket?.send(winnerMessage);
+    loserSocket?.send(loserMessage);
+
+
+    } catch (error) {
+        console.log("error in handleTimeExpired: ",error);
+    }
+  }
 
     private addHandler(socket:WebSocket,guestId:string){
        
@@ -165,7 +219,7 @@ export class GameManager{
                 user2: guestId,
                 status: GAME_ACTIVE,
                 fen: chess.fen(),
-                whiteTimer: 600,
+                whiteTimer: 30,
                 blackTimer: 600,
                 })
                 .setEx(`user:${user1Id}:game`, 1800, newGameId)
@@ -207,7 +261,6 @@ export class GameManager{
                     turn: chess.turn(),
                     whiteTimer: 600,
                     blackTimer: 600,
-                    moves,
                 },
                 })
             );
@@ -215,7 +268,7 @@ export class GameManager{
             // Add to active games for global timer handling
             await redis.sAdd("active-games", newGameId);
             await redis.incr("guest:games:total");
-
+            await this.startTimer()
 
             }
 

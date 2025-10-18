@@ -54,7 +54,9 @@ export async function makeMove(
     }
 
     const isWhiteTurn = gameState.turn === "w";
-    if ((isWhiteTurn && gameState.user1 !== playerId) || (!isWhiteTurn && gameState?.user2 !== playerId)) {
+    if ((isWhiteTurn && gameState.user1 !== playerId) || 
+        (!isWhiteTurn && gameState?.user2 !== playerId)) 
+        {
         console.log("Wrong player move");
         const message = JSON.stringify({
             type: WRONG_PLAYER_MOVE,
@@ -74,8 +76,6 @@ export async function makeMove(
         console.log("One or both players disconnected");
         return;
     }
-
-    
 
     const board = gameState.board;
 
@@ -99,18 +99,7 @@ export async function makeMove(
             }));
             return;
         }
-            
-    if (board.isCheck()) {
-        const message = JSON.stringify({
-            type: CHECK,
-            payload: {
-                move
-            }
-        });
-        user1Socket.send(message);
-        user2Socket.send(message);
-        return;
-    }
+  
 
     if (board.isStalemate()) {
         const message = JSON.stringify({
@@ -134,39 +123,96 @@ export async function makeMove(
 
     // Game Over logic
     if (board.isGameOver()) {
-        const winner = board.turn() === "w" ? "black" : "white";
+    const winnerColor = board.turn() === "w" ? "black" : "white";
+    const winnerId = winnerColor === "white" ? gameState.user1 : gameState.user2;
+    const loserId = winnerColor === "white" ? gameState.user2 : gameState.user1;
 
-        const message = JSON.stringify({
-            type: GAME_OVER,
-            payload: {
-                winner: winner
+    const winnerSocket = socketMap.get(winnerId);
+    const loserSocket = socketMap.get(loserId);
+
+    // --- Redis update ---
+    await redis.hSet(`game:${gameId}`, {
+        status: GAME_OVER,
+        winner: winnerColor
+    });
+    await redis.expire(`game:${gameId}`, 600);
+
+    // --- Construct clear payloads ---
+    const winnerMessage = JSON.stringify({
+        type: GAME_OVER,
+        payload: {
+            result: "win",
+            message: "🏆 Congratulations! You’ve won the game.",
+            winner: winnerColor,
+        },
+    });
+
+    const loserMessage = JSON.stringify({
+        type: GAME_OVER,
+        payload: {
+            result: "lose",
+            message: "💔 Game over. You’ve been checkmated.",
+            winner: winnerColor,
+        },
+    });
+
+    // --- Send to each player ---
+    winnerSocket?.send(winnerMessage);
+    loserSocket?.send(loserMessage);
+
+    return;
+}
+    const validMoves= await provideValidMoves(gameId)
+
+    const oppPayload={
+                type: MOVE,
+                payload: {
+                move,
+                turn: board.turn(),
+                fen: board.fen(),
+                validMoves
+                }
             }
-        });
+            const currentPlayerPayload={
+                type:MOVE,
+                payload:{
+                move,
+                turn: board.turn(),
+                fen: board.fen(),
+                validMoves:[]
+                }
+            }
+    const currentPlayerSocket = playerId === gameState.user1 ? user1Socket : user2Socket;
+    const opponentSocket = playerId === gameState.user1 ? user2Socket : user1Socket;
 
-        await redis.hSet(`game:${gameId}`, {
-            status: GAME_OVER,
-            winner: winner
-        });
-        await redis.expire(`game:${gameId}`, 600);
+    currentPlayerSocket.send(JSON.stringify(currentPlayerPayload));
+    opponentSocket.send(JSON.stringify(oppPayload));
 
-        user1Socket.send(message);
-        user2Socket.send(message);
+      
+            
+    if (board.isCheck()) {
+        const attackerCheckMessage = {
+            type: CHECK,
+            payload: {
+            message: "Check! You've put the opposing King under fire. The pressure is on them now!"
+            }
+        };
+
+        const defenderCheckMessage = {
+        type: CHECK,
+        payload: {
+            message: "You are in Check! Defend your King immediately. Your move."
+        }
+        };
+
+        currentPlayerSocket.send(JSON.stringify(attackerCheckMessage));
+        opponentSocket.send(JSON.stringify(defenderCheckMessage));
+
         return;
     }
-    
-    const validMoves= await provideValidMoves(gameId)
-    const opponent = playerId === gameState.user1 ? user2Socket : user1Socket;
-    opponent.send(JSON.stringify({
-        type: MOVE,
-        payload: {
-            move,
-            turn:board.turn(),
-            fen:board.fen(),
-            validMoves:validMoves
-        }
-    }));
-    
 
+    
+  
 }
 
 
@@ -200,6 +246,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
     const opponentId = playerId === game.user1 ? game.user2 : game.user1;
 
     console.log("sending the current moves to ", playerId);
+    const validMoves = await provideValidMoves(gameId);
 
     socket.send(JSON.stringify({
         type: GAME_FOUND,
@@ -210,7 +257,8 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
                 opponentId,
                 gameId,
                 whiteTimer:game.whiteTimer,
-                blackTimer:game.blackTimer
+                blackTimer:game.blackTimer,
+                validMoves: validMoves || []
             }
         }));
 

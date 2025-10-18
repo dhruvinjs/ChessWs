@@ -1,17 +1,16 @@
 import { create } from "zustand";
-// --- THIS IS THE FIX: A simple, direct import for chess.js as requested. ---
-import { Chess } from "chess.js";
 import { GameMessages } from "../constants";
 import { SocketManager } from "../lib/socketManager";
 
 interface Move {
   from: string;
   to: string;
-  promotion?: string;
+  promotion?: string | null;
 }
 
 type Color = "w" | "b" | null;
 
+// --- FIX: `turn` property removed from the interface ---
 interface GameState {
   guestId: string;
   color: Color;
@@ -24,7 +23,6 @@ interface GameState {
   gameStarted: boolean;
   fen: string;
   validMoves: Move[];
-  turn: Color;
   whiteTimer: number;
   blackTimer: number;
   selectedSquare: string | null;
@@ -58,14 +56,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   gameStatus: GameMessages.INIT_GAME,
   fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
   validMoves: [],
-  turn: "w",
+  // --- FIX: `turn` property removed from initial state ---
   whiteTimer: 600,
   blackTimer: 600,
   selectedSquare: null,
 
   initGame: (payload) =>
-    set((state) => ({
-      ...state,
+    set({
       ...payload,
       validMoves: payload.validMoves || [],
       gameStatus: GameMessages.GAME_ACTIVE,
@@ -73,29 +70,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       moves: [],
       winner: null,
       loser: null,
-    })),
+    }),
 
-  processServerMove: (payload) =>
+  processServerMove: (payload) => {
     set((state) => ({
-      ...state,
       fen: payload.fen,
-      turn: payload.turn,
+      // --- FIX: `turn` is no longer set here. FEN is the source of truth. ---
       validMoves: payload.validMoves || [],
       moves: [...state.moves, payload.move],
       whiteTimer: payload.whiteTimer ?? state.whiteTimer,
       blackTimer: payload.blackTimer ?? state.blackTimer,
       selectedSquare: null,
-    })),
+    }));
+  },
 
   reconnect: (payload) =>
-    set((state) => ({
-      ...state,
+    set({
       ...payload,
       validMoves: payload.validMoves || [],
       gameStatus: GameMessages.GAME_ACTIVE,
       gameStarted: true,
       oppConnected: true,
-    })),
+    }),
 
   setFen: (fen) => set({ fen }),
 
@@ -125,7 +121,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameStatus: GameMessages.INIT_GAME,
       fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       validMoves: [],
-      turn: "w",
+      // --- FIX: `turn` removed from reset state ---
       whiteTimer: 600,
       blackTimer: 600,
       selectedSquare: null,
@@ -134,22 +130,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   setSelectedSquare: (square) => set({ selectedSquare: square }),
 
   move: (move) => {
-    const { gameId, fen } = get();
+    const { gameId } = get();
     if (!gameId) return;
 
-    const chess = new Chess(fen);
-    const result = chess.move(move);
+    set({ selectedSquare: null });
 
-    if (result) {
-      set({
-        fen: chess.fen(),
-        turn: chess.turn(),
-        selectedSquare: null,
-        validMoves: [], 
-      });
-    }
-
-    SocketManager.getInstance().send({ type: GameMessages.MOVE, payload: { ...move, gameId } });
+    SocketManager.getInstance().send({ 
+      type: GameMessages.MOVE, 
+      payload: { ...move, gameId } 
+    });
   },
 
   initGameRequest: () => {
@@ -161,7 +150,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       validMoves: [],
       selectedSquare: null,
       color: null,
-      turn: "w",
+      // --- FIX: `turn` removed from init request ---
       winner: null,
       loser: null,
     });
@@ -178,3 +167,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 }));
+
+export const useGameActions = () =>
+  useGameStore((state) => ({
+    move: state.move,
+    initGameRequest: state.initGameRequest,
+    resign: state.resign,
+    setSelectedSquare: state.setSelectedSquare,
+  }));

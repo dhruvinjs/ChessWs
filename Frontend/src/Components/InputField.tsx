@@ -2,8 +2,8 @@ interface Props {
   className?: string;
   type: string;
   placeholder: string;
-  minLength: number;
-  maxLength: number;
+  minLength?: number;
+  maxLength?: number;
   required: boolean;
  inputRef?: React.RefObject<HTMLInputElement | null> ;
 }

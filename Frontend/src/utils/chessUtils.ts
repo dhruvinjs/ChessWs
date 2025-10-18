@@ -23,3 +23,36 @@ export function getSquareCoordinates(square: string): [number, number] {
 export const getSquareColor = (row: number, col: number): 'light' | 'dark' => {
   return (row + col) % 2 === 0 ? 'light' : 'dark';
 };
+
+export const getPieceFromFen = (fen: string, squareName: string): string | null => {
+    const fenBoard = fen.split(" ")[0];
+    const rows = fenBoard.split("/");
+    const file = squareName.charCodeAt(0) - "a".charCodeAt(0);
+    const rank = 8 - parseInt(squareName.substring(1), 10);
+
+    if (rank < 0 || rank >= 8 || file < 0 || file >= 8) {
+        return null;
+    }
+
+    const rowFen = rows[rank];
+    if (!rowFen) return null;
+
+    let currentFile = 0;
+    for (const char of rowFen) {
+        if (isNaN(parseInt(char, 10))) {
+            if (currentFile === file) {
+                const pieceColor = char === char.toUpperCase() ? "w" : "b";
+                return `${pieceColor}${char.toUpperCase()}`;
+            }
+            currentFile++;
+        } else {
+            const emptySquares = parseInt(char, 10);
+            if (currentFile + emptySquares > file) {
+                return null;
+            }
+            currentFile += emptySquares;
+        }
+    }
+
+    return null;
+};

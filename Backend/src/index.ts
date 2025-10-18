@@ -26,7 +26,7 @@ const wss = new WebSocketServer({ server });
 
 export const pc=new PrismaClient()
 app.use(cors({
-   origin: ["https://zp1v56uxy8rdx5ypatb0ockcb9tr6a-oci3--5173--96435430.local-credentialless.webcontainer-api.io/",'http://localhost:5173'], 
+   origin: ['http://localhost:5173'], 
    methods: ['GET', 'POST', 'PUT', 'DELETE'],
    allowedHeaders: ['Content-Type', 'Authorization'],
    credentials:true

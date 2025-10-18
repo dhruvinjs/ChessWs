@@ -24,7 +24,7 @@ export function About() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 transition-colors duration-300 relative overflow-hidden">
-      <Navbar />
+      <Navbar variant="about" />
 
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden">
