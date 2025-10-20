@@ -7,7 +7,7 @@ export const userApi=axios.create({
     withCredentials:true
 })
 
-export const gameApi=axios.create({
+export const gamesApi=axios.create({
 baseURL:game_base_url,
 withCredentials:true
 })

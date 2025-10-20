@@ -4,26 +4,30 @@ import { HeroChessBoard } from "./HeroChessBoard"
 import { Button } from "./Button"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 import { useNavigate } from "react-router-dom"
+import { useGuestGamesTotalQuery } from "../hooks/useGame"
+import { useUserStore } from "../stores/useUserStore"
 
 export function Hero() {
-  
   const players = useMotionValue(0)
+    const { isGuest } = useUserStore()
+
   const playersRounded = useTransform(players, (val) =>
     val >= 1_000_000 ? `${(val / 1_000_000).toFixed(1)}M+` : `${Math.floor(val)}`
   )
 
-  // ✅ Games counter
+  // ✅ Games counter (animated number)
   const games = useMotionValue(0)
-  const gamesRounded = useTransform(games, (val) =>
-    val >= 1000 ? `${Math.floor(val / 1000)}K+` : `${Math.floor(val)}`
-  )
+
+  // ✅ Fetch total guest games
+  const { isLoading, data: totalGames } = useGuestGamesTotalQuery()
 
   // Run animations once
   useMemo(() => {
     animate(players, 2_000_000, { duration: 2 }) // 2M players
     animate(games, 50_000, { duration: 2.5 }) // 50K games
   }, [])
-  const nav=useNavigate()
+
+  const nav = useNavigate()
   const floatingPieces = ["♛", "♜", "♝", "♞", "♟"]
   const floatingPieceStyles = useMemo(
     () =>
@@ -35,21 +39,17 @@ export function Hero() {
       })),
     [floatingPieces]
   )
-
+   const handleJoinRoom = () => {
+    if (isGuest) {
+      nav("/login") // ✅ redirect if not logged in
+      return
+    }
+    nav("/room") // or your join room route
+  }
   return (
     <section className="min-h-screen pt-20 pb-16 bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 overflow-hidden relative transition-colors duration-300">
-      {/* Background */}
+      {/* Background gradients & floating pieces */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-amber-300/40 to-orange-400/40 dark:from-amber-600/50 dark:to-orange-700/50 rounded-full blur-3xl animate-pulse"></div>
-        <div
-          className="absolute top-20 -left-32 w-80 h-80 bg-gradient-to-br from-yellow-300/30 to-amber-400/30 dark:from-amber-700/60 dark:to-yellow-700/60 rounded-full blur-2xl animate-pulse"
-          style={{ animationDelay: "1s" }}
-        ></div>
-        <div
-          className="absolute bottom-20 right-20 w-64 h-64 bg-gradient-to-br from-orange-300/40 to-red-400/40 dark:from-orange-600/70 dark:to-red-700/70 rounded-full blur-xl animate-pulse"
-          style={{ animationDelay: "2s" }}
-        ></div>
-
         {floatingPieces.map((piece, index) => (
           <div
             key={piece + index}
@@ -65,6 +65,7 @@ export function Hero() {
         <div className="lg:grid lg:grid-cols-12 lg:gap-12 items-center min-h-[80vh]">
           {/* Left Column */}
           <div className="lg:col-span-6 space-y-8">
+            {/* Tagline */}
             <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 rounded-full border border-amber-200 dark:border-amber-700/50 backdrop-blur-sm">
               <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400 mr-2" />
               <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
@@ -72,6 +73,7 @@ export function Hero() {
               </span>
             </div>
 
+            {/* Heading */}
             <div className="space-y-4">
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight">
                 <span className="text-slate-900 dark:text-white">Master</span>
@@ -83,6 +85,7 @@ export function Hero() {
               </h1>
             </div>
 
+            {/* Description */}
             <p className="text-xl lg:text-2xl text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
               Join the world's most advanced chess platform. Play against millions,
               <span className="font-semibold text-amber-700 dark:text-amber-400"> learn from grandmasters</span>,
@@ -95,14 +98,14 @@ export function Hero() {
                 variant="primary"
                 size="lg"
                 text="Quick Match"
-                onClick={() =>nav('/game')}
+                onClick={() => nav("/game")}
                 icon={<Play className="h-6 w-6" />}
               />
               <Button
                 variant="outline"
                 size="lg"
                 text="Join Room"
-                onClick={() => console.log("Join clicked")}
+                onClick={handleJoinRoom}
                 icon={<UserPlus className="h-6 w-6" />}
               />
             </div>
@@ -110,21 +113,25 @@ export function Hero() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 pt-8">
               <div className="text-center group cursor-pointer">
-                <motion.div
-                  className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform"
-                >
+                <motion.div className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
                   {playersRounded}
                 </motion.div>
                 <div className="text-slate-600 dark:text-slate-400 font-medium">Active Players</div>
               </div>
 
               <div className="text-center group cursor-pointer">
-                <motion.div
-                  className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform"
-                >
-                  {gamesRounded}
+                <motion.div className="text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white group-hover:scale-110 transition-transform">
+                  {isLoading ? (
+                    "Loading..."
+                  ) : totalGames && totalGames > 0 ? (
+                    totalGames
+                  ) : (
+                    "Be the first!"
+                  )}
                 </motion.div>
-                <div className="text-slate-600 dark:text-slate-400 font-medium">Daily Games</div>
+                <div className="text-slate-600 dark:text-slate-400 font-medium">
+                  {totalGames && totalGames > 0 ? "Guest Games Played" : "to play a game!"}
+                </div>
               </div>
 
               <div className="text-center group cursor-pointer">

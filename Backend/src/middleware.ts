@@ -3,15 +3,15 @@ import jwt from 'jsonwebtoken'
 import { NextFunction, Response,Request } from 'express'
 export function authMiddleware(req:Request,res:Response,next:NextFunction){
     try {
-        const token=req.headers.cookie
+        const token=req.cookies.token
         if(!token){
-            res.status(400).json({message:"Token Not found"})
+            res.status(401).json({message:"Token Not found"})
             return
         }
         //@ts-ignore
         const decodedToken=jwt.verify(token,process.env.SECRET_TOKEN)
         if(!decodedToken){
-             res.status(400).json({message:"Token is invalid"})
+             res.status(401).json({message:"Token is invalid"})
             return
             }
             //@ts-ignore

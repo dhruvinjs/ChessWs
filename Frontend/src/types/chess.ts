@@ -10,8 +10,8 @@ export interface ChessPiece {
 }
 
 export type BoardType=ChessPiece | null
-// A chess board is an 8×8 2D array of squares
 export type ChessBoard=BoardType[][]
+export type ChessLevel = "BEGINNER" | "INTERMEDIATE" | "PRO";
 
 //GameState
 export interface GameState{

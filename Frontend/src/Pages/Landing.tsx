@@ -1,6 +1,7 @@
 import {  Navbar, Footer, Hero, Testimonials } from "../Components";
 import { Features } from "../Components/Features";
 
+
 export function Landing() {
 
   return (

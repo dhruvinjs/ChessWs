@@ -36,6 +36,7 @@ const SquareComponent = ({
               opacity: 1,
               y: 0,
               scale: 1,
+              x:2,
               transition: { type: "spring", stiffness: 250, damping: 25 },
             }}
             exit={{

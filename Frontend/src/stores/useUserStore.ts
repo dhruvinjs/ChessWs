@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { userApi } from "../api/axios";
+import { persist } from "zustand/middleware";
+import { authApi } from "../api/auth";
 
 export type ChessLevel = "BEGINNER" | "INTERMEDIATE" | "PRO";
 
@@ -19,63 +20,104 @@ interface UserState {
 
 interface UserActions {
   setUser: (user: User, isGuest: boolean) => void;
-  logout: () => void;
-  checkAndInitGuest: () => Promise<void>;
+  logout: () => Promise<void>;
+  checkAndInitUser: () => Promise<void>;
   setError: (error: Error | null) => void;
   setLoading: (isLoading: boolean) => void;
 }
 
-type UserStore = UserState & UserActions;
+export const useUserStore = create<UserState & UserActions>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isGuest: true,
+      isLoading: false,
+      error: null,
+      initialized: false,
 
-export const useUserStore = create<UserStore>()((set, get) => ({
-  // State
-  user: null,
-  isGuest: true,
-  isLoading: false,
-  error: null,
-  initialized: false,
+      setUser: (user, isGuest) => set({ user, isGuest, error: null, initialized: true }),
 
-  // Actions
-  setUser: (user, isGuest) =>
-    set({ user, isGuest, error: null, initialized: true }),
+      setError: (error) => set({ error, isLoading: false }),
 
-  logout: () => set({ user: null, isGuest: true, error: null }),
+      setLoading: (isLoading) => set({ isLoading }),
 
-  setError: (error) => set({ error, isLoading: false }),
+      logout: async () => {
+        try {
+          await authApi.logout();
+          set({ user: null, isGuest: true, initialized: true });
+        } catch (error) {
+          console.error("Logout error:", error);
+        }
+      },
 
-  setLoading: (isLoading) => set({ isLoading }),
+      checkAndInitUser: async () => {
+        const state = get();
 
-  checkAndInitGuest: async () => {
-    const state = get();
-    // Skip if we already have a user or are loading
-    if (state.user || state.isLoading || state.initialized) return;
+        // Skip if already loading or initialized
+        if (state.isLoading || state.initialized) return;
 
-    try {
-      set({ isLoading: true, error: null });
-      const res = await userApi.get<{ guestId: string }>("/cookie");
+        set({ isLoading: true, error: null });
 
-      if (res.data?.guestId) {
-        const guest: User = {
-          id: res.data.guestId,
-          name: "Guest",
-          chessLevel: "BEGINNER",
-        };
-        set({
-          user: guest,
-          isGuest: true,
-          isLoading: false,
-          initialized: true,
-        });
-      } else {
-        throw new Error("No guest ID received");
-      }
-    } catch (error) {
-      console.error("Failed to initialize guest:", error);
-      set({
-        error: error as Error,
-        isLoading: false,
-        initialized: true,
-      });
+        try {
+          // ✅ FIX: Check for auth token FIRST (via checkAuth)
+          try {
+            const authCheck = await authApi.checkAuth();
+            
+            if (authCheck?.success) {
+              // User has valid token - get their profile
+              const profile = await authApi.getProfile();
+              
+              set({
+                user: {
+                  id: profile.user.id || String(profile.user.email),
+                  name: profile.user.name,
+                  chessLevel: profile.user.chessLevel,
+                },
+                isGuest: false,
+                isLoading: false,
+                initialized: true,
+              });
+              return; // ✅ Exit - don't create guest!
+            }
+          } catch (authError: any) {
+            // No valid token or token expired - continue to guest creation
+            console.log("No auth token found, creating guest");
+          }
+
+          // ✅ No auth token - create guest user
+          const guest = await authApi.getOrCreateGuest();
+          
+          if (!guest?.success) {
+            throw new Error("Failed to create guest");
+          }
+
+          set({
+            user: {
+              id: guest.guestId,
+              name: "Guest",
+              chessLevel: "BEGINNER",
+            },
+            isGuest: true,
+            isLoading: false,
+            initialized: true,
+          });
+        } catch (err) {
+          console.error("Init user failed:", err);
+          set({ 
+            error: err as Error, 
+            isLoading: false, 
+            initialized: true 
+          });
+        }
+      },
+    }),
+    {
+      name: "user-storage", // localStorage key
+      // Only persist user info, not loading states
+      partialize: (state) => ({ 
+        user: state.user, 
+        isGuest: state.isGuest 
+      }),
     }
-  },
-}));
+  )
+);

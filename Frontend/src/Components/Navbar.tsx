@@ -1,61 +1,70 @@
 import { useState, useEffect } from "react";
-import { Menu, X, Crown, Moon, Sun } from "lucide-react";
+import { Menu, X, Crown, Moon, Sun, LogOut, User } from "lucide-react";
 import { Button } from "../Components/Button";
 import { useThemeStore } from "../stores/useThemeStore";
-import {  useNavigate } from "react-router-dom";
+import { useUserStore } from "../stores/useUserStore";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useLogoutMutation } from "../hooks/useUser";
 
-export function Navbar({ variant = "default" }) {
+export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isDarkMode, initTheme, toggleDarkMode } = useThemeStore();
+  const { user } = useUserStore();
   const nav = useNavigate();
-  const scrollToFooter = () => {
-  const footer = document.getElementById("contact");
-  if (footer) {
-    footer.scrollIntoView({ behavior: "smooth" });
-    setIsMenuOpen(false); // close mobile menu after clicking
-  }
-};
+  const location = useLocation();
+  const { mutate: logout, isPending } = useLogoutMutation();
 
   useEffect(() => {
-    initTheme(); // initialize theme on mount
+    initTheme();
   }, [initTheme]);
 
-  const isAboutVariant = variant === "about";
+  const showLandingLinks = location.pathname === "/";
+
+  const scrollToFooter = () => {
+    const footer = document.getElementById("contact");
+    if (footer) {
+      footer.scrollIntoView({ behavior: "smooth" });
+      setIsMenuOpen(false);
+    }
+  };
 
   return (
     <header className="fixed top-0 w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-amber-100 dark:border-amber-800 z-50 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Main Navbar */}
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <Crown className="h-8 w-8 text-amber-700 dark:text-amber-400" />
-            <span className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+          <div
+            className="flex items-center space-x-2 cursor-pointer"
+            onClick={() => nav("/")}
+          >
+            <Crown className="h-7 w-7 text-amber-700 dark:text-amber-400" />
+            <span className="text-lg sm:text-2xl font-bold text-amber-900 dark:text-amber-100">
               ChessMaster
             </span>
           </div>
 
-          {/* Desktop Nav (hidden in about variant) */}
-          {!isAboutVariant && (
+          {/* Desktop Nav Links */}
+          {showLandingLinks && (
             <nav className="hidden md:flex items-center space-x-8">
               <a href="#features" className="nav-link">
                 Features
               </a>
-               <a href="/about" className="nav-link px-4">
-                About
-              </a>
-              <a onClick={scrollToFooter} className="nav-link cursor-pointer">
+              <a
+                onClick={scrollToFooter}
+                className="nav-link cursor-pointer"
+              >
                 Contact
               </a>
             </nav>
           )}
 
           {/* Desktop Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
             <Button
               variant="outline"
               size="sm"
               onClick={toggleDarkMode}
-              text=""
               icon={
                 isDarkMode ? (
                   <Sun className="h-5 w-5" />
@@ -64,27 +73,49 @@ export function Navbar({ variant = "default" }) {
                 )
               }
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => nav('/login')}
-              text="Sign In"
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => nav("/game")}
-              text="Quick Match"
-            />
+
+            {user ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  text={user.name || "Profile"}
+                  icon={<User className="h-5 w-5" />}
+                  onClick={() => nav("/profile")}
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  text={isPending ? "Logging out..." : "Logout"}
+                  icon={<LogOut className="h-5 w-5" />}
+                  loading={isPending}
+                  onClick={() => logout()}
+                />
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  text="Sign In"
+                  onClick={() => nav("/login")}
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  text="Quick Match"
+                  onClick={() => nav("/game")}
+                />
+              </>
+            )}
           </div>
 
-          {/* Mobile Menu Buttons */}
+          {/* Mobile Controls */}
           <div className="md:hidden flex items-center space-x-2">
             <Button
               variant="outline"
-              size="sm"
+              size="md"
               onClick={toggleDarkMode}
-              text=""
               icon={
                 isDarkMode ? (
                   <Sun className="h-5 w-5" />
@@ -93,35 +124,83 @@ export function Navbar({ variant = "default" }) {
                 )
               }
             />
-            {!isAboutVariant && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                text=""
-                icon={isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              />
-            )}
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              icon={
+                isMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )
+              }
+            />
           </div>
         </div>
 
-        {/* Mobile Nav Menu (only if not About variant) */}
-        {!isAboutVariant && isMenuOpen && (
-          <div className="md:hidden bg-white dark:bg-gray-900 border-t border-amber-100 dark:border-amber-800 py-4 transition-colors duration-300">
-            <div className="flex flex-col space-y-4">
-              <a href="#features" className="nav-link px-4">
-                Features
-              </a> 
-             <a href="/about" className="nav-link px-4">
-                About
-              </a>
-               <a onClick={scrollToFooter} className="nav-link px-4 cursor-pointer">
-                Contact
-              </a>
-              <div className="flex flex-col space-y-2 px-4 pt-4 border-t border-amber-100 dark:border-amber-800">
-                <Button variant="outline" size="sm" text="Sign In" onClick={()=>nav('/login')}/>
-                <Button variant="primary" size="sm" text="Start Playing" onClick={()=>nav('/game')} />
-              </div>
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white dark:bg-gray-900 border-t border-amber-100 dark:border-amber-800 py-4 transition-all duration-300">
+            <div className="flex flex-col space-y-3 px-4">
+              {showLandingLinks && (
+                <>
+                  <a href="#features" className="nav-link">
+                    Features
+                  </a>
+                  <a
+                    onClick={scrollToFooter}
+                    className="nav-link cursor-pointer"
+                  >
+                    Contact
+                  </a>
+                  <hr className="border-amber-200 dark:border-amber-700" />
+                </>
+              )}
+
+              {user ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    text={user.name || "Profile"}
+                    icon={<User className="h-5 w-5" />}
+                    onClick={() => {
+                      nav("/home");
+                      setIsMenuOpen(false);
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    text={isPending ? "Logging out..." : "Logout"}
+                    icon={<LogOut className="h-5 w-5" />}
+                    loading={isPending}
+                    onClick={() => logout()}
+                  />
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    text="Sign In"
+                    onClick={() => {
+                      nav("/login");
+                      setIsMenuOpen(false);
+                    }}
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    text="Start Playing"
+                    onClick={() => {
+                      nav("/game");
+                      setIsMenuOpen(false);
+                    }}
+                  />
+                </>
+              )}
             </div>
           </div>
         )}

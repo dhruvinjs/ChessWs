@@ -3,20 +3,16 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsc -b && node ./dist/index.js"
+    "dev": "tsc -b && node ./dist/index.js",
+    "prisma:migrate": "prisma migrate dev --schema ../prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema ../prisma/schema.prisma",
+    "prisma:seed": "prisma db seed --schema ../prisma/schema.prisma"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "prisma": {
+    "seed": "ts-node ./src/seed.ts"
+  },
   "dependencies": {
-    "@prisma/client": "^6.7.0",
-    "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.18",
-    "@types/express": "^5.0.1",
-    "@types/jsonwebtoken": "^9.0.9",
-    "@types/ws": "^8.18.1",
+    "@prisma/client": "^6.17.1",
     "bcrypt": "^5.1.1",
     "chess.js": "^1.2.0",
     "cookie-parser": "^1.4.7",
@@ -25,7 +21,6 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "nanoid": "^5.1.5",
-    "prisma": "^6.7.0",
     "redis": "^5.0.1",
     "typescript": "^5.8.3",
     "uuid": "^11.1.0",
@@ -33,6 +28,13 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.9"
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/ws": "^8.18.1",
+    "prisma": "^6.17.1",
+    "ts-node": "^10.9.2"
   }
 }

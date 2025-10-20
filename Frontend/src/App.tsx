@@ -1,16 +1,21 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Landing, Auth, Room, About, ChessGame } from "./Pages";
+import { Landing, Room, About, ChessGame, Login, Home } from "./Pages";
 import { Toaster } from "react-hot-toast";
 import { useUserStore } from "./stores/useUserStore";
 import { useEffect } from "react";
 import { SocketManager } from "./lib/socketManager"; // Import the SocketManager
+import { Register } from "./Pages/Register";
+import { PublicLayout } from "./Layout/PublicLayout";
+import { ProtectedLayout } from "./Layout/ProtectedLayout";
+import { Profile } from "./Pages/Profile";
 
 export function App() {
-  const { isLoading, error, checkAndInitGuest, user } = useUserStore();
+  const { isLoading, error, checkAndInitUser, user } = useUserStore();
 
-  useEffect(() => {
-    checkAndInitGuest();
-  }, [checkAndInitGuest]);
+  
+useEffect(() => {
+  checkAndInitUser();
+}, [checkAndInitUser]);
 
   // Initialize socket connection once the user is available
   useEffect(() => {
@@ -31,22 +36,34 @@ export function App() {
   if (error) return <p>Error fetching guest. Refresh the page.</p>;
 
   return (
-    <BrowserRouter>
+     <BrowserRouter>
       <Routes>
+        {/* Public Layout */}
+        <Route element={<PublicLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/about" element={<About />} />
         <Route path="/" element={<Landing />} />
-        <Route
-          path="/game"
-          element={
-            <div className="dark">
-              <ChessGame />
-            </div>
-          }
-        />
-        <Route path="/login" element={<Auth />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/room" element={<Room />} />
+        </Route>
+
+        {/* Protected Layout */}
+        <Route element={<ProtectedLayout />}>
+          <Route path="/game" element={<ChessGame />} />
+          <Route path="/room" element={<Room />} />
+          <Route path="/home" element={<Home />} />
+        <Route path="/profile" element={<Profile />} />
+
+        </Route>
+
+        {/* Landing page (can be public or own layout) */}
       </Routes>
 
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: { background: "#333", color: "#fff" },
+        }}
+      />
       <Toaster
         position="top-right"
         toastOptions={{

@@ -23,7 +23,8 @@ model User {
   id Int @default(autoincrement()) @id
   name String
   email String @unique
-  password String
+  password String?
+  googleId String?
   chessLevel ChessLevel
   gamesWon Game[] @relation("GamesWon")
   gamesLost Game[] @relation("GamesLost")

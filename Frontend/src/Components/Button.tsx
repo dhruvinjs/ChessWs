@@ -4,8 +4,8 @@ import { ReactElement } from "react";
 type ButtonProps = {
   variant: "primary" | "secondary" | "outline";
   size: "md" | "sm" | "lg";
-  onClick: () => void;
-  text: string;
+  onClick?: () => void;
+  text?: string;
   className?: string;
   loading?: boolean;
   icon?: ReactElement;

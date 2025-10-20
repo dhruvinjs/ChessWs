@@ -6,7 +6,6 @@ import cookieParser from "cookie-parser";
 import { WebSocketServer,WebSocket } from "ws";   
 import { gameManager, GameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
-import { Prisma, PrismaClient } from "@prisma/client";
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
@@ -24,7 +23,7 @@ const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server });
 
-export const pc=new PrismaClient()
+
 app.use(cors({
    origin: ['http://localhost:5173'], 
    methods: ['GET', 'POST', 'PUT', 'DELETE'],

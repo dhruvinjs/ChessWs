@@ -6,6 +6,7 @@ interface Props {
   maxLength?: number;
   required: boolean;
  inputRef?: React.RefObject<HTMLInputElement | null> ;
+ value?:string
 }
 
 export function Input({
@@ -15,7 +16,8 @@ export function Input({
   minLength,
   maxLength,
   required,
-  inputRef
+  inputRef,
+  value
 }: Props) {
   return (
     <input
@@ -26,6 +28,7 @@ export function Input({
       maxLength={maxLength}
       type={type}
       ref={inputRef}
+      value={value}
     />
   );
 }

@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express'
-import {PrismaClient} from '@prisma/client'
+
 import bcrypt from 'bcrypt'
 import { z } from "zod";
 import jwt from 'jsonwebtoken'
 import {v4 as uuidv4} from "uuid"
-import { pc } from '.';
+import pc  from './prismaClient';
 import { authMiddleware } from './middleware';
 const router=express.Router()
 import {nanoid} from "nanoid"
@@ -47,11 +47,30 @@ router.post('/register',async (req:Request,res:Response) => {
                 chessLevel:chessLevel
             }
         })
-        res.status(200).json({message:'User Created',success:true})
-
+        const token=jwt.sign({id:newUser.id},process.env.SECRET_TOKEN as string,{expiresIn:"8h"})
+        res.clearCookie('guestId')
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 6 * 60 * 60 * 1000 // 6 hours in ms
+        });
+        res.status(200).json({message:'User Created',success:true,id:newUser.id,username:newUser.name,chessLevel:chessLevel})
     } catch (error) {
-        res.status(500).json({error:error})
-        console.log(error)
+    if (error instanceof z.ZodError) {
+      // ✅ Handle validation errors specifically
+      res.status(400).json({
+        message: 'Validation error',
+        errors: error.errors,
+        success: false,
+      });
+    } else {
+      console.error('Register error:', error);
+      res.status(500).json({
+        message: 'Internal server error',
+        success: false,
+      });
+           }
     }
 })
 router.get("/getProfile",authMiddleware,async(req:Request,res:Response)=>{
@@ -82,19 +101,31 @@ router.get("/getProfile",authMiddleware,async(req:Request,res:Response)=>{
 
 router.post('/login',async(req:Request,res:Response)=>{
     try {
-        const {email,password}=req.body
-        const user=await pc.user.findUnique({where:{email:email}})
+        const schema=z.object({
+            email:z.string().email("Invalid Email"),
+            password:z.string().min(3,"Password is required")
+        })
+        const {email,password}=schema.parse(req.body)
+        const user=await pc.user.findUnique({where:{email}})
         if(!user) {
-            res.status(200).json({message:"User Does not exist"})
+            res.status(401).json({message:"User Does not exist",success:false})
             return
         }
 
+        if(!user.password){
+            res.status(400).json({
+                message:"This account uses social login.  Please sign in with Google.",
+                success:false
+            })
+            return
+        }
         const checkedPass=await bcrypt.compare(password,user.password)
 
         if(!checkedPass){
-            res.status(400).json({message:"password is wrong"})
+            res.status(401).json({message: 'Invalid email or password', success:false})
+            return
         }
-        const token=jwt.sign({id:user.id},process.env.SECRET_TOKEN as string,{expiresIn:'6h'})
+        const token=jwt.sign({id:user.id},process.env.SECRET_TOKEN as string,{expiresIn:'8h'})
         res.clearCookie('guestId')
          res.cookie('token', token, {
             httpOnly: true,
@@ -102,7 +133,8 @@ router.post('/login',async(req:Request,res:Response)=>{
             sameSite: 'lax',
             maxAge: 6 * 60 * 60 * 1000 // 6 hours in ms
         });
-        res.status(200).json({message:"Login Successful"})
+        res.status(200).json({success:true,message:"Login Successful",id:user.id,username:user.name,chessLevel:user.chessLevel})
+        return
     } catch (error) {
          res.status(500).json({error:error})
         console.log(error)
@@ -147,7 +179,7 @@ router.post('/edit',authMiddleware,async (req:Request,res:Response) => {
 router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
     try {
         res.clearCookie("token")
-        res.status(200).json({message:"Logout sucessfull"})
+        res.status(200).json({success:true,message:"Logout sucessfull"})
 
     } catch (error) {
         res.status(500).json({error:error})
@@ -171,7 +203,7 @@ router.get('/cookie', async(req:Request, res:Response) => {
                 maxAge: 30 * 60 * 1000, // 30 min
                 path: '/'
             });
-            res.status(200).json({ guestId: existingId });
+            res.status(200).json({ success:true });
             return
         }
     }
@@ -194,7 +226,7 @@ router.get('/cookie', async(req:Request, res:Response) => {
         maxAge: 30 * 60 * 1000, 
         path: '/'
       });
-      res.status(200).json({guestId:guestCookie});
+      res.status(200).json({guestId:guestCookie,success:true});
       return
     } catch (error) {
         res.status(500).json({error:error})
@@ -202,7 +234,23 @@ router.get('/cookie', async(req:Request, res:Response) => {
     }
 });
 
+router.post('/checkAuth',authMiddleware,async (req:Request,res:Response) => {
+    try {
+         //@ts-ignore
+        const id=req.userId
 
+        const user=await pc.user.findUnique({where:{id:Number(id)}})
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return
+    }
+    res.status(200).json({success:true});
+    } catch (error) {
+          res.status(500).json({error:error})
+        console.log(error)
+    }
+})
 router.post('/room/create',authMiddleware,async(req:Request,res:Response)=>{
     try {
         // @ts-ignore
