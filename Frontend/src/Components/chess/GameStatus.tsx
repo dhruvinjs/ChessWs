@@ -1,6 +1,6 @@
 import { Flag } from 'lucide-react';
 import { useGameStore } from '../../stores/useGameStore';
-import { GameMessages } from '../../constants';
+import { GameMessages } from '../../types/chess';
 import { memo } from 'react';
 
 const GameStatusComponent = () => {

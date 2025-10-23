@@ -2,13 +2,13 @@ import { useRef, useEffect } from "react";
 import { Button, Card, Input } from "../Components";
 import { toast } from "react-hot-toast";
 import { useThemeStore } from "../stores/useThemeStore";
-import { useLoginMutation } from "../hooks/useUser"; // ✅ import your mutation
+import { useLoginMutation } from "../hooks/useAuth";
 
 export function Login() {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  const { mutate: login, isPending } = useLoginMutation(); // ✅ mutation hook
+  const { mutate: login, isPending } = useLoginMutation();
 
   const inputStyles =
     "bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:outline-none text-slate-900 dark:text-slate-100 w-full transition-colors";
@@ -24,14 +24,13 @@ export function Login() {
       return;
     }
 
-    // ✅ Call the mutation
     login({ email, password });
   };
 
   const { initTheme } = useThemeStore();
 
   useEffect(() => {
-    initTheme(); // initialize dark/light theme
+    initTheme();
   }, [initTheme]);
 
   return (

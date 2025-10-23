@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { Menu, X, Crown, Moon, Sun, LogOut, User } from "lucide-react";
 import { Button } from "../Components/Button";
 import { useThemeStore } from "../stores/useThemeStore";
-import { useUserStore } from "../stores/useUserStore";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useLogoutMutation } from "../hooks/useUser";
+import { useLogoutMutation } from "../hooks/useAuth";
+import { useUserQuery } from "../hooks/useUserQuery";
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isDarkMode, initTheme, toggleDarkMode } = useThemeStore();
-  const { user } = useUserStore();
+  const { data: user, isLoading } = useUserQuery();
   const nav = useNavigate();
   const location = useLocation();
   const { mutate: logout, isPending } = useLogoutMutation();
@@ -19,6 +19,9 @@ export function Navbar() {
   }, [initTheme]);
 
   const showLandingLinks = location.pathname === "/";
+  
+  // Check if user is authenticated (not a guest)
+  const isAuthenticated = user && !user.isGuest;
 
   const scrollToFooter = () => {
     const footer = document.getElementById("contact");
@@ -26,6 +29,11 @@ export function Navbar() {
       footer.scrollIntoView({ behavior: "smooth" });
       setIsMenuOpen(false);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsMenuOpen(false);
   };
 
   return (
@@ -50,10 +58,7 @@ export function Navbar() {
               <a href="#features" className="nav-link">
                 Features
               </a>
-              <a
-                onClick={scrollToFooter}
-                className="nav-link cursor-pointer"
-              >
+              <a onClick={scrollToFooter} className="nav-link cursor-pointer">
                 Contact
               </a>
             </nav>
@@ -74,7 +79,8 @@ export function Navbar() {
               }
             />
 
-            {user ? (
+            {/* Show different buttons based on authentication status */}
+            {!isLoading && isAuthenticated ? (
               <>
                 <Button
                   variant="outline"
@@ -89,7 +95,7 @@ export function Navbar() {
                   text={isPending ? "Logging out..." : "Logout"}
                   icon={<LogOut className="h-5 w-5" />}
                   loading={isPending}
-                  onClick={() => logout()}
+                  onClick={handleLogout}
                 />
               </>
             ) : (
@@ -148,17 +154,14 @@ export function Navbar() {
                   <a href="#features" className="nav-link">
                     Features
                   </a>
-                  <a
-                    onClick={scrollToFooter}
-                    className="nav-link cursor-pointer"
-                  >
+                  <a onClick={scrollToFooter} className="nav-link cursor-pointer">
                     Contact
                   </a>
                   <hr className="border-amber-200 dark:border-amber-700" />
                 </>
               )}
 
-              {user ? (
+              {!isLoading && isAuthenticated ? (
                 <>
                   <Button
                     variant="outline"
@@ -166,7 +169,7 @@ export function Navbar() {
                     text={user.name || "Profile"}
                     icon={<User className="h-5 w-5" />}
                     onClick={() => {
-                      nav("/home");
+                      nav("/profile");
                       setIsMenuOpen(false);
                     }}
                   />
@@ -176,7 +179,7 @@ export function Navbar() {
                     text={isPending ? "Logging out..." : "Logout"}
                     icon={<LogOut className="h-5 w-5" />}
                     loading={isPending}
-                    onClick={() => logout()}
+                    onClick={handleLogout}
                   />
                 </>
               ) : (

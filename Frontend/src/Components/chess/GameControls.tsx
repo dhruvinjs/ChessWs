@@ -1,43 +1,69 @@
+// Components/chess/GameControls.tsx
+// Updated version with proper draw functionality
+
 import { useState, useCallback, memo } from 'react';
 import { ArrowLeft, Play, Handshake, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../Button';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useGameStore } from '../../stores/useGameStore';
-import { GameMessages } from '../../constants';
+import { GameMessages } from '../../types/chess';
 
-// ✅ Memoized component - only re-renders when its props/subscriptions change
 const GameControlsComponent = () => {
   const navigate = useNavigate();
   
-  // ✅ Only subscribe to what we need - NOT timers!
+  // Subscribe to necessary state
   const initGameRequest = useGameStore((state) => state.initGameRequest);
   const resign = useGameStore((state) => state.resign);
-  const moves = useGameStore((state) => state.moves);
+  const offerDraw = useGameStore((state) => state.offerDraw);
+  // const moves = useGameStore((state) => state.moves);
   const gameStatus = useGameStore((state) => state.gameStatus);
+  const gameStarted = useGameStore((state) => state.gameStarted);
+  const drawOfferSent = useGameStore((state) => state.drawOfferSent);
 
   const isWaitingForGame = gameStatus === GameMessages.SEARCHING;
+  const isGameActive = gameStatus === GameMessages.GAME_ACTIVE && gameStarted;
+  const isGameOver = gameStatus === GameMessages.GAME_OVER;
 
   const [showHomeConfirm, setShowHomeConfirm] = useState(false);
   const [showDrawConfirm, setShowDrawConfirm] = useState(false);
   const [showResignConfirm, setShowResignConfirm] = useState(false);
 
   const handleGoHome = useCallback(() => {
-    if (moves.length > 0) setShowHomeConfirm(true);
-    else navigate('/');
-  }, [moves.length, navigate]);
+    if (isGameActive) {
+      setShowHomeConfirm(true);
+    } else {
+      navigate('/');
+    }
+  }, [ isGameActive, navigate]);
 
   const confirmGoHome = useCallback(() => {
     setShowHomeConfirm(false);
-    navigate('/');
-  }, [navigate]);
+    if (isGameActive) {
+      resign();
+    }
+    setTimeout(() => navigate('/'), 300);
+  }, [navigate, resign, isGameActive]);
 
-  const handleOfferDraw = useCallback(() => setShowDrawConfirm(true), []);
-  const confirmDraw = useCallback(() => setShowDrawConfirm(false), []);
+  const handleOfferDraw = useCallback(() => {
+    if (!isGameActive) return;
+    setShowDrawConfirm(true);
+  }, [isGameActive]);
 
-  const handlePlayGame = useCallback(() => initGameRequest(), [initGameRequest]);
+  const confirmDraw = useCallback(() => {
+    setShowDrawConfirm(false);
+    offerDraw();
+  }, [offerDraw]);
 
-  const handleResign = useCallback(() => setShowResignConfirm(true), []);
+  const handlePlayGame = useCallback(() => {
+    initGameRequest();
+  }, [initGameRequest]);
+
+  const handleResign = useCallback(() => {
+    if (!isGameActive) return;
+    setShowResignConfirm(true);
+  }, [isGameActive]);
+
   const confirmResign = useCallback(() => {
     setShowResignConfirm(false);
     resign();
@@ -60,13 +86,15 @@ const GameControlsComponent = () => {
           text={isWaitingForGame ? 'Searching...' : 'Play'}
           icon={<Play className="w-4 h-4" />}
           loading={isWaitingForGame}
+          disabled={isGameActive || isWaitingForGame}
         />
         <Button
           variant="outline"
           size="md"
           onClick={handleOfferDraw}
-          text="Draw"
+          text={drawOfferSent ? "Offer Sent" : "Draw"}
           icon={<Handshake className="w-4 h-4" />}
+          disabled={!isGameActive || drawOfferSent || isGameOver}
         />
         <Button
           variant="secondary"
@@ -74,27 +102,33 @@ const GameControlsComponent = () => {
           onClick={handleResign}
           text="Resign"
           icon={<Flag className="w-4 h-4" />}
+          disabled={!isGameActive || isGameOver}
         />
       </div>
 
+      {/* Confirm Home Dialog */}
       <ConfirmDialog
         isOpen={showHomeConfirm}
         onClose={() => setShowHomeConfirm(false)}
         onConfirm={confirmGoHome}
         title="Leave Game?"
-        message="Are you sure you want to go back to home? Your current game progress will be lost."
+        message="Are you sure you want to go back to home? Your current game progress will be lost and you will forfeit the match."
         confirmText="Yes, Go Home"
         cancelText="Stay in Game"
       />
+
+      {/* Confirm Draw Dialog */}
       <ConfirmDialog
         isOpen={showDrawConfirm}
         onClose={() => setShowDrawConfirm(false)}
         onConfirm={confirmDraw}
         title="Offer Draw?"
-        message="Are you sure you want to offer a draw to your opponent?"
+        message="Are you sure you want to offer a draw to your opponent? They can accept or reject this offer."
         confirmText="Yes, Offer Draw"
         cancelText="Cancel"
       />
+
+      {/* Confirm Resign Dialog */}
       <ConfirmDialog
         isOpen={showResignConfirm}
         onClose={() => setShowResignConfirm(false)}
@@ -108,5 +142,4 @@ const GameControlsComponent = () => {
   );
 };
 
-// ✅ Export memoized version - won't re-render on timer updates
 export const GameControls = memo(GameControlsComponent);

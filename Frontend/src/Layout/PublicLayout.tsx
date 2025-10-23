@@ -1,30 +1,32 @@
-import { useEffect } from "react";
+// layouts/PublicLayout.tsx
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { Navbar } from "../Components/Navbar";
 import { useThemeStore } from "../stores/useThemeStore";
-import { useUserStore } from "../stores/useUserStore";
+import { useUserQuery } from "../hooks/useUserQuery";
+import { LoadingScreen } from "../Components/LoadingScreen";
 
 export function PublicLayout() {
   const { initTheme } = useThemeStore();
-  const { user, initialized, isGuest } = useUserStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: user, isLoading } = useUserQuery();
 
   useEffect(() => {
     initTheme();
   }, [initTheme]);
 
-  // Redirect only real users (non-guests) away from public pages
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // ✅ Redirect ONLY authenticated (non-guest) users away from /login or /register
   useEffect(() => {
-    if (
-      initialized &&
-      user &&
-      !isGuest && // ✅ Only redirect if not a guest
-      ["/login", "/register"].includes(location.pathname)
-    ) {
-      navigate("/home");
+    if (user && !user.isGuest && ["/login", "/register"].includes(location.pathname)) {
+      navigate("/home", { replace: true });
+      console.log("This is the culprit");
     }
-  }, [initialized, user, isGuest, location.pathname, navigate]);
+  }, [isLoading,user?.isGuest, location.pathname, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col">

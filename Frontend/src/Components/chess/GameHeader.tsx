@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Timer } from './Timer';
 import { useGameStore } from '../../stores/useGameStore';
-import { GameMessages } from '../../constants';
+import { GameMessages } from '../../types/chess';
 import { GameControls } from './GameControls';
 
 // ✅ Separate component for timers (high-frequency updates)

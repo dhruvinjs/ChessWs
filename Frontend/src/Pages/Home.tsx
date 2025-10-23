@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Cpu, Swords, Users } from "lucide-react";
 import { Button } from "../Components/Button";
+import { FloatingPieces } from "../Components/FloatingPieces";
 
 export function Home() {
   const nav = useNavigate();
@@ -32,6 +33,7 @@ export function Home() {
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-gray-950 dark:via-gray-900 dark:to-amber-950 flex flex-col items-center justify-center px-4 py-16">
+      <FloatingPieces/>
       <motion.h1
         className="text-4xl sm:text-5xl font-bold mb-12 text-slate-900 dark:text-white text-center"
         initial={{ opacity: 0, y: -20 }}

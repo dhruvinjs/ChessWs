@@ -1,5 +1,6 @@
 import { GameHeader, GameStatus, MoveHistory, ChessBoard } from "../Components";
-import { GameMessages } from "../constants";
+import { DrawOfferDialog } from "../Components/chess";
+import { GameMessages } from "../types/chess";
 import { useGameStore } from "../stores/useGameStore";
 
 export function ChessGame() {
@@ -40,6 +41,9 @@ export function ChessGame() {
 
         </div>
       </div>
+
+      {/* ✅ Draw Offer Dialog */}
+      <DrawOfferDialog />
     </div>
   );
 }

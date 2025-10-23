@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import { useGameStore } from '../stores/useGameStore';
+import { showGameMessage } from '../Components/chess';
 
 export const useChess = () => {
   // These trigger re-renders when they change
   const selectedSquare = useGameStore((state) => state.selectedSquare);
-  const playerColor = useGameStore((state) => state.color);
+  // const playerColor = useGameStore((state) => state.color);
   const validMoves = useGameStore((state) => state.validMoves);
 
   // Stable references (won’t change between renders)
@@ -15,7 +16,8 @@ export const useChess = () => {
       const state = useGameStore.getState();
       const fenNow = state.fen;
       const turn = fenNow.split(' ')[1] as 'w' | 'b';
-
+     const playerColor=state.color
+      const drawOfferSent=state.drawOfferSent
       console.log('🖱️ Square clicked:', {
         square,
         piece,
@@ -30,7 +32,10 @@ export const useChess = () => {
         console.warn('⛔ Not your turn!', { currentTurn: turn, yourColor: playerColor });
         return;
       }
-
+        if (drawOfferSent) {
+        showGameMessage("Draw Offer Sent!","⏳ Please wait — opponent hasn't responded to your draw offer yet.",{type:"warning"});
+        return;
+      }
       // ✅ Case 1: Piece already selected
       if (selectedSquare) {
         const validMove = validMoves.find(
@@ -109,7 +114,7 @@ export const useChess = () => {
         console.log('⚠️ Cannot select:', piece ? 'opponent piece' : 'empty square');
       }
     },
-    [selectedSquare, playerColor, validMoves]
+    [selectedSquare, validMoves]
   );
 
   return {

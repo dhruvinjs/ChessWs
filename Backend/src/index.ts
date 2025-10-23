@@ -43,15 +43,15 @@ wss.on("connection",async(socket,req:Request)=>{
      const {query}=parse(req.url,true)
    //This guestId is basically is the cookie which I am generating 
    //and will be used for reconvery mechanism
-   const guestId=typeof query.guestId==="string" ? query.guestId :undefined  
+   const id=typeof query.id==="string" ? query.id :undefined  
 
-   if(!guestId){
+   if(!id){
       //if cookie not provided the websocket connection will not start
       //cookie-mandatory
       socket.close()
       return;
    }
-   const verifyRedis=await verifyCookie(guestId)
+   const verifyRedis=await verifyCookie(id)
    if(!verifyRedis){
       socket.send(JSON.stringify({
          message:"unauthorized_uuid"
@@ -60,10 +60,10 @@ wss.on("connection",async(socket,req:Request)=>{
       return
    }
 
-   // console.log(`Guest verified: ${guestId}`);
-   gameManager.addUser(socket,guestId)
+   console.log(`Guest verified: ${id}`);
+   gameManager.addUser(socket,id)
    socket.on("close",()=>
-   gameManager.handleDisconnection(guestId)
+   gameManager.handleDisconnection(id)
    )
    
 

@@ -9,7 +9,6 @@ export function Landing() {
       <Navbar />
       <Hero/>
       <Features/>
-      {/* todo add testimonials */}
       <Testimonials/>
       <Footer />
     </div>

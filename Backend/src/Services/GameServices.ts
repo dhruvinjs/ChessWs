@@ -1,26 +1,33 @@
 import { WebSocket } from 'ws';
-import { Request } from 'express';
 import { 
     CHECK, 
+    DISCONNECTED, 
+    DRAW_ACCEPTED, 
+    DRAW_OFFERED, 
+    DRAW_REJECTED, 
     GAME_ACTIVE, 
-    GAME_FOUND, 
     GAME_NOT_FOUND, 
     GAME_OVER, 
     MOVE, 
+    OFFER_DRAW, 
     OPP_RECONNECTED, 
+    RECONNECT, 
     SERVER_ERROR, 
     STALEMATE, 
     WRONG_PLAYER_MOVE 
 } from '../messages';
 import { redis } from '../redisClient';
 import { Chess, PieceSymbol, Square } from 'chess.js';
-import { gameManager, GameManager } from '../Classes/GameManager';
+import { gameManager } from '../Classes/GameManager';
 
 //This Method Will Help To return the gameState to reconnected player
 export async function getGameState(gameId: string) {
     const existingGame = await redis.hGetAll(`game:${gameId}`) as Record<string, string>;
+    console.log(existingGame);
     if (Object.keys(existingGame).length === 0) return null;
     const board = new Chess(existingGame.fen);
+    const movesRaw = await redis.lRange(`game:${gameId}:moves`, 0, -1);
+  const moves = movesRaw.map(m => JSON.parse(m));
     return {
         user1: existingGame.user1,
         user2: existingGame.user2,
@@ -30,7 +37,9 @@ export async function getGameState(gameId: string) {
         turn: board.turn(),
         whiteTimer: existingGame.whiteTimer,
         blackTimer: existingGame.blackTimer,
-        gameStarted: existingGame.status === GAME_ACTIVE
+        gameStarted: existingGame.status === GAME_ACTIVE,
+        gameEnded:existingGame.status===GAME_OVER,
+        moves
     };
 }
 
@@ -123,10 +132,10 @@ export async function makeMove(
 
     // Game Over logic
     if (board.isGameOver()) {
-    const winnerColor = board.turn() === "w" ? "black" : "white";
-    const winnerId = winnerColor === "white" ? gameState.user1 : gameState.user2;
-    const loserId = winnerColor === "white" ? gameState.user2 : gameState.user1;
-
+    const winnerColor = board.turn() === "w" ? "b" : "w";
+    const winnerId = winnerColor === "w" ? gameState.user1 : gameState.user2;
+    const loserId = winnerColor === "b" ? gameState.user2 : gameState.user1;
+    const loserColor=winnerColor === "b" ? "w" : "b" 
     const winnerSocket = socketMap.get(winnerId);
     const loserSocket = socketMap.get(loserId);
 
@@ -144,6 +153,7 @@ export async function makeMove(
             result: "win",
             message: "🏆 Congratulations! You’ve won the game.",
             winner: winnerColor,
+            loser:loserColor
         },
     });
 
@@ -153,6 +163,7 @@ export async function makeMove(
             result: "lose",
             message: "💔 Game over. You’ve been checkmated.",
             winner: winnerColor,
+            loser:loserColor
         },
     });
 
@@ -229,7 +240,9 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
         socket.send(JSON.stringify(message))
         return;
     }
-    if (game.status === GAME_OVER) {
+    console.log(game.status)
+    console.log("GameEnded: ",game.gameEnded)
+    if (game.gameEnded) {
         const message={
             type:GAME_OVER,
             payload:{
@@ -239,8 +252,23 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
         socket.send(JSON.stringify(message))
         return;
     }
+    if(game.status===DISCONNECTED){
+        const timeElapsed=Date.now()-Number(await redis.hGet(`game:${gameId}`,"timestamp"))
+        // const disconnectedBy = await redis.hGet(`game:${gameId}`, "disconnectedBy");
+        if(timeElapsed > 60* 1000){
+            socket.send(JSON.stringify({
+                type:GAME_NOT_FOUND,
+                payload:{
+                    message:"Disconnected For Too Long"
+                }
+            }))
+            return
+        }
+    }
 
-   
+    await redis.hSet(`game:${gameId}`, { status: GAME_ACTIVE });
+    await redis.sAdd("active-games", gameId);
+    
 
     const color = playerId === game.user1 ? 'w' : 'b';
     const opponentId = playerId === game.user1 ? game.user2 : game.user1;
@@ -249,7 +277,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
     const validMoves = await provideValidMoves(gameId);
 
     socket.send(JSON.stringify({
-        type: GAME_FOUND,
+        type: RECONNECT,
         payload: {
                 fen: game.board.fen(),
                 color: color,
@@ -258,16 +286,14 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
                 gameId,
                 whiteTimer:game.whiteTimer,
                 blackTimer:game.blackTimer,
-                validMoves: validMoves || []
+                validMoves: validMoves || [],
+                moves:game.moves,
+                status:game.status
             }
         }));
 
-        await redis.hSet(`game:${gameId}`, {
-            status: GAME_ACTIVE
-        });
-        await redis.sAdd("active-games", gameId);
         const opponentSocket = socketMap.get(opponentId);
-        // gameManager.startTimer()
+        gameManager.startTimer()
         console.log("Sending reconnect notice to:", opponentId, socketMap.has(opponentId));
 
         opponentSocket?.send(JSON.stringify({
@@ -284,41 +310,84 @@ export async function getGamesCount() {
     console.log(count);
     return count ? parseInt(count) : 0;
 }
-//todo->leave game functionality 
-export async function playerLeft(playerId:string,gameId:string,socket:WebSocket,socketMap:Map<string,WebSocket>) {
-        const game = await getGameState(gameId);
-        if(!game){
-            console.log("Game Not found")
-            socket.send(JSON.stringify({
-                type:GAME_NOT_FOUND,
-                payload:{
-                    message:"Cannot leave game due to game not found"
-                }
-            }))
-            return
-        }
-        console.log("In player left method")
-        const winner = playerId === game.user1 ?"b" :"w"
-        const opponentId = playerId === game.user1 ? game.user2 : game.user1;
+export async function playerLeft(
+  playerId: string,
+  gameId: string,
+  socket: WebSocket,
+  socketMap: Map<string, WebSocket>
+) {
+  const game = await getGameState(gameId);
+  
+  if (!game) {
+    console.log("Game Not found");
+    socket.send(
+      JSON.stringify({
+        type: GAME_NOT_FOUND,
+        payload: {
+          message: "Cannot leave game due to game not found",
+        },
+      })
+    );
+    return;
+  }
 
-        const user2Socket=socketMap.get(opponentId)
+  // Check if game is already over
+  if (game.gameEnded) {
+    console.log("Game already over, ignoring player left");
+    return;
+  }
 
-        const message={
-            type:GAME_OVER,
-            payload:{
-                message:"Player Left You Won!"
-            }
-        }
+  console.log("In player left method");
 
-        await redis.hSet(`game:${gameId}`, {
-        status: GAME_OVER,
-        winner: winner
-        });        
-        await redis.expire(`game:${gameId}`, 600);
-//we will only send the message to opp because the other player left
-        user2Socket?.send(JSON.stringify(message))
+  const winnerColor = playerId === game.user1 ? "b" : "w";
+  const opponentId = playerId === game.user1 ? game.user2 : game.user1;
+  const loserColor = winnerColor === "b" ? "w" : "b";
+  const winnerSocket = socketMap.get(opponentId);
+  const loserSocket = socketMap.get(playerId);
 
-    }
+  const winnerMessage = {
+    type: GAME_OVER,
+    payload: {
+      result: "win",
+      message: "Player Left You Won!",
+      winner: winnerColor,
+      loser: loserColor,
+    },
+  };
+
+  const loserMessage = {
+    type: GAME_OVER,
+    payload: {
+      result: "lose",
+      message: "You Lost",
+      winner: winnerColor,
+      loser: loserColor,
+    },
+  };
+
+  // ✅ CRITICAL FIX: Use individual hSet calls in transaction
+  // Object syntax doesn't work properly in Redis MULTI
+  try {
+    await redis
+      .multi()
+      .hSet(`game:${gameId}`, "status", GAME_OVER)
+      .hSet(`game:${gameId}`, "winner", winnerColor)
+      .hSet(`game:${gameId}`, "reason", "player_left")
+      .expire(`game:${gameId}`, 600)
+      .expire(`game:${gameId}:moves`, 600)
+      .sRem("active-games", gameId)
+      .exec();
+
+    console.log(`✅ Game ${gameId} ended - Status set to GAME_OVER`);
+  } catch (error) {
+    console.error("Error updating game status:", error);
+  }
+
+  // Notify both players
+  winnerSocket?.send(JSON.stringify(winnerMessage));
+  loserSocket?.send(JSON.stringify(loserMessage));
+}
+
 
 export function calculateTime(lastMoveTime: number) {
     const currentTime = Date.now();
@@ -337,8 +406,14 @@ export function calculateTime(lastMoveTime: number) {
 
 export async function verifyCookie(cookieName:string){
     // const cookie = req.headers.cookieName
+
     const session = await redis.get(`guest:${cookieName}`)
-    if(!session) return null
+    if(!session) 
+        {   console.log("in verify cookie returning null")
+            return null
+
+        }
+        console.log('in verify cookie returning true');
     return true
 
 }
@@ -348,7 +423,6 @@ interface Move{
 export type Moves=Move[]
 export async function provideValidMoves(gameId:string):Promise<Moves | null> {
         const gameState=await getGameState(gameId)
-      
         if(!gameState?.fen){
             console.log("Fen Missing in Game State IN provideMove")
             return null
@@ -366,4 +440,109 @@ export async function provideValidMoves(gameId:string):Promise<Moves | null> {
 
         return validMoves
 
+}
+
+export async function offerDraw(playerId:string,gameId:string,offerSenderSocket:WebSocket,socketMap:Map<string,WebSocket>) {
+    const game=await getGameState(gameId)
+    if(!game || game.gameEnded){
+       offerSenderSocket.send(JSON.stringify({
+        type:GAME_NOT_FOUND,
+        payload:{message:"The Game You Are looking for is over"}
+       }))
+       return
+    }    
+    // const draw_offer_sender=socketMap.get(playerId)
+    const offerCountKey = `drawOffers:${gameId}:${playerId}`;
+    const count = await redis.incr(offerCountKey);
+
+    if (count > 3) {
+    offerSenderSocket.send(JSON.stringify({
+        type: "ERROR",
+        payload: { message: "You’ve reached the maximum of 3 draw offers." }
+    }));
+    await redis.decr(offerCountKey);
+    return;
+    }
+
+    const offerSenderColor=playerId === game.user1 ? "w" :"b"
+        offerSenderSocket?.send(
+            JSON.stringify({
+                type:OFFER_DRAW,
+                payload:{
+                    message:"Draw offered to the opponent. Waiting For the response!",
+                    offerSenderColor:offerSenderColor
+                }
+            })
+        )
+        const draw_offer_recieverId=game.user1 === playerId ? game.user2 : game.user1
+        const offerRecieverSocket=socketMap.get(draw_offer_recieverId)
+        offerRecieverSocket?.send(JSON.stringify({
+            type:DRAW_OFFERED,
+            payload:{message:"Draw Offered Do you want to accept it?",offerSenderColor:offerSenderColor}
+        }))
+
+}
+
+export async function acceptDraw(playerId:string,gameId:string,offerAcceptedSocket:WebSocket,socketMap:Map<string,WebSocket>) {
+    const game=await getGameState(gameId)
+     if(!game || game.gameEnded){
+       offerAcceptedSocket.send(JSON.stringify({
+        type:GAME_NOT_FOUND,
+        payload:{message:"The Game You Are looking for is over"}
+       }))
+       return
+    }  
+
+    const offerSenderId=playerId === game.user1 ? game.user2 : game.user1
+    const offerSenderSocket=socketMap.get(offerSenderId)
+   try {
+    await redis
+      .multi()
+      .hSet(`game:${gameId}`, "status", GAME_OVER)
+      .hSet(`game:${gameId}`, "winner", "draw")
+      .hSet(`game:${gameId}`, "reason", "draw offer accepted")
+      .expire(`game:${gameId}`, 600)
+      .expire(`game:${gameId}:moves`, 600)
+      .sRem("active-games", gameId)
+      .exec();
+
+    console.log(`✅ Game ${gameId} ended - Status set to GAME_OVER`);
+  } catch (error) {
+    console.error("Error updating game status:", error);
+  }
+    offerSenderSocket?.send(JSON.stringify({
+        type:DRAW_ACCEPTED,
+        payload:{
+            result:"draw"
+        }
+    })) 
+    offerAcceptedSocket.send(JSON.stringify({
+        type:DRAW_ACCEPTED,
+        payload:{
+            result:"draw"
+        }
+    }))
+}
+
+export async function rejectDraw(playerId:string,gameId:string,offerRejecterSocket:WebSocket,socketMap:Map<string,WebSocket>)  {
+  const game=await getGameState(gameId)
+  if(!game || game.gameEnded){
+       offerRejecterSocket.send(JSON.stringify({
+        type:GAME_NOT_FOUND,
+        payload:{message:"The Game You Are looking for is over"}
+       }))
+       return
+    }  
+
+ const otherPlayerId=playerId === game.user1 ? game.user2 : game.user1
+ const otherPlayerSocket=socketMap.get(otherPlayerId)
+ otherPlayerSocket?.send(JSON.stringify({
+    type:DRAW_REJECTED,
+    payload:{message:"Draw Offer Rejected! Game Should Go On"}
+ }))
+ offerRejecterSocket.send(JSON.stringify({
+        type:DRAW_REJECTED,
+        payload:{message:"Draw Rejected Offer sent to the Other Socket!"}
+
+ }))
 }

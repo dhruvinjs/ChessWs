@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "../Components"
 import { motion } from "framer-motion"
 import { useThemeStore } from "../stores/useThemeStore"
+import { FloatingPieces } from "../Components/FloatingPieces"
 
 export function Room() {
   const [roomCode, setRoomCode] = useState("")
@@ -25,30 +26,12 @@ export function Room() {
     console.log("Hosting room:", newRoomCode)
   }
 
-  const floatingPieces = useMemo(
-    () => [
-      { symbol: "♔", style: { top: "15%", left: "10%", fontSize: "4rem" } },
-      { symbol: "♕", style: { top: "35%", left: "75%", fontSize: "3rem" } },
-      { symbol: "♖", style: { bottom: "20%", left: "25%", fontSize: "3.5rem" } },
-      { symbol: "♗", style: { bottom: "10%", right: "15%", fontSize: "3rem" } },
-    ],
-    []
-  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 flex justify-center items-start pt-32 px-4 transition-colors duration-300 relative overflow-hidden">
       {/* Floating Pieces */}
-      {floatingPieces.map((piece, i) => (
-        <motion.div
-          key={i}
-          className="absolute text-amber-200/20 dark:text-amber-400/20 select-none"
-          style={piece.style}
-          animate={{ y: [0, -15, 0] }}
-          transition={{ duration: 4 + i, repeat: Infinity, delay: i * 0.5 }}
-        >
-          {piece.symbol}
-        </motion.div>
-      ))}
+        <FloatingPieces  />
+
 
       {/* Room Card */}
       <motion.div

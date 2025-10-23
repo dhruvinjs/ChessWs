@@ -1,26 +1,25 @@
 import {v4 as uuidv4} from "uuid"
 import { redis } from "../redisClient"
 import { WebSocket } from "ws"
-import { ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, PLAYER_UNAVAILABLE, RECONNECT, REQUEST_VALID_MOVES, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
-import { getGameState, makeMove, playerLeft, provideValidMoves, reconnectPlayer } from "../Services/GameServices"
+import { ACCEPT_DRAW, ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, OFFER_DRAW, PLAYER_UNAVAILABLE, RECONNECT, REJECT_DRAW, REQUEST_VALID_MOVES, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
+import { acceptDraw,  getGameState, makeMove, offerDraw, playerLeft, provideValidMoves, reconnectPlayer, rejectDraw } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
-import { RecordType } from "zod"
 export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
     private globalSetInterval:NodeJS.Timeout | null = null
 
     
 
-     async addUser(socket: WebSocket, guestId: string) {
-     this.socketMap.set(guestId, socket);
-     this.addHandler(socket, guestId);
+     async addUser(socket: WebSocket, id: string) {
+     this.socketMap.set(id, socket);
+     this.addHandler(socket, id);
 
-    const existingGameId = await redis.get(`user:${guestId}:game`);
+    const existingGameId = await redis.get(`user:${id}:game`);
     if (existingGameId) {
       
       // update socketMap for reconnection
-      await reconnectPlayer(guestId, existingGameId, socket,this.socketMap);
+      await reconnectPlayer(id, existingGameId, socket,this.socketMap);
       
       return;
     }
@@ -29,7 +28,7 @@ export class GameManager{
     
     socket.send(JSON.stringify({
       type: ASSIGN_ID,
-      payload:{id: guestId}
+      payload:{id: id}
     }));
 
   }
@@ -169,7 +168,7 @@ export class GameManager{
     }
   }
 
-    private addHandler(socket:WebSocket,guestId:string){
+    private addHandler(socket:WebSocket,id:string){
        
        socket.on("message",async(message:string)=>{
 
@@ -178,8 +177,8 @@ export class GameManager{
             
             //New Game Block
             if (type === INIT_GAME) {
-            await insertPlayerInQueue(guestId);
-            const match = await matchingPlayer(guestId);
+            await insertPlayerInQueue(id);
+            const match = await matchingPlayer(id);
 
             if (!match) {
                 socket.send(
@@ -216,14 +215,14 @@ export class GameManager{
                 .multi()
                 .hSet(`game:${newGameId}`, {
                 user1: user1Id,
-                user2: guestId,
+                user2: id,
                 status: GAME_ACTIVE,
                 fen: chess.fen(),
                 whiteTimer: 30,
                 blackTimer: 600,
                 })
                 .setEx(`user:${user1Id}:game`, 1800, newGameId)
-                .setEx(`user:${guestId}:game`, 1800, newGameId)
+                .setEx(`user:${id}:game`, 1800, newGameId)
                 .exec();
 
             // Precompute valid moves
@@ -239,7 +238,7 @@ export class GameManager{
                     color: "w",
                     gameId: newGameId,
                     fen: chess.fen(),
-                    opponentId: guestId,
+                    opponentId: id,
                     turn: chess.turn(),
                     whiteTimer: 600,
                     blackTimer: 600,
@@ -249,7 +248,7 @@ export class GameManager{
             );
 
             // Notify user2 (black)
-            const user2socket = this.socketMap.get(guestId);
+            const user2socket = this.socketMap.get(id);
             user2socket?.send(
                 JSON.stringify({
                 type: INIT_GAME,
@@ -280,8 +279,8 @@ export class GameManager{
             if(type===MOVE){
                 const {payload}=jsonMessage//from and to moves
                 console.log("IN make move testing")
-                console.log(guestId);
-                const gameId=await redis.get(`user:${guestId}:game`)
+                console.log(id);
+                const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
 
                     const message={
@@ -293,13 +292,13 @@ export class GameManager{
                     socket.send(JSON.stringify(message))
                     return
                 }
-                makeMove(socket,payload,gameId,guestId,this.socketMap)
+                makeMove(socket,payload,gameId,id,this.socketMap)
                 // provideValidMoves(gameId,socket)
                
             }
 
             if(type===LEAVE_GAME){
-                const gameId=await redis.get(`user:${guestId}:game`)
+                const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     const message={
                         type:SERVER_ERROR,
@@ -311,7 +310,7 @@ export class GameManager{
                     return
                 }
                 console.log("Player Left Block")
-                playerLeft(guestId,gameId,socket,this.socketMap)
+                playerLeft(id,gameId,socket,this.socketMap)
 
             }
 
@@ -330,13 +329,29 @@ export class GameManager{
                     }))
                     return
                 }
-                    await reconnectPlayer(guestId, gameId, socket,this.socketMap);
+                    await reconnectPlayer(id, gameId, socket,this.socketMap);
                     return;
 
             }
 
-            if(type===REQUEST_VALID_MOVES){
-                const gameId=await redis.get(`user:${guestId}:game`)
+            // if(type===REQUEST_VALID_MOVES){
+            //     const gameId=await redis.get(`user:${id}:game`)
+            //     if(!gameId){
+            //         socket.send(JSON.stringify({
+            //             type:GAME_NOT_FOUND,
+            //             payload:{
+            //                 message:"Game Not found"
+            //             }
+            //         }))
+            //         return
+            //     }
+            //     // provideValidMoves(gameId,socket)
+            //     return
+            // }
+
+
+            if(type===OFFER_DRAW){
+              const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
                         type:GAME_NOT_FOUND,
@@ -346,9 +361,39 @@ export class GameManager{
                     }))
                     return
                 }
-                // provideValidMoves(gameId,socket)
+                await offerDraw(id,gameId,socket,this.socketMap)
                 return
             }
+            if(type===ACCEPT_DRAW){
+              const gameId=await redis.get(`user:${id}:game`)
+                if(!gameId){
+                    socket.send(JSON.stringify({
+                        type:GAME_NOT_FOUND,
+                        payload:{
+                            message:"Game Not found"
+                        }
+                    }))
+                    return
+                }
+                await acceptDraw(id,gameId,socket,this.socketMap)
+                return
+            }
+            
+            if(type===REJECT_DRAW){
+              const gameId=await redis.get(`user:${id}:game`)
+                if(!gameId){
+                    socket.send(JSON.stringify({
+                        type:GAME_NOT_FOUND,
+                        payload:{
+                            message:"Game Not found"
+                        }
+                    }))
+                    return
+                }
+                await rejectDraw(id,gameId,socket,this.socketMap)
+                return
+            }
+            
 
 
 
@@ -372,7 +417,14 @@ export class GameManager{
         }
         const existingGame=await getGameState(gameId)
         if(!existingGame) return GAME_NOT_FOUND
-      
+     
+     
+        if (existingGame.gameEnded) {
+        console.log(`Game ${gameId} already over, ignoring disconnection`);
+        // Clean up socket but don't change game state
+        this.socketMap.delete(playerId);
+        return;
+    }
         // if playerId is user1 then connected user is user2 and message
         // will be sent to that user
         const connected_user= existingGame.user1 === playerId ? existingGame.user2 : existingGame.user1
@@ -383,13 +435,13 @@ export class GameManager{
                 message:"Opponent Left due to bad connectivty"
             }
         })
-        user_socket?.send(message)
-
+        
         await redis.hSet(`game:${gameId}`,{
-            status:DISCONNECTED,
-            disconnectedBy:playerId,
-            timestamp:Date.now().toString()
+          status:DISCONNECTED,
+          disconnectedBy:playerId,
+          timestamp:Date.now().toString()
         })
+        user_socket?.send(message)
     
         setTimeout(async ()=>{
             const latestStatus=await redis.hGet(`game:${gameId}`,"status")

@@ -1,4 +1,4 @@
-import { User } from "../stores/useUserStore";
+import { User } from "../types/user";
 import { ChessLevel } from "../types/chess";
 import { userApi } from "./axios";
 
@@ -21,7 +21,7 @@ export interface LoginResponse{
 
 
 
-export const authApi = {
+export const authApis = {
   register: async (payload: RegisterPayload) => {
     const res = await userApi.post("/register", payload);
     return res.data;
@@ -38,8 +38,8 @@ export const authApi = {
   },
 
   getProfile: async () => {
-    const res = await userApi.get("/getProfile", { withCredentials: true });
-    return res.data;
+    const res = await userApi.get("/getProfile");
+    return res.data.user;
   },
   checkAuth: async () => {
     const res = await userApi.post("/checkAuth", {});
@@ -50,3 +50,14 @@ export const authApi = {
     return res.data;
   },
 };
+
+export const roomApis={
+  createRoom:async()=>{
+    const res=await userApi.get('/create')
+    return res.data
+  },
+  joinRoom:async(roomId:string):Promise<boolean>=>{
+    const res=await userApi.post('/join',{roomId},)
+    return res.data.success
+  }
+}

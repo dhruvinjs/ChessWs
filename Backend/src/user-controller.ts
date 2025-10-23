@@ -55,7 +55,11 @@ router.post('/register',async (req:Request,res:Response) => {
             sameSite: 'lax',
             maxAge: 6 * 60 * 60 * 1000 // 6 hours in ms
         });
-        res.status(200).json({message:'User Created',success:true,id:newUser.id,username:newUser.name,chessLevel:chessLevel})
+        res.status(200).json({message:'User Created',success:true,
+            id:newUser.id,username:newUser.name,
+            chessLevel:chessLevel,
+            isGuest:false
+        })
     } catch (error) {
     if (error instanceof z.ZodError) {
       // ✅ Handle validation errors specifically
@@ -91,7 +95,10 @@ router.get("/getProfile",authMiddleware,async(req:Request,res:Response)=>{
       res.status(404).json({ error: "User not found" });
       return
     }
-    res.status(200).json({success:true,user:user});
+    res.status(200).json({success:true,
+        user:user,
+        isGuest:false
+    });
     } catch (error) {
           res.status(500).json({error:error})
         console.log(error)
@@ -133,7 +140,11 @@ router.post('/login',async(req:Request,res:Response)=>{
             sameSite: 'lax',
             maxAge: 6 * 60 * 60 * 1000 // 6 hours in ms
         });
-        res.status(200).json({success:true,message:"Login Successful",id:user.id,username:user.name,chessLevel:user.chessLevel})
+        res.status(200).json({success:true,
+            message:"Login Successful",
+            id:user.id,username:user.name,
+            chessLevel:user.chessLevel,
+            isGuest:false})
         return
     } catch (error) {
          res.status(500).json({error:error})
@@ -190,20 +201,20 @@ router.post('/logout',authMiddleware,async(req:Request,res:Response)=>{
 //This api is used for guest cookie generation which can be used to restore games.
 router.get('/cookie', async(req:Request, res:Response) => {
     try {
-        const existingId = req.cookies.guestId;
+        const existingId = req.cookies.id;
         
         console.log(existingId)
       if (existingId) {
         const isValidId=await verifyCookie(existingId)
         if(isValidId){
             await redis.expire(`guest:${existingId}`,30 * 60)
-            res.cookie('guestId', existingId, {
+            res.cookie('id', existingId, {
                 httpOnly: true,
                 secure:true,
                 maxAge: 30 * 60 * 1000, // 30 min
                 path: '/'
             });
-            res.status(200).json({ success:true });
+            res.status(200).json({ id:existingId,success:true,isGuest:true, });
             return
         }
     }
@@ -220,13 +231,13 @@ router.get('/cookie', async(req:Request, res:Response) => {
       )
 
 
-      res.cookie('guestId', guestCookie, {
+      res.cookie('id', guestCookie, {
         httpOnly: true,
         secure:true,
         maxAge: 30 * 60 * 1000, 
         path: '/'
       });
-      res.status(200).json({guestId:guestCookie,success:true});
+      res.status(200).json({id:guestCookie,success:true,isGuest:true});
       return
     } catch (error) {
         res.status(500).json({error:error})

@@ -21,5 +21,11 @@ export const TIMER_UPDATE="timer_update"
 export const DISCONNECTED="player_left"
 export const LEAVE_GAME="leave_game"
 export const REQUEST_VALID_MOVES="request_valid_moves"
+export const OFFER_DRAW="offer_draw"
+export const DRAW_OFFERED = "draw_offered";
+export const ACCEPT_DRAW = "accept_draw";
+export const REJECT_DRAW = "reject_draw";
+export const DRAW_ACCEPTED = "draw_accepted";
+export const DRAW_REJECTED = "draw_rejected";
 
 
