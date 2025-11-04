@@ -1,8 +1,6 @@
-// 1. First, update your useGameStore.ts to handle draw state
-
 import { create } from "zustand";
-import { GameMessages } from "../types/chess";
 import { SocketManager } from "../lib/socketManager";
+import { GameMessages } from "../types/chess";
 
 interface Move {
   from: string;
@@ -27,27 +25,27 @@ interface GameState {
   whiteTimer: number;
   blackTimer: number;
   selectedSquare: string | null;
-  
-  // ✅ NEW: Draw offer state
+
+  // ✅ Draw offer state
   drawOfferReceived: boolean;
   drawOfferSent: boolean;
+  drawOfferCount: number;
 
-  // actions
+  // Actions
   initGame: (payload: any) => void;
   processServerMove: (payload: any) => void;
+  reconnect: (payload: any) => void;
   setFen: (fen: string) => void;
   setOppStatus: (status: boolean) => void;
   updateTimers: (white: number, black: number) => void;
   endGame: (winner: Color | "draw", loser: Color | null) => void;
   resetGame: () => void;
-  reconnect: (payload: any) => void;
   setSelectedSquare: (square: string | null) => void;
-
-  // ✅ NEW: Draw actions
-  setDrawOfferReceived: (received: boolean) => void;
+  setDrawOfferCount: (count: number) => void;
   setDrawOfferSent: (sent: boolean) => void;
+  setDrawOfferReceived: (received: boolean) => void;
 
-  // socket actions
+  // Socket actions
   move: (move: Move) => void;
   initGameRequest: () => void;
   resign: () => void;
@@ -64,17 +62,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   loser: null,
   gameId: null,
   oppConnected: true,
-  gameStarted: false,
   gameStatus: GameMessages.INIT_GAME,
+  gameStarted: false,
   fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
   validMoves: [],
   whiteTimer: 600,
   blackTimer: 600,
   selectedSquare: null,
-  
-  // ✅ NEW: Draw offer state
+
+  // ✅ Initial draw state
   drawOfferReceived: false,
   drawOfferSent: false,
+  drawOfferCount: 0,
 
   initGame: (payload) =>
     set({
@@ -87,6 +86,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       loser: null,
       drawOfferReceived: false,
       drawOfferSent: false,
+      drawOfferCount: 0,
     }),
 
   processServerMove: (payload) => {
@@ -101,36 +101,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   reconnect: (payload) => {
-    const {
-      fen,
-      color,
-      gameId,
-      whiteTimer,
-      blackTimer,
-      validMoves,
-      moves = [],
-    } = payload;
-
     set({
-      fen,
-      color,
-      gameId,
-      moves,
-      validMoves: validMoves || [],
-      whiteTimer,
-      blackTimer,
+      fen: payload.fen,
+      color: payload.color,
+      gameId: payload.gameId,
+      validMoves: payload.validMoves || [],
+      moves: payload.moves || [],
+      whiteTimer: payload.whiteTimer,
+      blackTimer: payload.blackTimer,
       gameStatus: GameMessages.GAME_ACTIVE,
       gameStarted: true,
       oppConnected: true,
       drawOfferReceived: false,
       drawOfferSent: false,
+      drawOfferCount:payload.count ?? 0
     });
   },
 
   setFen: (fen) => set({ fen }),
-
   setOppStatus: (status) => set({ oppConnected: status }),
-
   updateTimers: (white, black) => set({ whiteTimer: white, blackTimer: black }),
 
   endGame: (winner, loser) =>
@@ -138,7 +127,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameStatus: GameMessages.GAME_OVER,
       winner,
       loser,
-      selectedSquare: null,
       validMoves: [],
       drawOfferReceived: false,
       drawOfferSent: false,
@@ -162,20 +150,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedSquare: null,
       drawOfferReceived: false,
       drawOfferSent: false,
+      drawOfferCount: 0,
     }),
 
   setSelectedSquare: (square) => set({ selectedSquare: square }),
-
-  // ✅ NEW: Draw state setters
-  setDrawOfferReceived: (received) => set({ drawOfferReceived: received }),
+  setDrawOfferCount: (count) => set({ drawOfferCount: count ?? 0 }),
   setDrawOfferSent: (sent) => set({ drawOfferSent: sent }),
+  setDrawOfferReceived: (received) => set({ drawOfferReceived: received }),
 
   move: (move) => {
     const { gameId } = get();
     if (!gameId) return;
-
-    set({ selectedSquare: null });
-
     SocketManager.getInstance().send({
       type: GameMessages.MOVE,
       payload: { ...move, gameId },
@@ -198,6 +183,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       loser: null,
       drawOfferReceived: false,
       drawOfferSent: false,
+      drawOfferCount: 0,
     });
   },
 
@@ -215,29 +201,36 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  // ✅ NEW: Draw actions
+  // ✅ Draw actions
   offerDraw: () => {
     const { gameId } = get();
     if (!gameId) return;
-    
+
     SocketManager.getInstance().send({
       type: GameMessages.OFFER_DRAW,
       payload: {},
     });
-    
+
     set({ drawOfferSent: true });
+
+    // Fallback reset if no response (15s)
+    setTimeout(() => {
+      if (get().drawOfferSent && get().gameStatus === GameMessages.GAME_ACTIVE) {
+        set({ drawOfferSent: false });
+      }
+    }, 15000);
   },
 
   acceptDraw: () => {
     const { gameId } = get();
     if (!gameId) return;
-    
+
     SocketManager.getInstance().send({
       type: GameMessages.ACCEPT_DRAW,
       payload: {},
     });
-    
-    set({ 
+
+    set({
       drawOfferReceived: false,
       gameStatus: GameMessages.GAME_OVER,
       winner: "draw",
@@ -248,23 +241,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   rejectDraw: () => {
     const { gameId } = get();
     if (!gameId) return;
-    
+
     SocketManager.getInstance().send({
       type: GameMessages.REJECT_DRAW,
       payload: {},
     });
-    
-    set({ drawOfferReceived: false });
+
+    set({
+      drawOfferReceived: false,
+      drawOfferSent: false,
+    });
   },
 }));
-
-export const useGameActions = () =>
-  useGameStore((state) => ({
-    move: state.move,
-    initGameRequest: state.initGameRequest,
-    resign: state.resign,
-    setSelectedSquare: state.setSelectedSquare,
-    offerDraw: state.offerDraw,
-    acceptDraw: state.acceptDraw,
-    rejectDraw: state.rejectDraw,
-  }));

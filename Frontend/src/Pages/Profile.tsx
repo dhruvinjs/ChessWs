@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react";
 import { User, Trophy, Clock, Target, Star, Edit3, Camera } from "lucide-react";
 import { Button, Input } from "../Components";
-import { useThemeStore } from "../stores/useThemeStore";
 import { useUserQuery } from "../hooks/useUserQuery";
 import { useNavigate } from "react-router-dom";
 
 export function Profile() {
-  const { initTheme } = useThemeStore();
+  // const { initTheme } = useThemeStore();
   const { data: user, isLoading, isError } = useUserQuery();
   const nav = useNavigate();
 
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
+  // useEffect(() => {
+  //   initTheme();
+  // }, [initTheme]);
 
   // Redirect unauthorized users to login
   useEffect(() => {

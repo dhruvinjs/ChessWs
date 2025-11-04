@@ -205,7 +205,7 @@ export async function makeMove(
         const attackerCheckMessage = {
             type: CHECK,
             payload: {
-            message: "Check! You've put the opposing King under fire. The pressure is on them now!"
+            message: "Check! You\'ve put the opposing King under fire. The pressure is on them now!"
             }
         };
 
@@ -275,7 +275,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
 
     console.log("sending the current moves to ", playerId);
     const validMoves = await provideValidMoves(gameId);
-
+    const drawCount=redis.get(`drawOffers:${gameId}:${playerId}`)
     socket.send(JSON.stringify({
         type: RECONNECT,
         payload: {
@@ -288,7 +288,8 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
                 blackTimer:game.blackTimer,
                 validMoves: validMoves || [],
                 moves:game.moves,
-                status:game.status
+                status:game.status,
+                count:Number(drawCount)
             }
         }));
 
@@ -376,7 +377,9 @@ export async function playerLeft(
       .expire(`game:${gameId}`, 600)
       .expire(`game:${gameId}:moves`, 600)
       .sRem("active-games", gameId)
+      .del(`drawOffers:${gameId}:${playerId}`)
       .exec();
+        const offerCountKey = `drawOffers:${gameId}:${playerId}`;
 
     console.log(`✅ Game ${gameId} ended - Status set to GAME_OVER`);
   } catch (error) {
@@ -404,20 +407,20 @@ export function calculateTime(lastMoveTime: number) {
 }
 
 
-export async function verifyCookie(cookieName:string){
-    // const cookie = req.headers.cookieName
+// export async function verifyCookie(cookieName:string){
+//     // const cookie = req.headers.cookieName
 
-    const session = await redis.get(`guest:${cookieName}`)
-    if(!session) 
-        {   console.log("in verify cookie returning null")
-            return null
+//     const session = await redis.get(`guest:${cookieName}`)
+//     if(!session) 
+//         {   console.log("in verify cookie returning null")
+//             return null
 
-        }
-        console.log('in verify cookie returning true');
-    return true
+//         }
+//         console.log('in verify cookie returning true');
+//     return true
 
-}
-interface Move{
+// }
+export interface Move{
     to:Square,from:Square,promotion?:PieceSymbol|null
 }
 export type Moves=Move[]
@@ -464,13 +467,13 @@ export async function offerDraw(playerId:string,gameId:string,offerSenderSocket:
     return;
     }
 
-    const offerSenderColor=playerId === game.user1 ? "w" :"b"
+    // const offerSenderColor=playerId === game.user1 ? "w" :"b"
         offerSenderSocket?.send(
             JSON.stringify({
                 type:OFFER_DRAW,
                 payload:{
                     message:"Draw offered to the opponent. Waiting For the response!",
-                    offerSenderColor:offerSenderColor
+                    count: count
                 }
             })
         )
@@ -478,7 +481,7 @@ export async function offerDraw(playerId:string,gameId:string,offerSenderSocket:
         const offerRecieverSocket=socketMap.get(draw_offer_recieverId)
         offerRecieverSocket?.send(JSON.stringify({
             type:DRAW_OFFERED,
-            payload:{message:"Draw Offered Do you want to accept it?",offerSenderColor:offerSenderColor}
+            payload:{message:"Draw Offered Do you want to accept it?"}
         }))
 
 }
@@ -495,6 +498,8 @@ export async function acceptDraw(playerId:string,gameId:string,offerAcceptedSock
 
     const offerSenderId=playerId === game.user1 ? game.user2 : game.user1
     const offerSenderSocket=socketMap.get(offerSenderId)
+      const offerCountKey = `drawOffers:${gameId}:${playerId}`;
+    const count=await redis.get(offerCountKey)
    try {
     await redis
       .multi()
@@ -513,13 +518,15 @@ export async function acceptDraw(playerId:string,gameId:string,offerAcceptedSock
     offerSenderSocket?.send(JSON.stringify({
         type:DRAW_ACCEPTED,
         payload:{
-            result:"draw"
+            result:"draw",
+            count:Number(count)
         }
     })) 
     offerAcceptedSocket.send(JSON.stringify({
         type:DRAW_ACCEPTED,
         payload:{
-            result:"draw"
+            result:"draw",
+            count:Number(count)
         }
     }))
 }
@@ -534,15 +541,17 @@ export async function rejectDraw(playerId:string,gameId:string,offerRejecterSock
        return
     }  
 
+     const offerCountKey = `drawOffers:${gameId}:${playerId}`;
+    const count=await redis.get(offerCountKey)
  const otherPlayerId=playerId === game.user1 ? game.user2 : game.user1
  const otherPlayerSocket=socketMap.get(otherPlayerId)
- otherPlayerSocket?.send(JSON.stringify({
-    type:DRAW_REJECTED,
-    payload:{message:"Draw Offer Rejected! Game Should Go On"}
- }))
- offerRejecterSocket.send(JSON.stringify({
-        type:DRAW_REJECTED,
-        payload:{message:"Draw Rejected Offer sent to the Other Socket!"}
+ offerRejecterSocket?.send(JSON.stringify({
+    type: DRAW_REJECTED,
+    payload: { message: "You rejected the draw offer.", count: Number(count) }
+  }));
 
- }))
+  otherPlayerSocket?.send(JSON.stringify({
+    type: DRAW_REJECTED,
+    payload: { message: "Your opponent rejected the draw offer.", count: Number(count) }
+  }));
 }

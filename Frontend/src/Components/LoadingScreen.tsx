@@ -1,14 +1,11 @@
 import { motion } from "framer-motion";
-import { useEffect } from "react";
-import { useThemeStore } from "../stores/useThemeStore";
 
 export const LoadingScreen = () => {
-  const { initTheme } = useThemeStore();
+  
+  
+  
+  
 
-  // Initialize theme on mount
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
 
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 z-50 overflow-hidden">

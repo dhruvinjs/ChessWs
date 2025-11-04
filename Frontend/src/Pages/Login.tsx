@@ -1,7 +1,7 @@
-import { useRef, useEffect } from "react";
+import { useRef,  } from "react";
 import { Button, Card, Input } from "../Components";
 import { toast } from "react-hot-toast";
-import { useThemeStore } from "../stores/useThemeStore";
+
 import { useLoginMutation } from "../hooks/useAuth";
 
 export function Login() {
@@ -27,11 +27,11 @@ export function Login() {
     login({ email, password });
   };
 
-  const { initTheme } = useThemeStore();
+  // const { initTheme } = useThemeStore();
 
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
+  // useEffect(() => {
+  //   initTheme();
+  // }, [initTheme]);
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-amber-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">

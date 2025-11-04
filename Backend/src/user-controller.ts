@@ -10,11 +10,17 @@ const router=express.Router()
 import {nanoid} from "nanoid"
 import { redis } from './redisClient';
 import { GAME_ACTIVE, GAME_OVER,  INIT_GAME } from './messages';
-import { verifyCookie } from './Services/GameServices';
+import { roomManager } from './Classes/RoomManager';
+// import { verifyCookie } from './Services/GameServices';
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
   PRO
+}
+export enum RoomStatus {
+    WAITING,
+    ACTIVE,
+    FINISHED
 }
 
 router.post('/register',async (req:Request,res:Response) => {
@@ -133,7 +139,7 @@ router.post('/login',async(req:Request,res:Response)=>{
             return
         }
         const token=jwt.sign({id:user.id},process.env.SECRET_TOKEN as string,{expiresIn:'8h'})
-        res.clearCookie('guestId')
+        res.clearCookie('id')
          res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -205,7 +211,7 @@ router.get('/cookie', async(req:Request, res:Response) => {
         
         console.log(existingId)
       if (existingId) {
-        const isValidId=await verifyCookie(existingId)
+        const isValidId=await redis.exists(`guest:${existingId}`)
         if(isValidId){
             await redis.expire(`guest:${existingId}`,30 * 60)
             res.cookie('id', existingId, {
@@ -262,153 +268,163 @@ router.post('/checkAuth',authMiddleware,async (req:Request,res:Response) => {
         console.log(error)
     }
 })
-router.post('/room/create',authMiddleware,async(req:Request,res:Response)=>{
-    try {
-        // @ts-ignore
-        const userId=req.userId 
+router.post("/room/create", authMiddleware, async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
 
-        const user=await pc.user.findUnique({
-            where:{id:userId},
-            select:{
-                name:true,
-                email:true,
-                chessLevel:true
-            }
-        })
-        if(!user){
-            res.status(200).json({
-                success:false,
-                message:"Session ended,Please login again"
-            })
-            return
-        }
-        const roomId=nanoid(8)
-       await redis.multi()
-       .hSet(`room:${roomId}`,{
-        user1:JSON.stringify(user),
-        user2:"",
-        status:INIT_GAME,
-        createdAt:Date.now()
-       })
-        .setEx(`user:${userId}:room`,1800,roomId)
-        .expire(`room:${roomId}`,1800).exec()
+    // Find active (WAITING/ACTIVE) room owned or joined by user
+    const activeRoom = await pc.room.findFirst({
+      where: {
+        status: { in: ["WAITING", "ACTIVE"] },
+        OR: [
+          { createdById: userId },
+          { joinedById: userId },
+        ],
+      },
+    });
 
-        res.status(200).json({
-            roomId:roomId,
-            success:true
-        }) 
-        return;
-    } catch (error) {
-        res.status(500).json({error:error})
-        console.log(error)
+    if (activeRoom) {
+       res.status(400).json({
+        message: "You are already in an active room. Please finish or leave that match before creating a new one.",
+        success: false,
+        roomId: activeRoom.code,
+      });
+      return
     }
-})
+
+    // Try to reuse cancelled room (optional UX feature)
+    const cancelledRoom = await pc.room.findFirst({
+      where: {  status: "CANCELLED" },
+    });
+
+    let roomId: string;
+
+    if (cancelledRoom) {
+    await pc.room.update({
+      where: { code: cancelledRoom.code },
+      data: {
+        status: "WAITING",
+        createdById: userId,
+        joinedById: null,
+        gameId: null
+      }
+    });
+      roomId = cancelledRoom.code;
+    } else {
+      roomId = nanoid(8);
+      await pc.room.create({
+        data: {
+          createdById: userId,
+          code: roomId,
+          status: "WAITING",
+        },
+      });
+    }
+
+    res.status(200).json({
+      roomId,
+      success: true,
+    });
+    return
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error", success: false });
+  }
+});
+
 
 router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
     try {
         const {roomId}=req.body
         //@ts-ignore
         const userId=req.userId
-        const redisRoomData=await redis.hGetAll(`room:${roomId}`)
-        if(!redisRoomData && Object.keys(redisRoomData).length === 0){
-            res.status(400).json({
-                message:"Wrong room id",
-                success:false
-            })
-            return
-        }
-        console.log(redisRoomData)
-        const redisUser1=String(redisRoomData.user1)
-        const redisUser2=String(redisRoomData.user2)
-        const user1=JSON.parse(redisUser1)
-        if(redisUser2){
-            res.status(400).json({
-                message:"Room already full or roomId expired",
-                success:false
-            })
-            return
-        } 
-         const user2=await pc.user.findUnique({
-            where:{id:userId},
-            select:{
-                name:true,
-                email:true,
-                chessLevel:true
+        const room=await pc.room.findUnique({
+            where:{code:roomId},include:{
+                createdBy:true,
+                game:true,
+                joinedBy:true,
+            
             }
         })
-
-       await redis.multi().hSet(`room:${roomId}`,
-       {
-        user2:JSON.stringify(user2),
-        status:GAME_ACTIVE
-       })
-       .setEx(`user:${userId}:room`,1800,roomId).exec()
-
-       res.status(200).json({success:true,message:"Room joined match started"})
-       
+        if(!room){
+            res.status(404).json({message: "Room does not exist or roomId is incorrect",success:false})
+            return
+        }
+        if (room.createdById === Number(userId)) {
+            res.status(400).json({ message: "You cannot join a room you already created.", success: false });
+            return;
+        }
+        if(room.joinedBy){
+            res.status(404).json({message: "Room is already full and match is started",success:false})
+            return
+            
+        }
+          
+        await pc.room.update({
+            where:{id:room.id},data:{
+                joinedById:userId,status:"FULL"
+        }})
+        roomManager.roomJoined(room.createdById,userId)
+        res.status(200).json({success:true,message:"Room joined match can be started"})
+        return
     } catch (error) {
         res.status(500).json({message:"Internal Server error"})
         console.log(error)
     }
 })
-router.post('/room/leave',authMiddleware,async(req:Request,res:Response)=>{
-    try {
-        // @ts-ignore
-        const userId=req.userId
-        // const {roomId}=req.bo
-        const user=await pc.user.findUnique({
-        where:{id:userId},
-        select:{
-            email:true,
-            name:true,
-            chessLevel:true
-        }
-        })
-        const redisRoomid=await redis.get(`user:${userId}:room`)
+// router.post("/room/leave", authMiddleware, async (req: Request, res: Response) => {
+//   try {
+//     // @ts-ignore
+//     const userId = req.userId;
+//     const { code } = req.body;
 
-        if (!redisRoomid) {
-         res.status(404).json({
-            message: "User is not in any room",
-            success: false
-        });
-        return
-        }
-        // 3. Get full room data
-        const redisRoomData=await redis.hGetAll(`room:${redisRoomid}`)
-        const redisUser1 = redisRoomData.user1 ? JSON.parse(String(redisRoomData.user1)) : null;
-        const redisUser2 = redisRoomData.user2 ? JSON.parse(String(redisRoomData.user2)) : null;
+//     const room = await pc.room.findUnique({
+//       where: { code },
+//       include: { game: true },
+//     });
 
-        const isUser1=user===redisUser1 ? true : false
-        if(isUser1){
-            await redis.hSet(`room:${redisRoomid}`,{
-                loser:JSON.stringify(redisUser1),
-                winner:JSON.stringify(redisUser2),
-                status:GAME_OVER
-            })
-            res.status(200).json({
-                message: "You Lost",
-                success: true
-            });
-            return
-        }else{
-            await redis.hSet(`room:${redisRoomid}`,{
-                loser:JSON.stringify(redisUser2),
-                winner:JSON.stringify(redisUser1),
-                status:GAME_OVER
-            })
-             res.status(200).json({
-                message: "You Lost",
-                success: true
-            });
-            return
-        }
+//     if (!room) {
+//       res.status(404).json({ message: "Room doesn't exist or code incorrect", success: false });
+//         return
+//     }
 
-    } catch (error) {
-        res.status(500).json({
-            message:"Internal Server error",
-            success:false
-        })
-        console.log(error)
-    }
-})
+//     if (userId !== room.createdById && userId !== room.joinedById) {
+//        res.status(403).json({ message: "You are not part of this room", success: false });
+//        return
+//     }
+
+//     let updatedRoom;
+
+//     if (room.status === "WAITING") {
+//       updatedRoom = await pc.room.update({
+//         where: { id: room.id },
+//         data: { status: "CANCELLED" },
+//       });
+
+//        res.status(200).json({
+//         message: "Room cancelled successfully.",
+//         success: true,
+//         room: updatedRoom,
+//       });
+//       return
+//     }
+
+  
+//     // 3️⃣ Already finished — no changes
+//      res.status(200).json({
+//       message: "Room is already finished or cancelled.",
+//       success: true,
+//       room,
+//     });
+//     return
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({
+//       message: "Internal Server Error",
+//       success: false,
+//     });
+//   }
+// });
+
 export {router}

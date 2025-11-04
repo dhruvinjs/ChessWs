@@ -2,7 +2,7 @@
 import { useGameStore } from "../stores/useGameStore";
 import { showGameMessage } from "../Components/chess/ChessGameMessage";
 import { GameMessages } from "../types/chess";
-import { SocketMessage } from "../types/socket";
+import { GameModes, SocketMessage } from "../types/socket";
 import { launchConfetti } from "./confetti";
 
 export class SocketManager {
@@ -35,6 +35,7 @@ export class SocketManager {
       initGame,
       setDrawOfferReceived,
       setDrawOfferSent,
+      setDrawOfferCount,
     } = useGameStore.getState();
     
       switch (type) {
@@ -70,9 +71,10 @@ export class SocketManager {
 
        case GameMessages.OFFER_DRAW:
         setDrawOfferSent(true);
+        setDrawOfferCount(payload.count)
         showGameMessage(
           "🤝 Draw Offer Sent", 
-          payload.message || "Waiting for opponent's response...", 
+          payload.message || "Waiting for opponent\'s response...", 
           { type: "info" }
         );
         break;
@@ -141,10 +143,11 @@ export class SocketManager {
                 whiteTimer,
                 blackTimer,
                 validMoves,
+                moves, 
+                count
               } = payload;
 
               console.log("[RECONNECT] restoring game state", payload);
-
               // Update your store
               useGameStore.getState().reconnect({
                 fen,
@@ -154,6 +157,8 @@ export class SocketManager {
                 whiteTimer,
                 blackTimer,
                 validMoves,
+                moves,
+                count // Pass moves to the store
               });
 
               showGameMessage(
@@ -183,7 +188,7 @@ export class SocketManager {
         case GameMessages.STALEMATE:
           showGameMessage(
             "🤝 Stalemate",
-            payload.message || "It's a draw!",
+            payload.message || "It\'s a draw!",
             { type: "info" }
           );
           break;
@@ -201,7 +206,7 @@ export class SocketManager {
           setOppStatus(false);
           showGameMessage(
             "🔴 Opponent Disconnected",
-            "They've left the game.",
+            "They\'ve left the game.",
             { type: "warning" }
           );
           break;
@@ -209,7 +214,7 @@ export class SocketManager {
         case GameMessages.TIME_EXCEEDED:
           endGame(payload.winner, payload.loser);
           showGameMessage(
-            "⏰ Time's Up!",
+            "⏰ Time\'s Up!",
             payload.message || "Time ran out!",
             { type: "error" }
           );
@@ -253,48 +258,70 @@ export class SocketManager {
     }
   }
 
-  public init(userId: string): WebSocket | null {
-    if (
-      this.socket &&
-      (this.socket.readyState === WebSocket.OPEN ||
-        this.socket.readyState === WebSocket.CONNECTING)
-    ) {
-      return this.socket;
-    }
+public init(type: GameModes, userId?: string, token?: string){
+      if (this.socket) {
+        const state = this.socket.readyState;
+        if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
+          return this.socket;
+        }
+      }
+
     if (this.isConnecting) return this.socket;
-    if (!userId) {
-      console.warn("⚠️ Cannot initialize socket without userId.");
-      return null;
+
+    let wsUrl = "";
+
+    switch (type) {
+      case "guest":
+        if (!userId) {
+          console.warn("⚠️ No guest ID provided.");
+          return null;
+        }
+        wsUrl = `${this.wsBaseUrl}/guest?id=${userId}`;
+        break;
+
+      case "room":
+        if (!token) {
+          console.warn("⚠️ No auth token provided for room game.");
+          return null;
+        }
+        wsUrl = `${this.wsBaseUrl}/room?token=${token}`;
+        break;
+
+      case "computer":
+        wsUrl = `${this.wsBaseUrl}/computer`;
+        break;
+
+      default:
+        console.error("❌ Invalid game type");
+        return null;
     }
 
-    const wsUrl = `${this.wsBaseUrl}/ws?id=${userId}`;
     this.isConnecting = true;
 
     try {
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
-        console.log("✅ WebSocket connected:", wsUrl);
+        console.log(`✅ Connected to ${type} WebSocket:`, wsUrl);
         this.isConnecting = false;
       };
 
       this.socket.onclose = (event) => {
-        console.log("🔌 WebSocket disconnected", event.reason);
+        console.log(`🔌 ${type} WebSocket closed`, event.reason);
         this.socket = null;
         this.isConnecting = false;
       };
 
       this.socket.onerror = (err) => {
-        console.error("❌ WebSocket error:", err);
+        console.error(`❌ ${type} WebSocket error:`, err);
         this.socket = null;
         this.isConnecting = false;
       };
 
       this.socket.onmessage = this.handleMessage.bind(this);
-
       return this.socket;
     } catch (error) {
-      console.error("❌ WebSocket creation failed:", error);
+      console.error(`❌ Failed to connect ${type} socket:`, error);
       this.socket = null;
       this.isConnecting = false;
       return null;

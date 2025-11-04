@@ -218,7 +218,7 @@ export class GameManager{
                 user2: id,
                 status: GAME_ACTIVE,
                 fen: chess.fen(),
-                whiteTimer: 30,
+                whiteTimer: 600,
                 blackTimer: 600,
                 })
                 .setEx(`user:${user1Id}:game`, 1800, newGameId)
@@ -278,8 +278,8 @@ export class GameManager{
 
             if(type===MOVE){
                 const {payload}=jsonMessage//from and to moves
-                console.log("IN make move testing")
-                console.log(id);
+                // console.log("IN make move testing")
+                // console.log(id);
                 const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
 

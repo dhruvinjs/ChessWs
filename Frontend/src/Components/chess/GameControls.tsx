@@ -16,10 +16,10 @@ const GameControlsComponent = () => {
   const initGameRequest = useGameStore((state) => state.initGameRequest);
   const resign = useGameStore((state) => state.resign);
   const offerDraw = useGameStore((state) => state.offerDraw);
-  // const moves = useGameStore((state) => state.moves);
   const gameStatus = useGameStore((state) => state.gameStatus);
   const gameStarted = useGameStore((state) => state.gameStarted);
   const drawOfferSent = useGameStore((state) => state.drawOfferSent);
+  const drawOfferCount = useGameStore((state) => state.drawOfferCount);
 
   const isWaitingForGame = gameStatus === GameMessages.SEARCHING;
   const isGameActive = gameStatus === GameMessages.GAME_ACTIVE && gameStarted;
@@ -69,6 +69,18 @@ const GameControlsComponent = () => {
     resign();
   }, [resign]);
 
+  const getDrawButtonText = () => {
+    if (drawOfferSent) {
+      return "Offer Sent";
+    }
+    if (isGameActive) {
+      return `Draw (${drawOfferCount}/3)`;
+    }
+    return "Draw";
+  };
+  
+  const isDrawDisabled = !isGameActive || drawOfferSent || isGameOver || drawOfferCount >= 3;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -92,9 +104,9 @@ const GameControlsComponent = () => {
           variant="outline"
           size="md"
           onClick={handleOfferDraw}
-          text={drawOfferSent ? "Offer Sent" : "Draw"}
+          text={getDrawButtonText()}
           icon={<Handshake className="w-4 h-4" />}
-          disabled={!isGameActive || drawOfferSent || isGameOver}
+          disabled={isDrawDisabled}
         />
         <Button
           variant="secondary"
@@ -123,7 +135,7 @@ const GameControlsComponent = () => {
         onClose={() => setShowDrawConfirm(false)}
         onConfirm={confirmDraw}
         title="Offer Draw?"
-        message="Are you sure you want to offer a draw to your opponent? They can accept or reject this offer."
+        message={`Are you sure you want to offer a draw? You have ${3 - drawOfferCount} offers remaining.`}
         confirmText="Yes, Offer Draw"
         cancelText="Cancel"
       />

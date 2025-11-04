@@ -2,19 +2,14 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Navbar } from "../Components/Navbar";
-import { useThemeStore } from "../stores/useThemeStore";
 import { useUserQuery } from "../hooks/useUserQuery";
 import { LoadingScreen } from "../Components/LoadingScreen";
 
 export function PublicLayout() {
-  const { initTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: user, isLoading } = useUserQuery();
 
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
 
   if (isLoading) {
     return <LoadingScreen />;
