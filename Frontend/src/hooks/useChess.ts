@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { useGameStore } from '../stores/useGameStore';
-import { showGameMessage } from '../Components/chess';
-
+import { showMessage } from '../Components';
 export const useChess = () => {
   // These trigger re-renders when they change
   const selectedSquare = useGameStore((state) => state.selectedSquare);
@@ -33,7 +32,7 @@ export const useChess = () => {
         return;
       }
         if (drawOfferSent) {
-        showGameMessage("Draw Offer Sent!","⏳ Please wait — opponent hasn't responded to your draw offer yet.",{type:"warning"});
+        showMessage("Draw Offer Sent!","⏳ Please wait — opponent hasn't responded to your draw offer yet.",{type:"warning"});
         return;
       }
       // ✅ Case 1: Piece already selected

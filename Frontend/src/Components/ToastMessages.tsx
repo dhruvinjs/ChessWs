@@ -2,9 +2,11 @@ import toast from "react-hot-toast";
 
 interface MessageOptions {
   type: "success" | "error" | "info" | "warning";
+  position?: "top-center" | "top-right" | "top-left" | "bottom-center" | "bottom-right" | "bottom-left";
+  duration?: number;
 }
 
-export const showGameMessage = (
+export const showMessage = (
   title: string,
   message: string,
   options: MessageOptions
@@ -21,8 +23,8 @@ export const showGameMessage = (
   };
 
   const toastOptions = {
-    duration: 5000,
-    position: "top-center" as const,
+    duration: options.duration || 5000,
+    position: options.position || "top-center" as const,
     style: {
       ...baseStyle,
       background:

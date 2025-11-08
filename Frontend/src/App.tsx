@@ -69,8 +69,8 @@ import { useAppSetup } from "./hooks/useAppTheme";
               <Route path="/profile" element={<Profile />} />
               <Route path="/game" element={<ChessGame />} />
               <Route path="/room" element={<Room />} />
+              <Route path="/room/:roomId" element={<RoomChessPage />} />
             </Route>
-              <Route path='/room/:roomId' element={<RoomChessPage/>}/>
 
 
             <Route path="*" element={<NotFound />} />

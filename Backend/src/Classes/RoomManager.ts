@@ -129,16 +129,39 @@
 
 
     async roomJoined(createdById: number, opponentId: number) {
-      const createdBySocket = this.roomSocketManager.get(createdById);
-      createdBySocket?.send(
-        JSON.stringify({
-          type: USER_HAS_JOINED,
-          payload: {
-            message: "Opponent has joined!",
-            opponentId,
-          },
-        })
-      );
+      try {
+        // Get opponent's name from database
+        const opponent = await pc.user.findUnique({
+          where: { id: opponentId },
+          select: { name: true }
+        });
+
+        const createdBySocket = this.roomSocketManager.get(createdById);
+        createdBySocket?.send(
+          JSON.stringify({
+            type: USER_HAS_JOINED,
+            payload: {
+              message: "Opponent has joined!",
+              opponentId,
+              opponentName: opponent?.name || null,
+            },
+          })
+        );
+      } catch (error) {
+        console.error("Error in roomJoined:", error);
+        // Still send the message even if we can't get the name
+        const createdBySocket = this.roomSocketManager.get(createdById);
+        createdBySocket?.send(
+          JSON.stringify({
+            type: USER_HAS_JOINED,
+            payload: {
+              message: "Opponent has joined!",
+              opponentId,
+              opponentName: null,
+            },
+          })
+        );
+      }
     }
 
     async startRoomTimer() {
@@ -397,7 +420,7 @@
                 whiteTimer: 30,
                 blackTimer: 600,
                 opponentId: joinerId,
-                gameId:gameId
+                roomGameId: gameId
               },
             })
           );
@@ -412,7 +435,7 @@
                 opponentId: creatorId,
                 whiteTimer: 30,
                 blackTimer: 600,
-                gameId:gameId
+                roomGameId: gameId
               },
             })
           );
@@ -424,50 +447,50 @@
 
         else if (type === ROOM_MOVE) {
           const { payload } = msg;
-          const { to, from, promotion, gameId } = payload;
-          const gameExists = await redis.exists(`room-game:${gameId}`);
+          const { to, from, promotion, roomGameId } = payload;
+          const gameExists = await redis.exists(`room-game:${roomGameId}`);
 
           if (!gameExists) {
-            await this.restoreGameFromDB(gameId);
+            await this.restoreGameFromDB(roomGameId);
           }
 
           await handleRoomMove(
             userId,
             userSocket,
             { from,to,promotion },
-            gameId,
+            roomGameId,
             this.roomSocketManager
           );
           return;
         }
         else if (type === ROOM_CHAT){
           
-            const {message,gameId}=payload;
-            const gameExists=await redis.exists(`room-game:${gameId}`)
+            const {message,roomGameId}=payload;
+            const gameExists=await redis.exists(`room-game:${roomGameId}`)
             if (!gameExists) {
-            await this.restoreGameFromDB(gameId);
+            await this.restoreGameFromDB(roomGameId);
           }
 
-          await handleRoomChat(userId, userSocket, gameId,message,this.roomSocketManager);
+          await handleRoomChat(userId, userSocket, roomGameId,message,this.roomSocketManager);
           return;
         }
 
         else if (type === ROOM_LEAVE_GAME) {
         
-          const { gameId } = payload;
-          const gameExists = await redis.exists(`room-game:${gameId}`);
+          const { roomGameId } = payload;
+          const gameExists = await redis.exists(`room-game:${roomGameId}`);
 
           if (!gameExists) {
-            await this.restoreGameFromDB(gameId);
+            await this.restoreGameFromDB(roomGameId);
           }
 
-          await handleRoomGameLeave(userId, userSocket, gameId,this.roomSocketManager);
+          await handleRoomGameLeave(userId, userSocket, roomGameId,this.roomSocketManager);
           return;
         }
 
         else if (type === ROOM_RECONNECT) {
 
-          const gameId = payload.gameId;
+          const gameId = payload.roomGameId;
           const gameExists = await redis.exists(`room-game:${gameId}`);
 
           if (!gameExists) {

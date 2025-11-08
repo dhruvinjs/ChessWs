@@ -32,6 +32,41 @@ export function useLoginMutation() {
   });
 }
 
+export function useRegisterMutation() {
+  const queryClient = useQueryClient();
+  const nav = useNavigate();
+
+  return useMutation({
+    mutationFn: authApis.register,
+    onSuccess: (data) => {
+      toast.success(data.message || "Registration successful");
+
+      const user: User = {
+        id: data.id,
+        name: data.username,
+        chessLevel: data.chessLevel,
+        email: data.email,
+        isGuest: false,
+      };
+
+      // ✅ Update react-query cache
+      queryClient.setQueryData(["user"], user);
+      nav("/home");
+    },
+    onError: (err: any) => {
+      // Handle Zod validation errors specifically
+      if (err.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        errors.forEach((error: any) => {
+          toast.error(error.message);
+        });
+      } else {
+        toast.error(err.response?.data?.message || err.message || "Registration failed");
+      }
+    },
+  });
+}
+
 export function useLogoutMutation() {
   const queryClient = useQueryClient();
 

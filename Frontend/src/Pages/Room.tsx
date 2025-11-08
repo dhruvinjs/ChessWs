@@ -1,29 +1,200 @@
-"use client"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "../Components"
 import { motion } from "framer-motion"
-import { useThemeStore } from "../stores/useThemeStore"
 import { FloatingPieces } from "../Components/FloatingPieces"
+import { roomApis } from "../api/api"
+import { showMessage } from "../Components/ToastMessages"
+import { useNavigate } from "react-router-dom"
+import { useGameStore } from "../stores/useGameStore"
+import { AlertTriangle, X } from "lucide-react"
 
 export function Room() {
   const [roomCode, setRoomCode] = useState("")
   const [mode, setMode] = useState<"join" | "host">("join")
+  const [isLoading, setIsLoading] = useState(false)
+  const [showExistingRoomDialog, setShowExistingRoomDialog] = useState(false)
+  const [existingRoomId, setExistingRoomId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const setRoomInfo = useGameStore((state) => state.setRoomInfo)
 
-  const { initTheme } = useThemeStore()
+  const handleJoinRoom = async () => {
+    const trimmedRoomCode = roomCode.trim();
+    
+    if (!trimmedRoomCode) {
+      showMessage("Validation Error", "Please enter a room code", { type: "error" });
+      return;
+    }
 
-  useEffect(() => {
-    initTheme()
-  }, [initTheme])
+    if (trimmedRoomCode.length !== 8) {
+      showMessage("Validation Error", "Room code must be exactly 8 characters", { type: "error" });
+      return;
+    }
 
-  const handleJoinRoom = () => {
-    if (roomCode.trim()) console.log("Joining room:", roomCode)
+    console.log("Attempting to join room:", trimmedRoomCode); // Debug log
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await roomApis.joinRoom(trimmedRoomCode);
+      console.log("Join room response:", response); // Debug log
+      
+      if (response.success) {
+        const roomInfo = response.room;
+        console.log("Room joined with status:", roomInfo); // Debug log
+        
+        // ✅ Store room info in Zustand
+        setRoomInfo(roomInfo);
+        
+        showMessage("Room Joined!", `${response.message}. Status: ${roomInfo.status} (${roomInfo.playerCount}/2 players). Redirecting...`, { type: "success" });
+        
+        // Clear the room code input after successful join
+        setRoomCode("");
+        
+        // Navigate to the room chess page with a slight delay for better UX
+        setTimeout(() => {
+          navigate(`/room/${trimmedRoomCode}`);
+        }, 1000);
+      } else {
+        showMessage("Join Failed", response.message || "Failed to join room", { type: "error" });
+      }
+    } catch (error: any) {
+      console.error("Join room error:", error); // Debug log
+      let errorMessage = "Failed to join room";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Add more specific error messages
+      if (error.response?.status === 404) {
+        errorMessage = "Room not found. Please check the room code and try again.";
+      } else if (error.response?.status === 400) {
+        errorMessage = error.response.data.message || "Invalid room code or room is full.";
+      }
+      
+      showMessage("Error", errorMessage, { type: "error" });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  const handleHostRoom = () => {
-    const newRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase()
-    setRoomCode(newRoomCode)
-    console.log("Hosting room:", newRoomCode)
+  const handleHostRoom = async () => {
+    setIsLoading(true);
+    try {
+      const response = await roomApis.createRoom();
+      if (response.success) {
+        const createdRoomId = response.roomId;
+        const roomInfo = response.room;
+        setRoomCode(createdRoomId);
+        
+        console.log("Room created with status:", roomInfo); // Debug log
+        
+        // ✅ Store room info in Zustand
+        setRoomInfo(roomInfo);
+        
+        showMessage("Room Created!", `Room ${createdRoomId} created successfully! Status: ${roomInfo.status} (${roomInfo.playerCount}/2 players). Redirecting...`, { type: "success" });
+        
+        // Navigate to the created room after a short delay
+        setTimeout(() => {
+          navigate(`/room/${createdRoomId}`);
+        }, 1500);
+      } else {
+        const errorMessage = response.message || "Failed to create room";
+        showMessage("Creation Failed", errorMessage, { type: "error" });
+      }
+    } catch (error: any) {
+      console.error("Create room error:", error); // Debug log
+      
+      // Check if user already has an active room
+      if (error.response?.status === 400 && error.response?.data?.roomId) {
+        const existingRoomCode = error.response.data.roomId;
+        console.log("User already has active room:", existingRoomCode); // Debug log
+        
+        // Show dialog asking user if they want to rejoin
+        setExistingRoomId(existingRoomCode);
+        setShowExistingRoomDialog(true);
+      } else {
+        // Handle other types of errors
+        const errorMessage = error.response?.data?.message || "Failed to create room";
+        showMessage("Error", errorMessage, { type: "error" });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const handleRejoinExistingRoom = () => {
+    if (existingRoomId) {
+      showMessage(
+        "Rejoining Room", 
+        `Redirecting to your active room (${existingRoomId})...`, 
+        { type: "info" }
+      );
+      
+      setShowExistingRoomDialog(false);
+      navigate(`/room/${existingRoomId}`);
+    }
+  }
+
+  const handleCancelRejoin = () => {
+    setShowExistingRoomDialog(false);
+    setExistingRoomId(null);
+    showMessage(
+      "Cancelled", 
+      "Please finish or leave your existing room before creating a new one.", 
+      { type: "info" }
+    );
+  }
+
+  const handleCancelExistingRoom = async () => {
+    if (!existingRoomId) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await roomApis.cancelRoom(existingRoomId);
+      
+      if (response.success) {
+        showMessage(
+          "Room Cancelled", 
+          `Room ${existingRoomId} has been cancelled successfully.`, 
+          { type: "success" }
+        );
+        
+        // Close dialog and clear stored room info
+        setShowExistingRoomDialog(false);
+        setExistingRoomId(null);
+        
+        // Clear persisted room data from Zustand
+        setRoomInfo({
+          code: "",
+          status: "CANCELLED",
+          playerCount: 0,
+          isCreator: false,
+          opponentId: null,
+          opponentName: null,
+          gameId: null,
+        });
+        
+        // Now allow user to create a new room
+        showMessage(
+          "Ready", 
+          "You can now create a new room.", 
+          { type: "info" }
+        );
+      } else {
+        showMessage("Error", response.message || "Failed to cancel room", { type: "error" });
+      }
+    } catch (error: any) {
+      console.error("Cancel room error:", error);
+      const errorMessage = error.response?.data?.message || "Failed to cancel room";
+      showMessage("Error", errorMessage, { type: "error" });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
 
@@ -79,13 +250,21 @@ export function Room() {
                   <input
                     type="text"
                     value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                    className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
-                    placeholder="Enter room code"
-                    maxLength={6}
+                    onChange={(e) => setRoomCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8))}
+                    className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider text-slate-900 dark:text-white transition-all focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    placeholder="Enter 8-character room code"
+                    maxLength={8}
+                    autoComplete="off"
                   />
                 </div>
-                <Button size="lg" variant="primary" text="Join Room" className="w-full" onClick={handleJoinRoom} />
+                <Button 
+                  size="lg" 
+                  variant="primary" 
+                  text={isLoading ? "Joining..." : "Join Room"} 
+                  className="w-full" 
+                  onClick={handleJoinRoom}
+                  disabled={isLoading}
+                />
               </>
             ) : (
               <>
@@ -97,17 +276,112 @@ export function Room() {
                     {roomCode || "Click to generate"}
                   </div>
                 </div>
-                <Button size="lg" variant="primary" text="Host New Room" className="w-full" onClick={handleHostRoom} />
+                <Button 
+                  size="lg" 
+                  variant="primary" 
+                  text={isLoading ? "Loading..." : (roomCode ? "Join Your Room" : "Host New Room")} 
+                  className="w-full" 
+                  onClick={roomCode ? () => navigate(`/room/${roomCode}`) : handleHostRoom}
+                  disabled={isLoading}
+                />
                 {roomCode && (
-                  <p className="text-sm text-center text-slate-600 dark:text-slate-400 mt-2">
-                    Share this code with your opponent
-                  </p>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        text="Copy Code" 
+                        className="flex-1"
+                        onClick={() => {
+                          navigator.clipboard.writeText(roomCode);
+                          showMessage("Copied", "Room code copied to clipboard!", { type: "success" });
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        text="Enter Room" 
+                        className="flex-1"
+                        onClick={() => navigate(`/room/${roomCode}`)}
+                      />
+                    </div>
+                    <p className="text-sm text-center text-slate-600 dark:text-slate-400">
+                      Share this code with your opponent, then enter the room to start playing!
+                    </p>
+                  </div>
                 )}
               </>
             )}
           </div>
         </div>
       </motion.div>
+
+      {/* Existing Room Dialog with 3 options */}
+      {showExistingRoomDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCancelRejoin}
+          />
+          
+          {/* Dialog */}
+          <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Active Room Found
+                </h3>
+              </div>
+              <button
+                onClick={handleCancelRejoin}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-2">
+                You already have an active room: <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">{existingRoomId}</span>
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Choose an option below:
+              </p>
+            </div>
+
+            {/* Actions - 3 buttons */}
+            <div className="flex flex-col gap-3 p-6 pt-0">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleRejoinExistingRoom}
+                text="Rejoin Existing Room"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleCancelExistingRoom}
+                disabled={isLoading}
+                className="px-4 py-2.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700 rounded-lg transition-colors duration-150 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? "Cancelling..." : "Cancel Existing Room"}
+              </button>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={handleCancelRejoin}
+                text="Go Back"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

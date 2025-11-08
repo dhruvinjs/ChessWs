@@ -12,8 +12,6 @@ import http from 'http'
 import cors from 'cors'
 import { parse } from "url";
 import { gameRouter } from './game-controllers';
-// import { verifyCookie } from './Services/GameServices';
-// import { tokenToString } from 'typescript';
 import { INVALID_AUTH, NO_AUTH } from './messages';
 import { redis } from './redisClient';
 import { roomManager } from './Classes/RoomManager';

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { SocketManager } from "../lib/socketManager";
 import { GameMessages } from "../types/chess";
 
@@ -31,6 +32,19 @@ interface GameState {
   drawOfferSent: boolean;
   drawOfferCount: number;
 
+  //room-state
+  roomId:string;
+  isRoomCreator: boolean;
+  opponentId:number | null;
+  opponentName:string | null;
+  roomGameId:number | null;
+  roomStatus:"WAITING" | "FULL" |"CANCELLED" | "ACTIVE" | "FINISHED" | null;
+  chatMsg:Array<{
+    sender:number,
+    message:string,
+    timestamp:number
+  }>;
+
   // Actions
   initGame: (payload: any) => void;
   processServerMove: (payload: any) => void;
@@ -44,6 +58,17 @@ interface GameState {
   setDrawOfferCount: (count: number) => void;
   setDrawOfferSent: (sent: boolean) => void;
   setDrawOfferReceived: (received: boolean) => void;
+  
+  // Room actions
+  setRoomInfo: (roomInfo: {
+    code: string;
+    status: string;
+    playerCount: number;
+    isCreator: boolean;
+    opponentId: number | null;
+    opponentName: string | null;
+    gameId: string | null;
+  }) => void;
 
   // Socket actions
   move: (move: Move) => void;
@@ -54,7 +79,9 @@ interface GameState {
   rejectDraw: () => void;
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
+export const useGameStore = create<GameState>()(
+  persist(
+    (set, get) => ({
   guestId: "",
   color: null,
   moves: [],
@@ -74,6 +101,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   drawOfferReceived: false,
   drawOfferSent: false,
   drawOfferCount: 0,
+
+  // ✅ Initial room state
+  roomId: "",
+  isRoomCreator: false,
+  opponentId: null,
+  opponentName: null,
+  roomGameId: null,
+  roomStatus: null,
+  chatMsg: [],
 
   initGame: (payload) =>
     set({
@@ -252,4 +288,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       drawOfferSent: false,
     });
   },
-}));
+
+  // ✅ Room action
+  setRoomInfo: (roomInfo) => {
+    set({
+      roomId: roomInfo.code,
+      isRoomCreator: roomInfo.isCreator,
+      opponentId: roomInfo.opponentId,
+      opponentName: roomInfo.opponentName,
+      roomStatus: roomInfo.status as "WAITING" | "FULL" | "CANCELLED" | "ACTIVE" | "FINISHED",
+      roomGameId: roomInfo.gameId ? Number(roomInfo.gameId) : null,
+    });
+  },
+}),
+    {
+      name: "chess-game-storage", // localStorage key
+      partialize: (state) => ({
+        // Only persist room-related state
+        roomId: state.roomId,
+        isRoomCreator: state.isRoomCreator,
+        opponentId: state.opponentId,
+        opponentName: state.opponentName,
+        roomStatus: state.roomStatus,
+        roomGameId: state.roomGameId,
+      }),
+    }
+  )
+);

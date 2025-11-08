@@ -356,16 +356,16 @@ export function validatePayload(type:string,payload:any):string | null{
             if (!payload.roomId) return "Missing roomId";
             break;
         case ROOM_RECONNECT:
-            if(!payload.gameId) return "Missing GameId"
+            if(!payload.roomGameId) return "Missing GameId";
             break;
         case ROOM_MOVE:
-            if(!payload.to || !payload.from ||!payload.gameId) return "Missing Move or GameId";
+            if(!payload.to || !payload.from ||!payload.roomGameId) return "Missing Move or GameId";
             break;
         case ROOM_CHAT:
-            if(!payload.message || !payload.gameId) return "Missing Message or GameId";
+            if(!payload.message || !payload.roomGameId) return "Missing Message or GameId";
             break;
         case ROOM_LEAVE_GAME:
-          if (!payload.gameId) return "Missing field: gameId";
+          if (!payload.roomGameId) return "Missing field: gameId";
           break;
         case LEAVE_ROOM:
             if(!payload.roomId) return "Missing Room Code";

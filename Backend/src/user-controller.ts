@@ -325,6 +325,16 @@ router.post("/room/create", authMiddleware, async (req: Request, res: Response) 
     res.status(200).json({
       roomId,
       success: true,
+      room: {
+        code: roomId,
+        status: "WAITING",
+        playerCount: 1,
+        isCreator: true,
+        currentUserId: userId,
+        opponentId: null,
+        opponentName: null,
+        gameId: null
+      }
     });
     return
   } catch (error) {
@@ -361,12 +371,39 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
             
         }
           
-        await pc.room.update({
-            where:{id:room.id},data:{
+        const updatedRoom = await pc.room.update({
+            where:{id:room.id},
+            data:{
                 joinedById:userId,status:"FULL"
-        }})
+            },
+            include: {
+                createdBy: {
+                    select: { id: true, name: true }
+                },
+                joinedBy: {
+                    select: { id: true, name: true }
+                }
+            }
+        })
+        
         roomManager.roomJoined(room.createdById,userId)
-        res.status(200).json({success:true,message:"Room joined match can be started"})
+        
+        res.status(200).json({
+            success:true,
+            message:"Room joined match can be started",
+            room: {
+                code: updatedRoom.code,
+                status: "FULL",
+                playerCount: 2,
+                isCreator: false,
+                currentUserId: userId,
+                opponentId: updatedRoom.createdById,
+                opponentName: updatedRoom.createdBy.name,
+                gameId: updatedRoom.gameId,
+                createdBy: updatedRoom.createdBy,
+                joinedBy: updatedRoom.joinedBy
+            }
+        })
         return
     } catch (error) {
         res.status(500).json({message:"Internal Server error"})
@@ -426,5 +463,28 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
 //     });
 //   }
 // });
+
+router.patch('/room/:roomId/status',async (req:Request,res:Response) => {
+  try {
+  const {roomId}=req.body
+  const room=await pc.room.findFirst({where:{code:roomId}})
+  if(!room){
+    res.status(404).json({message:"Room Code Incorrect! Room Does Not Exist",success:false})
+    return
+  }
+  await pc.room.update({where:{id:room.id},data:{
+    status:"CANCELLED"
+  }})
+  res.status(200).json({success:true,message:"Room Is cancelled successfully"})
+  return
+  } catch (error) {
+     console.error(error);
+    res.status(500).json({
+       message: "Internal Server Error",
+       success: false,
+     });
+  }
+})
+
 
 export {router}

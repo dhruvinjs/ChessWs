@@ -1,6 +1,6 @@
 // lib/SocketManager.ts
 import { useGameStore } from "../stores/useGameStore";
-import { showGameMessage } from "../Components/chess/ChessGameMessage";
+import { showMessage } from "../Components";
 import { GameMessages } from "../types/chess";
 import { GameModes, SocketMessage } from "../types/socket";
 import { launchConfetti } from "./confetti";
@@ -41,7 +41,7 @@ export class SocketManager {
       switch (type) {
         case GameMessages.ASSIGN_ID:
           console.log("Assign Id");
-          showGameMessage("Assign ID", "Guest Id Assigned", { type: "info" });
+          showMessage("Assign ID", "Guest Id Assigned", { type: "info" });
           break;
 
         case GameMessages.MOVE:
@@ -54,14 +54,14 @@ export class SocketManager {
 
           const { color } = useGameStore.getState();
           if (color === payload.winner) {
-            showGameMessage(
+            showMessage(
               "🏆 You Won!",
               payload.message || "Congratulations! You won the match.",
               { type: "success" }
             );
             launchConfetti();
           } else {
-            showGameMessage(
+            showMessage(
               "👎 You Lost!",
               payload.message || "Better luck next time!",
               { type: "error" }
@@ -72,7 +72,7 @@ export class SocketManager {
        case GameMessages.OFFER_DRAW:
         setDrawOfferSent(true);
         setDrawOfferCount(payload.count)
-        showGameMessage(
+        showMessage(
           "🤝 Draw Offer Sent", 
           payload.message || "Waiting for opponent\'s response...", 
           { type: "info" }
@@ -82,7 +82,7 @@ export class SocketManager {
       // ✅ Draw offer received from opponent
       case GameMessages.DRAW_OFFERED:
         setDrawOfferReceived(true);
-        showGameMessage(
+        showMessage(
           "🤝 Draw Offered", 
           payload.message || "Your opponent offered a draw.", 
           { type: "info" }
@@ -94,7 +94,7 @@ export class SocketManager {
         setDrawOfferSent(false);
         setDrawOfferReceived(false);
         endGame("draw", null);
-        showGameMessage(
+        showMessage(
           "🤝 Draw Accepted", 
           "The game ended in a draw.", 
           { type: "success" }
@@ -105,7 +105,7 @@ export class SocketManager {
       case GameMessages.DRAW_REJECTED:
         setDrawOfferSent(false);
         setDrawOfferReceived(false);
-        showGameMessage(
+        showMessage(
           "❌ Draw Rejected", 
           payload.message || "The opponent rejected the draw offer.", 
           { type: "error" }
@@ -118,7 +118,7 @@ export class SocketManager {
           if (isReconnection) {
             // Handle reconnection
             reconnect(payload);
-            showGameMessage(
+            showMessage(
               "🔄 Reconnected",
               "Welcome back to your game!",
               { type: "info" }
@@ -126,7 +126,7 @@ export class SocketManager {
           } else {
             // Handle new game initialization
             initGame(payload);
-            showGameMessage(
+            showMessage(
               "🎯 Match Started",
               `You are playing as ${payload.color === "w" ? "⚪ White" : "⚫ Black"}.`,
               { type: "success" }
@@ -161,7 +161,7 @@ export class SocketManager {
                 count // Pass moves to the store
               });
 
-              showGameMessage(
+              showMessage(
                 "🔄 Reconnected",
                 "Welcome back to your game!",
                 { type: "info" }
@@ -170,7 +170,7 @@ export class SocketManager {
             }
 
         case GameMessages.GAME_ACTIVE:
-          showGameMessage(
+          showMessage(
             "✅ Game Ready",
             "A new match is ready to begin!",
             { type: "success" }
@@ -178,7 +178,7 @@ export class SocketManager {
           break;
 
         case GameMessages.CHECK:
-          showGameMessage(
+          showMessage(
             "⚠️ Check!",
             payload.message || "Your king is under attack!",
             { type: "warning" }
@@ -186,7 +186,7 @@ export class SocketManager {
           break;
 
         case GameMessages.STALEMATE:
-          showGameMessage(
+          showMessage(
             "🤝 Stalemate",
             payload.message || "It\'s a draw!",
             { type: "info" }
@@ -195,7 +195,7 @@ export class SocketManager {
 
         case GameMessages.OPP_RECONNECTED:
           setOppStatus(true);
-          showGameMessage(
+          showMessage(
             "🔌 Opponent Reconnected",
             "Your opponent is back online.",
             { type: "info" }
@@ -204,7 +204,7 @@ export class SocketManager {
 
         case GameMessages.DISCONNECTED:
           setOppStatus(false);
-          showGameMessage(
+          showMessage(
             "🔴 Opponent Disconnected",
             "They\'ve left the game.",
             { type: "warning" }
@@ -213,7 +213,7 @@ export class SocketManager {
 
         case GameMessages.TIME_EXCEEDED:
           endGame(payload.winner, payload.loser);
-          showGameMessage(
+          showMessage(
             "⏰ Time\'s Up!",
             payload.message || "Time ran out!",
             { type: "error" }
@@ -221,7 +221,7 @@ export class SocketManager {
           break;
 
         case GameMessages.SERVER_ERROR:
-          showGameMessage(
+          showMessage(
             "💥 Server Error",
             "Something went wrong on the server.",
             { type: "error" }
@@ -229,7 +229,7 @@ export class SocketManager {
           break;
 
         case GameMessages.WRONG_PLAYER_MOVE:
-          showGameMessage(
+          showMessage(
             "🚫 Not Your Turn",
             payload.message || "Please wait for your opponent to move.",
             { type: "error" }
@@ -245,12 +245,30 @@ export class SocketManager {
           }
           break;
 
+        // ✅ When second player joins the room (sent to room creator)
+        case GameMessages.USER_HAS_JOINED:
+          const { opponentId: joinedOpponentId, opponentName } = payload;
+          useGameStore.setState({
+            opponentId: joinedOpponentId,
+            opponentName: opponentName,
+            roomStatus: "FULL",
+          });
+          showMessage(
+            "👤 Player Joined",
+            `${opponentName || "A player"} has joined the room!`,
+            { type: "success" }
+          );
+          break;
+
+        case GameMessages.INIT_ROOM_GAME:
+
+          break;
         default:
           console.warn(`Unknown message type: ${type}`);
       }
     } catch (error) {
       console.error("Error handling message:", error);
-      showGameMessage(
+      showMessage(
         "Error",
         "There was a problem processing a server message.",
         { type: "error" }

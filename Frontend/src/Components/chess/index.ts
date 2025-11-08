@@ -5,6 +5,6 @@ export { GameHeader } from './GameHeader';
 export { GameStatus } from './GameStatus';
 export { MoveHistory } from './MoveHistory';
 export { Piece} from './Piece';
-export {showGameMessage} from './ChessGameMessage'
+export {showMessage} from '../ToastMessages'
 export {GameControls} from './GameControls'
 export {DrawOfferDialog} from './DrawOfferDialog'

@@ -308,7 +308,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
 
 export async function getGamesCount() {
     const count = await redis.get("guest:games:total");
-    console.log(count);
+    // console.log(count);
     return count ? parseInt(count) : 0;
 }
 export async function playerLeft(
