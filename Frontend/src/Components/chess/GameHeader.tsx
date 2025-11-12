@@ -1,23 +1,8 @@
 import { memo } from 'react';
-import { Timer } from './Timer';
 import { useGameStore } from '../../stores/useGameStore';
 import { GameMessages } from '../../types/chess';
 import { GameControls } from './GameControls';
-
-// ✅ Separate component for timers (high-frequency updates)
-const GameTimersComponent = () => {
-  const whiteTimer = useGameStore((state) => state.whiteTimer);
-  const blackTimer = useGameStore((state) => state.blackTimer);
-
-  return (
-    <div className="flex flex-col sm:flex-row items-center gap-2">
-      <Timer time={whiteTimer} label="White" />
-      <Timer time={blackTimer} label="Black" />
-    </div>
-  );
-};
-
-const GameTimers = memo(GameTimersComponent);
+import { GameTimers } from './GameTimers';
 
 // ✅ Separate component for turn indicator (low-frequency updates)
 const TurnIndicatorComponent = () => {
@@ -45,11 +30,11 @@ const TurnIndicator = memo(TurnIndicatorComponent);
 // ✅ Main GameHeader - composed of isolated components
 export function GameHeader() {
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div className="w-full flex flex-col gap-6">
       {/* Top row: Timers and Turn */}
       <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-between gap-4 w-full text-center sm:text-left">
         {/* Timers - Updates every second */}
-        <GameTimers />
+        <GameTimers layout="horizontal" />
 
         {/* Turn Indicator - Updates only on moves */}
         <TurnIndicator />

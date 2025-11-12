@@ -1,27 +1,115 @@
 // layouts/PublicLayout.tsx
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "../Components/Navbar";
 import { useUserQuery } from "../hooks/useUserQuery";
 import { LoadingScreen } from "../Components/LoadingScreen";
+import { showMessage } from "../Components/ToastMessages";
 
 export function PublicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: user, isLoading } = useUserQuery();
+  const { data: user, isLoading, error } = useUserQuery();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Check if user should be redirected (before any rendering)
+  const publicPages = ["/", "/login", "/register", "/about"];
+  const shouldRedirect = user && !user.isGuest && publicPages.includes(location.pathname);
 
+  // Handle expired token edge case
+  useEffect(() => {
+    if (error) {
+      // Check if it's an authentication error
+      const isAuthError = error?.message?.includes('401') || 
+                         error?.message?.includes('403') ||
+                         error?.message?.includes('token') ||
+                         error?.message?.includes('expired');
+      
+      if (isAuthError && !location.pathname.includes('/login')) {
+        showMessage(
+          "Session Expired", 
+          "Your session has expired. Please login again to continue.", 
+          { type: "warning", duration: 6000 }
+        );
+        
+        // Clear expired cookie
+        document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+        
+        // Redirect to login after a short delay
+        setTimeout(() => {
+          navigate("/login", { replace: true });
+        }, 2000);
+      }
+    }
+  }, [error, location.pathname, navigate]);
+
+  // ✅ Redirect authenticated (non-guest) users away from all public pages
+  useEffect(() => {
+    if (shouldRedirect && !isRedirecting) {
+      setIsRedirecting(true);
+      
+      // Redirect after showing the animated screen (no toast needed)
+      setTimeout(() => {
+        navigate("/home", { replace: true });
+        setIsRedirecting(false);
+      }, 3000); // Increased to 3 seconds for better showcase
+    }
+  }, [shouldRedirect, isRedirecting, navigate]);
+
+  // Show loading screen while checking authentication
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // ✅ Redirect ONLY authenticated (non-guest) users away from /login or /register
-  useEffect(() => {
-    if (user && !user.isGuest && ["/login", "/register"].includes(location.pathname)) {
-      navigate("/home", { replace: true });
-      console.log("This is the culprit");
-    }
-  }, [isLoading,user?.isGuest, location.pathname, navigate]);
+  // Show redirect screen immediately if user should be redirected (prevents white flash)
+  if (shouldRedirect || isRedirecting) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex-grow pt-16 flex items-center justify-center bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950"
+          >
+            <div className="text-center space-y-6 p-8">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-16 h-16 mx-auto"
+              >
+                <div className="w-full h-full border-4 border-amber-200 dark:border-amber-700 border-t-amber-600 dark:border-t-amber-400 rounded-full animate-spin"></div>
+              </motion.div>
+              
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                className="space-y-2"
+              >
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  Welcome Back! 👋
+                </h2>
+                <p className="text-slate-600 dark:text-slate-300">
+                  You're already logged in. Redirecting you to home...
+                </p>
+              </motion.div>
+              
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 3, ease: "easeInOut" }}
+                className="h-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full mx-auto max-w-xs"
+              />
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

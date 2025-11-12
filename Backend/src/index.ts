@@ -12,7 +12,7 @@ import http from 'http'
 import cors from 'cors'
 import { parse } from "url";
 import { gameRouter } from './game-controllers';
-import { INVALID_AUTH, NO_AUTH } from './messages';
+import { ErrorMessages } from './messages';
 import { redis } from './redisClient';
 import { roomManager } from './Classes/RoomManager';
 
@@ -29,7 +29,7 @@ const wss = new WebSocketServer({ server });
 
 app.use(cors({
    origin: ['http://localhost:5173'], 
-   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+   methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],
    allowedHeaders: ['Content-Type', 'Authorization'],
    credentials:true
 }));
@@ -48,28 +48,24 @@ wss.on("connection",async(socket,req:Request)=>{
 
 
    const id = typeof query.id === "string" ? query.id : undefined
-   const token=typeof query.token === "string" ? query.token : undefined
+   const userId = query.userId ? parseInt(query.userId as string) : undefined
    try {
       if(pathname === "/room"){
-         if(!token){
+         if(!userId || isNaN(userId)){
             socket.send(JSON.stringify({
-               type : NO_AUTH,
+               type : ErrorMessages.NO_AUTH,
                payload:{
-                  message:"No Token Provided for the room!"
+                  message:"No Valid User ID Provided for the room!"
                }
             }))
             return
          }
    
-         //@ts-ignore
-         const verifiedToken=jwt.verify(token,process.env.SECRET_TOKEN)
-         const userId=verifiedToken.id
-         // console.log("Sucessfull connection of auth user: ",userId);
+         console.log("Successful connection of auth user: ",userId);
          roomManager.addRoomUser(userId,socket)
 
          socket.on("close", async () => {
         try {
-          // room disconnection handling
           await roomManager.handleDisconnection(userId, socket);
           console.log(`Room player ${userId} disconnected`);
         } catch (err) {
@@ -80,7 +76,7 @@ wss.on("connection",async(socket,req:Request)=>{
       else if(pathname === "/guest" ){
          if(!id){
             socket.send(JSON.stringify({
-               type:NO_AUTH,
+               type:ErrorMessages.NO_AUTH,
                payload:{
                   message:"No Id Provided for the guest!"
                }
@@ -97,7 +93,7 @@ wss.on("connection",async(socket,req:Request)=>{
          }
          else{
             socket.send(JSON.stringify({
-               message:INVALID_AUTH,
+               message:ErrorMessages.INVALID_AUTH,
                payload:{
                   message:"Invalid Guest Id"
                }
@@ -113,7 +109,7 @@ wss.on("connection",async(socket,req:Request)=>{
    } catch (error) {
       console.log("Invalid Auth Error: ",error)
       socket.send(JSON.stringify({
-         type:INVALID_AUTH,
+         type:ErrorMessages.INVALID_AUTH,
          payload:{
             message:"Invalid Auth Provided"
          }

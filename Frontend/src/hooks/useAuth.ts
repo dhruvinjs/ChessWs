@@ -21,7 +21,7 @@ export function useLoginMutation() {
         email: data.email,
         isGuest: false,
       };
-
+      // console.log(data);
       // ✅ Update react-query cache
       queryClient.setQueryData(["user"], user);
       nav("/home");

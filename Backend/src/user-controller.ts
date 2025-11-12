@@ -7,9 +7,8 @@ import {v4 as uuidv4} from "uuid"
 import pc  from './prismaClient';
 import { authMiddleware } from './middleware';
 const router=express.Router()
-import {nanoid} from "nanoid"
+import {nanoid } from 'nanoid';
 import { redis } from './redisClient';
-import { GAME_ACTIVE, GAME_OVER,  INIT_GAME } from './messages';
 import { roomManager } from './Classes/RoomManager';
 // import { verifyCookie } from './Services/GameServices';
 export enum ChessLevel {
@@ -62,7 +61,9 @@ router.post('/register',async (req:Request,res:Response) => {
             maxAge: 6 * 60 * 60 * 1000 // 6 hours in ms
         });
         res.status(200).json({message:'User Created',success:true,
-            id:newUser.id,username:newUser.name,
+            id:newUser.id,
+            username:newUser.name,
+            email:newUser.email,
             chessLevel:chessLevel,
             isGuest:false
         })
@@ -91,6 +92,7 @@ router.get("/getProfile",authMiddleware,async(req:Request,res:Response)=>{
         const user=await pc.user.findUnique({
             where:{id:Number(id)},
             select:{
+                id:true,
                 name:true,
                 email:true,
                 chessLevel:true
@@ -148,7 +150,9 @@ router.post('/login',async(req:Request,res:Response)=>{
         });
         res.status(200).json({success:true,
             message:"Login Successful",
-            id:user.id,username:user.name,
+            id:user.id,
+            username:user.name,
+            email:user.email,
             chessLevel:user.chessLevel,
             isGuest:false})
         return
@@ -276,7 +280,7 @@ router.post("/room/create", authMiddleware, async (req: Request, res: Response) 
     // Find active (WAITING/ACTIVE) room owned or joined by user
     const activeRoom = await pc.room.findFirst({
       where: {
-        status: { in: ["WAITING", "ACTIVE"] },
+        status: { in: ["WAITING", "ACTIVE","FULL"] },
         OR: [
           { createdById: userId },
           { joinedById: userId },
@@ -361,9 +365,42 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
             res.status(404).json({message: "Room does not exist or roomId is incorrect",success:false})
             return
         }
-        if (room.createdById === Number(userId)) {
-            res.status(400).json({ message: "You cannot join a room you already created.", success: false });
+       if (room.createdById === Number(userId)) {
+            res.status(200).json({ 
+                success: true,
+                message: "Welcome back to your room",
+                room: {
+                    code: room.code,
+                    status: room.status,
+                    playerCount: room.joinedById ? 2 : 1,
+                    isCreator: true,  // ✅ Frontend knows they're the creator
+                    currentUserId: userId,
+                    opponentId: room.joinedById,
+                    opponentName: room.joinedBy?.name || null,
+                    gameId: room.gameId,
+                    createdBy: room.createdBy,
+                    joinedBy: room.joinedBy
+                }
+            });
             return;
+        }
+        if(room.joinedById === Number(userId)){
+        res.status(200).json({
+            success:true,
+            message:"You have already joined this room",
+            room: {
+              code:room.code,
+              status: room.status,
+              playerCount: 2,
+              isCreator:false,
+              opponentId:room.createdById,
+              opponentName:room.createdBy.name,
+              gameId: room.gameId,
+              createdBy: room.createdBy,
+              joinedBy: room.joinedBy
+            }
+        })
+        return;
         }
         if(room.joinedBy){
             res.status(404).json({message: "Room is already full and match is started",success:false})
@@ -386,7 +423,14 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
             }
         })
         
-        roomManager.roomJoined(room.createdById,userId)
+        // Notify room creator via WebSocket if they're connected
+        // We do this in a try-catch to avoid blocking the response
+        try {
+            roomManager.roomJoined(room.createdById, userId)
+        } catch (error) {
+            console.error("Error notifying room creator:", error)
+            // Don't block the response if WebSocket notification fails
+        }
         
         res.status(200).json({
             success:true,

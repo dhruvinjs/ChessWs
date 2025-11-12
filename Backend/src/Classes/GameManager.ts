@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from "uuid"
 import { redis } from "../redisClient"
 import { WebSocket } from "ws"
-import { ACCEPT_DRAW, ASSIGN_ID, DISCONNECTED, GAME_ACTIVE,  GAME_NOT_FOUND, GAME_OVER,  INIT_GAME, LEAVE_GAME, MATCH_NOT_FOUND, MOVE, NO_ACTIVE_GAMES, OFFER_DRAW, PLAYER_UNAVAILABLE, RECONNECT, REJECT_DRAW, REQUEST_VALID_MOVES, SERVER_ERROR, TIME_EXCEEDED, TIMER_UPDATE } from "../messages"
+import { GameMessages, ErrorMessages } from "../messages";
 import { acceptDraw,  getGameState, makeMove, offerDraw, playerLeft, provideValidMoves, reconnectPlayer, rejectDraw } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
@@ -27,7 +27,7 @@ export class GameManager{
     // No previous game, so assign ID and queue for matchmaking
     
     socket.send(JSON.stringify({
-      type: ASSIGN_ID,
+      type: GameMessages.ASSIGN_ID,
       payload:{id: id}
     }));
 
@@ -71,7 +71,7 @@ export class GameManager{
         }
 
         // Skip if game already over
-        if (game.status === GAME_OVER || game.status === DISCONNECTED) {
+        if (game.status === GameMessages.GAME_OVER || game.status === GameMessages.DISCONNECTED) {
           await redis.sRem("active-games", gameId);
           continue;
         }
@@ -98,7 +98,7 @@ export class GameManager{
         // Send timer update to both players
         if (user1Socket && user2Socket) {
           const timerMessage = {
-            type: TIMER_UPDATE,
+            type: GameMessages.TIMER_UPDATE,
             payload: {
               whiteTimer: whiteTimer,
               blackTimer: blackTimer,
@@ -130,7 +130,7 @@ export class GameManager{
         const winnerColor= winnerId === game.user1 ? "w" : "b"
 
         await redis.hSet(`game:${gameId}`,{
-            status:GAME_OVER,
+            status:GameMessages.GAME_OVER,
             winner:winnerId,
         })
         await redis.sRem('active-games',gameId)
@@ -139,10 +139,10 @@ export class GameManager{
         const winnerSocket=this.socketMap.get(winnerId)
         const loserSocket=this.socketMap.get(loserId)
          const winnerMessage = JSON.stringify({
-      type: GAME_OVER,
+      type: GameMessages.GAME_OVER,
       payload: {
         result: "win",
-        reason: TIME_EXCEEDED,
+        reason: GameMessages.TIME_EXCEEDED,
         winner: winnerColor,
         message: "🎉 You won! Your opponent ran out of time.",
       },
@@ -150,10 +150,10 @@ export class GameManager{
 
     // Send loser message
     const loserMessage = JSON.stringify({
-      type: GAME_OVER,
+      type: GameMessages.GAME_OVER,
       payload: {
         result: "lose",
-        reason: TIME_EXCEEDED,
+        reason: GameMessages.TIME_EXCEEDED,
         winner: winnerColor,
         message: "⏱️ Time's up! You lost on time.",
       },
@@ -176,14 +176,14 @@ export class GameManager{
             const {type}=jsonMessage
             
             //New Game Block
-            if (type === INIT_GAME) {
+            if (type === GameMessages.INIT_GAME) {
             await insertPlayerInQueue(id);
             const match = await matchingPlayer(id);
 
             if (!match) {
                 socket.send(
                 JSON.stringify({
-                    type: MATCH_NOT_FOUND,
+                    type: GameMessages.MATCH_NOT_FOUND,
                     payload: {
                     message: "No opponent available right now",
                     },
@@ -198,7 +198,7 @@ export class GameManager{
             if (!user1socket) {
                 socket.send(
                 JSON.stringify({
-                    type: PLAYER_UNAVAILABLE,
+                    type: GameMessages.PLAYER_UNAVAILABLE,
                     payload: {
                     message: "Player not found",
                     },
@@ -216,7 +216,7 @@ export class GameManager{
                 .hSet(`game:${newGameId}`, {
                 user1: user1Id,
                 user2: id,
-                status: GAME_ACTIVE,
+                status: GameMessages.GAME_ACTIVE,
                 fen: chess.fen(),
                 whiteTimer: 600,
                 blackTimer: 600,
@@ -233,7 +233,7 @@ export class GameManager{
             // Notify user1 (white)
             user1socket.send(
                 JSON.stringify({
-                type: INIT_GAME,
+                type: GameMessages.INIT_GAME,
                 payload: {
                     color: "w",
                     gameId: newGameId,
@@ -251,7 +251,7 @@ export class GameManager{
             const user2socket = this.socketMap.get(id);
             user2socket?.send(
                 JSON.stringify({
-                type: INIT_GAME,
+                type: GameMessages.INIT_GAME,
                 payload: {
                     color: "b",
                     gameId: newGameId,
@@ -276,7 +276,7 @@ export class GameManager{
 
 
 
-            if(type===MOVE){
+            if(type===GameMessages.MOVE){
                 const {payload}=jsonMessage//from and to moves
                 // console.log("IN make move testing")
                 // console.log(id);
@@ -284,7 +284,7 @@ export class GameManager{
                 if(!gameId){
 
                     const message={
-                        type:SERVER_ERROR,
+                        type:ErrorMessages.SERVER_ERROR,
                         payload:{
                             message:"internal server error cannot find game and cannot make move"
                         }
@@ -297,11 +297,11 @@ export class GameManager{
                
             }
 
-            if(type===LEAVE_GAME){
+            if(type===GameMessages.LEAVE_GAME){
                 const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     const message={
-                        type:SERVER_ERROR,
+                        type:ErrorMessages.SERVER_ERROR,
                         payload:{
                             message:"internal server error cannot find game and cannot make move"
                         }
@@ -317,12 +317,12 @@ export class GameManager{
 
 
 
-            if(type===RECONNECT){
+            if(type===GameMessages.RECONNECT){
                 const {id}=jsonMessage
                 const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
-                        type:GAME_NOT_FOUND,
+                        type:GameMessages.GAME_NOT_FOUND,
                         payload:{
                             message:"Game Not found"
                         }
@@ -350,11 +350,11 @@ export class GameManager{
             // }
 
 
-            if(type===OFFER_DRAW){
+            if(type===GameMessages.OFFER_DRAW){
               const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
-                        type:GAME_NOT_FOUND,
+                        type:GameMessages.GAME_NOT_FOUND,
                         payload:{
                             message:"Game Not found"
                         }
@@ -364,11 +364,11 @@ export class GameManager{
                 await offerDraw(id,gameId,socket,this.socketMap)
                 return
             }
-            if(type===ACCEPT_DRAW){
+            if(type===GameMessages.ACCEPT_DRAW){
               const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
-                        type:GAME_NOT_FOUND,
+                        type:GameMessages.GAME_NOT_FOUND,
                         payload:{
                             message:"Game Not found"
                         }
@@ -379,11 +379,11 @@ export class GameManager{
                 return
             }
             
-            if(type===REJECT_DRAW){
+            if(type===GameMessages.REJECT_DRAW){
               const gameId=await redis.get(`user:${id}:game`)
                 if(!gameId){
                     socket.send(JSON.stringify({
-                        type:GAME_NOT_FOUND,
+                        type:GameMessages.GAME_NOT_FOUND,
                         payload:{
                             message:"Game Not found"
                         }
@@ -413,12 +413,11 @@ export class GameManager{
         //this is the gameId:string which can be retrieved using the playerId 
         const gameId=await redis.get(`user:${playerId}:game`)
         if(!gameId){
-            return GAME_NOT_FOUND
+            return GameMessages.GAME_NOT_FOUND
         }
         const existingGame=await getGameState(gameId)
-        if(!existingGame) return GAME_NOT_FOUND
-     
-     
+        if(!existingGame) return GameMessages.GAME_NOT_FOUND
+
         if (existingGame.gameEnded) {
         console.log(`Game ${gameId} already over, ignoring disconnection`);
         // Clean up socket but don't change game state
@@ -430,14 +429,14 @@ export class GameManager{
         const connected_user= existingGame.user1 === playerId ? existingGame.user2 : existingGame.user1
         const user_socket=this.socketMap.get(connected_user)
         const message=JSON.stringify({
-            type:DISCONNECTED,
+            type:GameMessages.DISCONNECTED,
             payload:{
                 message:"Opponent Left due to bad connectivty"
             }
         })
         
         await redis.hSet(`game:${gameId}`,{
-          status:DISCONNECTED,
+          status:GameMessages.DISCONNECTED,
           disconnectedBy:playerId,
           timestamp:Date.now().toString()
         })
@@ -445,19 +444,19 @@ export class GameManager{
     
         setTimeout(async ()=>{
             const latestStatus=await redis.hGet(`game:${gameId}`,"status")
-            if(latestStatus !== DISCONNECTED) return;
+            if(latestStatus !== GameMessages.DISCONNECTED) return;
 
             const winner=connected_user
             
             await redis.hSet(`game:${gameId}`,{
-                status:GAME_OVER,
+                status:GameMessages.GAME_OVER,
                 winner:winner
             })
             const message=JSON.stringify({
-                type:GAME_OVER,
+                type:GameMessages.GAME_OVER,
                 payload:{
                     winner:winner,
-                    reason:DISCONNECTED
+                    reason:GameMessages.DISCONNECTED
                 }
             })
             user_socket?.send(message)

@@ -83,7 +83,7 @@ const GameControlsComponent = () => {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex items-center justify-between w-full">
         <Button
           variant="secondary"
           size="md"
@@ -91,31 +91,37 @@ const GameControlsComponent = () => {
           text="Home"
           icon={<ArrowLeft className="w-4 h-4" />}
         />
+        
+        {/* Play button - centered CTA */}
         <Button
           variant="primary"
           size="md"
           onClick={handlePlayGame}
-          text={isWaitingForGame ? 'Searching...' : 'Play'}
-          icon={<Play className="w-4 h-4" />}
+          text={isWaitingForGame ? 'Searching For Opponent...' : 'Play Game'}
+          icon={<Play className="w-6 h-4" />}
           loading={isWaitingForGame}
           disabled={isGameActive || isWaitingForGame}
         />
-        <Button
-          variant="outline"
-          size="md"
-          onClick={handleOfferDraw}
-          text={getDrawButtonText()}
-          icon={<Handshake className="w-4 h-4" />}
-          disabled={isDrawDisabled}
-        />
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={handleResign}
-          text="Resign"
-          icon={<Flag className="w-4 h-4" />}
-          disabled={!isGameActive || isGameOver}
-        />
+        
+        {/* Secondary game actions - positioned on right */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Button
+            variant="outline"
+            size="md"
+            onClick={handleOfferDraw}
+            text={getDrawButtonText()}
+            icon={<Handshake className="w-4 h-4" />}
+            disabled={isDrawDisabled}
+          />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleResign}
+            text="Resign"
+            icon={<Flag className="w-4 h-4" />}
+            disabled={!isGameActive || isGameOver}
+          />
+        </div>
       </div>
 
       {/* Confirm Home Dialog */}

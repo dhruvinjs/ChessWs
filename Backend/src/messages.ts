@@ -1,61 +1,81 @@
-export const INIT_GAME="init_game"
-export const MOVE="move"
-export const GAME_ACTIVE="ongoing_game"
-export const GAME_NOT_FOUND="game_not_found"
-export const GAME_OVER="game_over"
-export const RECONNECT="reconnect"
-export const RECONNECT_REQ="reconnect_req"
-export const MATCH_NOT_FOUND="match_not_found"
-export const PLAYER_UNAVAILABLE="player_unavailable"
-export const ASSIGN_ID="assign_id"
-export const USER_HAS_JOINED="user_has_joined"
-export const GAME_FOUND="existing_game_found"
-export const CHECK="check_move"
-export const WRONG_PLAYER_MOVE="wrong_player_move"
-export const STALEMATE="game_drawn"
-export const OPP_RECONNECTED="opp_reconnected"
-export const TIME_EXCEEDED="time_exceeded"
-export const WRONG_MOVE="illegal_move"
-export const SERVER_ERROR="server_error"
-export const NO_ACTIVE_GAMES="no_active_games"
-export const TIMER_UPDATE="timer_update"
-export const DISCONNECTED="player_left"
-export const LEAVE_GAME="leave_game"
-export const REQUEST_VALID_MOVES="request_valid_moves"
-export const OFFER_DRAW="offer_draw"
-export const DRAW_OFFERED = "draw_offered";
-export const ACCEPT_DRAW = "accept_draw";
-export const REJECT_DRAW = "reject_draw";
-export const DRAW_ACCEPTED = "draw_accepted";
-export const DRAW_REJECTED = "draw_rejected";
-export const INVALID_AUTH="invalid_auth"
-export const NO_AUTH="no_auth"
+export const GameMessages = {
+  // Client -> Server
+  INIT_GAME: "init_game",
+  MOVE: "move",
+  LEAVE_GAME: "leave_game",
+  RECONNECT_REQ: "reconnect_req",
+  OFFER_DRAW: "offer_draw",
+  ACCEPT_DRAW: "accept_draw",
+  REJECT_DRAW: "reject_draw",
+  REQUEST_VALID_MOVES: "request_valid_moves",
+  
+  // Server -> Client
+  ASSIGN_ID: "assign_id",
+  GAME_ACTIVE: "ongoing_game",
+  GAME_NOT_FOUND: "game_not_found",
+  GAME_OVER: "game_over",
+  RECONNECT: "reconnect",
+  GAME_FOUND: "existing_game_found",
+  CHECK: "check_move",
+  STALEMATE: "game_drawn",
+  TIMER_UPDATE: "timer_update",
+  TIME_EXCEEDED: "time_exceeded",
+  WRONG_MOVE: "illegal_move",
+  DRAW_OFFERED: "draw_offered",
+  DRAW_ACCEPTED: "draw_accepted",
+  DRAW_REJECTED: "draw_rejected",
+  OPP_RECONNECTED: "opp_reconnected",
+  DISCONNECTED: "player_left",
+  WRONG_PLAYER_MOVE: "wrong_player_move",
+  USER_HAS_JOINED: "user_has_joined",
+  MATCH_NOT_FOUND: "match_not_found",
+  PLAYER_UNAVAILABLE: "player_unavailable",
+  NO_ACTIVE_GAMES: "no_active_games",
+  DRAW_LIMIT_REACHED: "draw_limit_reached",
+} as const;
 
-// Room Messages
-export const INIT_ROOM_GAME="init_room_game"
-export const ASSIGN_ID_FOR_ROOM="assign_id_for_room"
-export const ROOM_GAME_ACTIVE="room_game_active"
-export const ROOM_GAME_OVER="room_game_over"
-export const ROOM_TIMER_UPDATE="room_timer_update"
-export const ROOM_TIME_EXCEEDED="room_timer_exceeded"
-export const ROOM_MOVE="room_move"
-export const ROOM_GAME_NOT_FOUND="room_game_not_found"
-export const ROOM_LEAVE_GAME="room_leave_game"
-export const NO_ROOM_RECONNECTION="no_room_reconnection"
-export const WRONG_ROOM_MESSAGE="wrong_room_message"
-export const ILLEGAL_ROOM_MOVE = "illegal_room_move"
-export const ROOM_DRAW = "room_draw"
-export const ROOM_RECONNECT="room_reconnect"
-export const OPP_ROOM_RECONNECTED="opp_room_reconnect"
-export const ROOM_OPPONENT_LEFT="room_opponent_left"
-export const ROOM_NOT_FOUND="room_not_found"
-export const ROOM_GAME_ACTIVE_ERROR="room_game_active_error"
-export const ROOM_NOT_READY="room_not_ready"
-export const UNAUTHORIZED="unauthorized"
-export const PAYLOAD_ERROR="payload_error"
-export const ROOM_OPP_DISCONNECTED="room_opp_disconnected"
-export const ROOM_READY_TO_START="room_ready_to_start"
-export const ROOM_CHAT="room_chat"
-export const LEAVE_ROOM="leave_room"
-export const ROOM_LEFT="room_left"
-export const ROOM_USER_JOINED="room_user_joined"
+export const RoomMessages = {
+  // Client -> Server
+  INIT_ROOM_GAME: "init_room_game",
+  ROOM_MOVE: "room_move",
+  LEAVE_ROOM: "leave_room",
+  ROOM_CHAT: "room_chat",
+  ROOM_LEAVE_GAME: "room_leave_game",
+  
+  // Server -> Client
+  ASSIGN_ID_FOR_ROOM: "assign_id_for_room",
+  ROOM_GAME_ACTIVE: "room_game_active",
+  ROOM_GAME_OVER: "room_game_over",
+  ROOM_TIMER_UPDATE: "room_timer_update",
+  ROOM_TIME_EXCEEDED: "room_timer_exceeded",
+  ROOM_USER_JOINED: "room_user_joined",
+  ROOM_READY_TO_START: "room_ready_to_start",
+  ROOM_NOT_FOUND: "room_not_found",
+  ROOM_NOT_READY: "room_not_ready",
+  ROOM_GAME_ACTIVE_ERROR: "room_game_active_error",
+  ROOM_OPP_DISCONNECTED: "room_opp_disconnected",
+  OPP_ROOM_RECONNECTED: "opp_room_reconnect",
+  ROOM_RECONNECT: "room_reconnect",
+  ROOM_LEFT: "room_left",
+  ROOM_GAME_NOT_FOUND: "room_game_not_found",
+  NO_ROOM_RECONNECTION: "no_room_reconnection",
+  WRONG_ROOM_MESSAGE: "wrong_room_message",
+  ILLEGAL_ROOM_MOVE: "illegal_room_move",
+  ROOM_DRAW: "room_draw",
+  ROOM_OPPONENT_LEFT: "room_opponent_left",
+} as const;
+
+export const ErrorMessages = {
+  SERVER_ERROR: "server_error",
+  UNAUTHORIZED: "unauthorized",
+  PAYLOAD_ERROR: "payload_error",
+  INVALID_AUTH: "invalid_auth",
+  NO_AUTH: "no_auth",
+} as const;
+
+// Combined export for backward compatibility if needed
+export const Messages = {
+  ...GameMessages,
+  ...RoomMessages,
+  ...ErrorMessages,
+} as const;

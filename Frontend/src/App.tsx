@@ -1,13 +1,11 @@
     import { BrowserRouter, Route, Routes } from "react-router-dom";
     import { Landing, Room, About, ChessGame, Login, Home, NotFound } from "./Pages";
-    import { Toaster } from "react-hot-toast";
-    import { SocketManager } from "./lib/socketManager";
+    import { ToastProvider } from "./Components/ToastMessages";
     import { Register } from "./Pages/Register";
     import { PublicLayout } from "./Layout/PublicLayout";
     import { ProtectedLayout } from "./Layout/ProtectedLayout";
     import { Profile } from "./Pages/Profile";
     import { useUserQuery } from "./hooks/useUserQuery"; 
-    import { useEffect } from "react";
     import { LoadingScreen } from "./Components/LoadingScreen";
 import { RoomChessPage } from "./Pages/RoomChessPage";
 import { useAppSetup } from "./hooks/useAppTheme";
@@ -16,15 +14,8 @@ import { useAppSetup } from "./hooks/useAppTheme";
       useAppSetup()
       const { data: user, isLoading, isError, error } = useUserQuery();
 
-      useEffect(() => {
-        if (user?.id) {
-          SocketManager.getInstance().init("guest",user.id);
-        }
-
-        return () => {
-          SocketManager.getInstance().closeSocket();
-        };
-      }, [user]);
+      // ✅ Don't auto-connect here - let individual game pages handle their own connections
+      // This prevents conflicts between guest mode and room mode connections
 
       if (isLoading) return <LoadingScreen />;
 
@@ -76,12 +67,7 @@ import { useAppSetup } from "./hooks/useAppTheme";
             <Route path="*" element={<NotFound />} />
           </Routes>
 
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: { background: "#333", color: "#fff" },
-            }}
-          />
+          <ToastProvider />
         </BrowserRouter>
       );
     }

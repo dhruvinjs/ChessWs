@@ -15,7 +15,7 @@ export { MoveHistory } from "./chess/MoveHistory";
 export { Square } from "./chess/Square";
 
 // Toast Messages
-export { showMessage } from "./ToastMessages";
+export { showMessage, ToastProvider } from "./ToastMessages";
 
 // Room components
 export { RoomHeader } from "./room/RoomHeader";
