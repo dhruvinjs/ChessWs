@@ -38,20 +38,27 @@ export class SocketManager {
       } = useGameStore.getState();
     
       switch (type) {
+        // ========================================
+        // SILENT / CONSOLE ONLY - Internal Setup
+        // ========================================
         case GameMessages.ASSIGN_ID:
-          console.log("Assign Id");
-          showMessage("Assign ID", "Guest Id Assigned", { type: "info" });
+          console.log("✅ Guest ID assigned");
           break;
 
         case GameMessages.ASSIGN_ID_FOR_ROOM:
-          console.log("✅ Room ID assigned");
-          showMessage("Connected to Room", "Successfully connected to room server", { type: "info" });
+          console.log("✅ Room WebSocket connected");
           break;
 
+        // ========================================
+        // GAME MECHANICS - No Toast Needed
+        // ========================================
         case GameMessages.MOVE:
           processServerMove(payload);
           break;
 
+        // ========================================
+        // GAME END - Keep Toasts (Important)
+        // ========================================
         case GameMessages.GAME_OVER:
           if (payload.fen) setFen(payload.fen);
           endGame(payload.winner, payload.loser);
@@ -60,18 +67,28 @@ export class SocketManager {
           if (color === payload.winner) {
             showMessage(
               "🏆 You Won!",
-              payload.message || "Congratulations! You won the match.",
+              payload.message || "Congratulations!",
               { type: "success" }
             );
             launchConfetti();
+          } else if (payload.winner === "draw") {
+            showMessage(
+              "🤝 Draw",
+              payload.message || "Game ended in a draw",
+              { type: "info" }
+            );
           } else {
             showMessage(
-              "👎 You Lost!",
-              payload.message || "Better luck next time!",
+              "� You Lost",
+              payload.message || "Better luck next time",
               { type: "error" }
             );
           }
           break;
+
+        // ========================================
+        // DRAW ACTIONS - Keep Toasts (Interactive)
+        // ========================================
 
         case GameMessages.OFFER_DRAW:
           setDrawOfferSent(true);
@@ -113,25 +130,28 @@ export class SocketManager {
           );
           break;
 
+        // ========================================
+        // GAME START - Keep Toast
+        // ========================================
         case GameMessages.INIT_GAME:
           const isReconnection = payload.moves && payload.moves.length > 0;
           
           if (isReconnection) {
             reconnect(payload);
-            showMessage(
-              "🔄 Reconnected",
-              "Welcome back to your game!",
-              { type: "info" }
-            );
+            console.log("🔄 Reconnected to game");
           } else {
             initGame(payload);
             showMessage(
               "🎯 Match Started",
-              `You are playing as ${payload.color === "w" ? "⚪ White" : "⚫ Black"}.`,
+              `You are ${payload.color === "w" ? "⚪ White" : "⚫ Black"}`,
               { type: "success" }
             );
           }
           break;
+
+        // ========================================
+        // RECONNECTION - Silent (Just Restore State)
+        // ========================================
 
         case GameMessages.RECONNECT: {
           const {
@@ -158,44 +178,43 @@ export class SocketManager {
             moves,
             count
           });
-
-          showMessage(
-            "🔄 Reconnected",
-            "Welcome back to your game!",
-            { type: "info" }
-          );
+          console.log("🔄 Reconnected to game");
           break;
         }
 
+        // ========================================
+        // GAME STATUS - Silent (UI State Only)
+        // ========================================
         case GameMessages.GAME_ACTIVE:
-          showMessage(
-            "✅ Game Ready",
-            "A new match is ready to begin!",
-            { type: "success" }
-          );
+          console.log("✅ Game is active");
           break;
+
+        // ========================================
+        // IN-GAME ALERTS - Keep Toast (Important)
+        // ========================================
 
         case GameMessages.CHECK:
           showMessage(
             "⚠️ Check!",
-            payload.message || "Your king is under attack!",
+            payload.message || "King is under attack",
             { type: "warning" }
           );
           break;
 
         case GameMessages.STALEMATE:
-          showMessage(
-            "🤝 Stalemate",
-            payload.message || "It's a draw!",
-            { type: "info" }
-          );
+          // Already handled by game end state
+          console.log("Stalemate detected");
           break;
+
+        // ========================================
+        // CONNECTION STATUS - Keep Toast (Important)
+        // ========================================
 
         case GameMessages.OPP_RECONNECTED:
           setOppStatus(true);
           showMessage(
             "🔌 Opponent Reconnected",
-            "Your opponent is back online.",
+            "Your opponent is back",
             { type: "info" }
           );
           break;
@@ -204,10 +223,14 @@ export class SocketManager {
           setOppStatus(false);
           showMessage(
             "🔴 Opponent Disconnected",
-            "They've left the game.",
+            "Waiting for reconnection...",
             { type: "warning" }
           );
           break;
+
+        // ========================================
+        // TIMER & ERRORS - Keep Toast
+        // ========================================
 
         case GameMessages.TIME_EXCEEDED:
           endGame(payload.winner, payload.loser);
@@ -229,7 +252,7 @@ export class SocketManager {
         case GameMessages.WRONG_PLAYER_MOVE:
           showMessage(
             "🚫 Not Your Turn",
-            payload.message || "Please wait for your opponent to move.",
+            payload.message || "Wait for your opponent",
             { type: "error" }
           );
           break;
@@ -242,6 +265,10 @@ export class SocketManager {
             updateTimers(payload.whiteTimer, payload.blackTimer);
           }
           break;
+
+        // ========================================
+        // ROOM UPDATES - UI State Only (No Toast)
+        // ========================================
 
         case GameMessages.USER_HAS_JOINED:
           const { 
@@ -265,16 +292,16 @@ export class SocketManager {
             ...(roomCode && { roomId: roomCode })
           });
           
-          console.log(`✅ USER_HAS_JOINED - syncing state: isCreator=${finalIsCreator}, opponent=${opponentName}`);
-          showMessage(
-            "👤 Room Updated",
-            payload.message || `${opponentName || "A player"} has joined the room!`,
-            { type: "success" }
-          );
+          console.log(`✅ ${opponentName} joined room - isCreator=${finalIsCreator}`);
+          // Room header will show this visually
           break;
 
+        // ========================================
+        // ROOM GAME START - Keep Toast
+        // ========================================
+
         case GameMessages.INIT_ROOM_GAME:
-          const { color: roomColor, fen: roomFen, whiteTimer, blackTimer, opponentId: roomOppId, roomGameId } = payload;
+          const { color: roomColor, fen: roomFen, whiteTimer, blackTimer, opponentId: roomOppId, roomGameId, validMoves: initRoomValidMoves } = payload;
           
           // Preserve existing room state while starting game
           const currentGameState = useGameStore.getState();
@@ -285,7 +312,11 @@ export class SocketManager {
             blackTimer,
             opponentId: roomOppId,
             gameId: roomGameId,
+            roomGameId: roomGameId,
             gameStatus: GameMessages.GAME_ACTIVE,
+            gameStarted: true,
+            validMoves: initRoomValidMoves || [],
+            moves: [],
             // Explicitly preserve creator status
             isRoomCreator: currentGameState.isRoomCreator,
             roomStatus: "ACTIVE",
@@ -293,54 +324,92 @@ export class SocketManager {
 
           showMessage(
             "🎮 Game Started!",
-            `You are playing as ${roomColor === "w" ? "⚪ White" : "⚫ Black"}`,
+            `You are ${roomColor === "w" ? "⚪ White" : "⚫ Black"}`,
             { type: "success" }
           );
           break;
 
-        // ✅ Room move received
+        // ========================================
+        // ROOM GAME MECHANICS - No Toast
+        // ========================================
         case GameMessages.ROOM_MOVE:
-          const { move: roomMove, fen: roomMoveFen, validMoves: roomValidMoves } = payload;
+          const { move: roomMove, fen: roomMoveFen, validMoves: roomMoveValidMoves } = payload;
           
+          // Update game state with new position
+          const currentMoves = useGameStore.getState().moves || [];
           useGameStore.setState({
             fen: roomMoveFen,
-            validMoves: roomValidMoves || [],
+            validMoves: roomMoveValidMoves || [],
+            moves: roomMove ? [...currentMoves, roomMove] : currentMoves,
+            selectedSquare: null,
           });
-
-          // Add move to history if needed
-          if (roomMove) {
-            const currentMoves = useGameStore.getState().moves || [];
-            useGameStore.setState({
-              moves: [...currentMoves, roomMove],
-            });
-          }
           break;
 
-        // ✅ Room game over
+        // ========================================
+        // ROOM GAME END - Keep Toast
+        // ========================================
         case GameMessages.ROOM_GAME_OVER:
-          const { result, winner: roomWinner, loser: roomLoser, message: gameOverMsg } = payload;
+          const { winner: roomWinner, loser: roomLoser, message: gameOverMsg, reason, roomStatus, gameStatus } = payload;
           
           if (payload.fen) setFen(payload.fen);
           endGame(roomWinner, roomLoser);
 
-          if (result === "win") {
-            showMessage("🏆 You Won!", gameOverMsg || "Congratulations!", { type: "success" });
+          // Update room and game status if provided
+          if (roomStatus) {
+            useGameStore.setState({ roomStatus });
+          }
+          if (gameStatus) {
+            useGameStore.setState({ gameStatus });
+          }
+
+          // Determine if message indicates win, lose, or draw based on message content or reason
+          if (gameOverMsg && gameOverMsg.includes("won")) {
+            // Winner message
+            showMessage(
+              "🏆 Victory!", 
+              gameOverMsg || "Congratulations!", 
+              { type: "success" }
+            );
             launchConfetti();
-          } else if (result === "lose") {
-            showMessage("💔 You Lost", gameOverMsg || "Better luck next time!", { type: "error" });
-          } else if (result === "draw") {
+          } else if (gameOverMsg && (gameOverMsg.includes("lost") || gameOverMsg.includes("resigned"))) {
+            // Loser message (for person who resigned)
+            showMessage(
+              "Game Over", 
+              gameOverMsg, 
+              { type: "info" }
+            );
+          } else if (reason === "draw") {
             showMessage("🤝 Draw", gameOverMsg || "Game ended in a draw", { type: "info" });
           }
+
+          // Auto-exit room after game ends (5 seconds delay to see results)
+          setTimeout(() => {
+            const { exitRoom } = useGameStore.getState();
+            exitRoom();
+            showMessage(
+              "Room Closed", 
+              "Game has ended. Returning to lobby...", 
+              { type: "info" }
+            );
+            // Navigate to room lobby
+            if (window.location.pathname.includes('/room/')) {
+              window.location.href = '/room';
+            }
+          }, 5000);
           break;
 
-        // ✅ Room timer updates
+        // ========================================
+        // ROOM TIMERS - No Toast
+        // ========================================
         case GameMessages.ROOM_TIMER_UPDATE:
           if (payload.whiteTimer !== undefined && payload.blackTimer !== undefined) {
             updateTimers(payload.whiteTimer, payload.blackTimer);
           }
           break;
 
-        // ✅ Room time exceeded
+        // ========================================
+        // ROOM ERRORS - Keep Toast
+        // ========================================
         case GameMessages.ROOM_TIME_EXCEEDED:
           const { winner: timeWinner, loser: timeLoser } = payload;
           endGame(timeWinner, timeLoser);
@@ -351,26 +420,50 @@ export class SocketManager {
           );
           break;
 
-        // ✅ Illegal room move
         case GameMessages.ILLEGAL_ROOM_MOVE:
           showMessage(
             "❌ Illegal Move",
-            payload.message || "That move is not allowed.",
+            payload.message || "That move is not allowed",
             { type: "error" }
           );
           break;
 
-        // ✅ Room draw
         case GameMessages.ROOM_DRAW:
           endGame("draw", null);
+          
+          // Update room and game status if provided
+          if (payload.roomStatus) {
+            useGameStore.setState({ roomStatus: payload.roomStatus });
+          }
+          if (payload.gameStatus) {
+            useGameStore.setState({ gameStatus: payload.gameStatus });
+          }
+          
           showMessage(
             "🤝 Draw",
-            payload.message || "The game ended in a draw.",
+            payload.message || "Game ended in a draw",
             { type: "info" }
           );
+
+          // Auto-exit room after draw (5 seconds delay)
+          setTimeout(() => {
+            const { exitRoom } = useGameStore.getState();
+            exitRoom();
+            showMessage(
+              "Room Closed", 
+              "Game has ended in a draw. Returning to lobby...", 
+              { type: "info" }
+            );
+            // Navigate to room lobby
+            if (window.location.pathname.includes('/room/')) {
+              window.location.href = '/room';
+            }
+          }, 5000);
           break;
 
-        // ✅ Room reconnect
+        // ========================================
+        // ROOM RECONNECTION - Silent
+        // ========================================
         case GameMessages.ROOM_RECONNECT:
           // Reconnect with game state
           reconnect(payload);
@@ -382,44 +475,55 @@ export class SocketManager {
               isRoomCreator: payload.isCreator,
               opponentId: payload.opponentId,
               opponentName: payload.opponentName,
-              roomGameId: payload.roomGameId,
+              roomGameId: payload.roomGameId || payload.gameId,
               roomStatus: "ACTIVE",
+              gameStarted: true,
+              // Ensure valid moves are set from reconnection
+              validMoves: payload.validMoves || [],
             });
             console.log(`🔄 Room reconnection - syncing host status: isCreator=${payload.isCreator}`);
           }
           
-          showMessage(
-            "🔄 Reconnected",
-            "Welcome back to your room game!",
-            { type: "info" }
-          );
+          console.log("🔄 Reconnected to room game");
           break;
 
-        // ✅ Room opponent left
-        case GameMessages.ROOM_OPPONENT_LEFT:
-          showMessage(
-            "👋 Opponent Left",
-            payload.message || "Your opponent has left the game.",
-            { type: "warning" }
-          );
-          break;
-
-        // ✅ Room game not found
+        // ========================================
+        // ROOM STATUS CHANGES - Mixed
+        // ========================================
         case GameMessages.ROOM_GAME_NOT_FOUND:
           showMessage(
             "❌ Game Not Found",
-            payload.message || "The room game could not be found.",
+            payload.message || "Room game not found",
             { type: "error" }
           );
           break;
 
-        // ✅ Room left confirmation
         case GameMessages.ROOM_LEFT:
+          // Update room and game status if provided
+          if (payload.roomStatus) {
+            useGameStore.setState({ roomStatus: payload.roomStatus });
+          }
+          if (payload.gameStatus) {
+            useGameStore.setState({ gameStatus: payload.gameStatus });
+          }
+          
+          // Show message that user resigned
           showMessage(
-            "👋 Left Room",
-            payload.message || "You have left the room.",
+            "You Resigned", 
+            "You have left the game. Returning to lobby...", 
             { type: "info" }
           );
+
+          // Auto-navigate after resignation (2 seconds delay)
+          setTimeout(() => {
+            const { exitRoom } = useGameStore.getState();
+            exitRoom();
+            if (window.location.pathname.includes('/room/')) {
+              window.location.href = '/room';
+            }
+          }, 2000);
+          
+          console.log("👋 Left room");
           break;
           
         case GameMessages.ROOM_READY_TO_START:
@@ -427,21 +531,20 @@ export class SocketManager {
           const currentStore = useGameStore.getState();
           useGameStore.setState({
             roomStatus: "FULL",
-            // Explicitly preserve creator status
             isRoomCreator: currentStore.isRoomCreator,
           });
-          console.log(`✅ ROOM_READY_TO_START - preserving isRoomCreator: ${currentStore.isRoomCreator}`);
-          showMessage(
-            "✅ Room Ready",
-            payload.message || "Both players are ready! You can start the game.",
-            { type: "success" }
-          );
+          console.log(`✅ Room ready - both players present`);
+          // UI will show "Start Game" button - no toast needed
           break;
+
+        // ========================================
+        // ROOM CONNECTION STATUS - Keep Toast
+        // ========================================
 
         case GameMessages.OPP_ROOM_RECONNECTED:
           showMessage(
             "🔌 Opponent Reconnected",
-            payload.message || "Your opponent has reconnected to the room.",
+            payload.message || "Your opponent is back",
             { type: "info" }
           );
           break;
@@ -449,31 +552,32 @@ export class SocketManager {
         case GameMessages.ROOM_OPP_DISCONNECTED:
           showMessage(
             "🔴 Opponent Disconnected",
-            payload.message || "Your opponent has disconnected from the room.",
+            payload.message || "Waiting for reconnection...",
             { type: "warning" }
           );
           break;
 
+        // ========================================
+        // ROOM ERRORS - Keep Toast
+        // ========================================
+
         case GameMessages.ROOM_NOT_FOUND:
           showMessage(
             "❌ Room Not Found",
-            payload.message || "The room you're trying to join doesn't exist.",
+            payload.message || "Room doesn't exist",
             { type: "error" }
           );
           break;
 
         case GameMessages.ROOM_NOT_READY:
-          showMessage(
-            "⏳ Room Not Ready",
-            payload.message || "Waiting for opponent to join the room.",
-            { type: "info" }
-          );
+          // Room is waiting for opponent - no toast needed
+          console.log("⏳ Room not ready - waiting for players");
           break;
 
         case GameMessages.ROOM_GAME_ACTIVE_ERROR:
           showMessage(
-            "⚠️ Game Already Active",
-            payload.message || "A game is already active in this room.",
+            "⚠️ Game Active",
+            payload.message || "Game already in progress",
             { type: "error" }
           );
           break;
@@ -481,7 +585,7 @@ export class SocketManager {
         case GameMessages.UNAUTHORIZED:
           showMessage(
             "🚫 Unauthorized",
-            payload.message || "You don't have permission to perform this action.",
+            payload.message || "Permission denied",
             { type: "error" }
           );
           break;
@@ -489,7 +593,7 @@ export class SocketManager {
         case GameMessages.PAYLOAD_ERROR:
           showMessage(
             "❌ Invalid Request",
-            payload.message || "The request data is invalid.",
+            payload.message || "Request data is invalid",
             { type: "error" }
           );
           break;
@@ -497,14 +601,32 @@ export class SocketManager {
         case GameMessages.NO_ROOM_RECONNECTION:
           showMessage(
             "❌ Cannot Reconnect",
-            payload.message || "Unable to reconnect to the room game.",
+            payload.message || "Unable to reconnect",
             { type: "error" }
           );
           break;
 
+        // ========================================
+        // CHAT - Handle in UI (No Toast)
+        // ========================================
+
         case GameMessages.ROOM_CHAT:
-          console.log("Room chat message:", payload);
+          // Add chat message to store
+          const { sender, message: chatMessage, timestamp } = payload;
+          const currentChatMessages = useGameStore.getState().chatMsg || [];
+          useGameStore.setState({
+            chatMsg: [...currentChatMessages, { 
+              sender, 
+              message: chatMessage, 
+              timestamp 
+            }]
+          });
+          console.log("💬 Chat message received from user:", sender);
           break;
+
+        // ========================================
+        // UNKNOWN MESSAGE TYPE
+        // ========================================
 
         default:
           console.warn(`Unknown message type: ${type}`);

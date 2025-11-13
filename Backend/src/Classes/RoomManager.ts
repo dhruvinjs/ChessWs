@@ -3,8 +3,17 @@ import { GameMessages, RoomMessages, ErrorMessages } from "../messages";
 import { Chess } from "chess.js";
 import { redis } from "../redisClient";
 import pc from "../prismaClient";
+import { handleRoomChat, 
+  handleRoomGameLeave, 
+  handleRoomLeave, 
+  handleRoomMove, 
+  handleRoomReconnection, 
+  validatePayload, 
+  handleRoomDrawOffer,
+  handleRoomDrawAcceptance,
+  handleRoomDrawRejection,
+  provideRoomValidMoves } from "../Services/RoomGameServices";
 
-import { handleRoomChat, handleRoomGameLeave, handleRoomLeave, handleRoomMove, handleRoomReconnection, validatePayload, handleRoomDrawOffer, handleRoomDrawAcceptance, handleRoomDrawRejection } from "../Services/RoomGameServices";
 
 interface RestoredGameState {
   user1: number;
@@ -302,6 +311,8 @@ class RoomManager {
           reason: RoomMessages.ROOM_TIME_EXCEEDED,
           winner: winnerColor,
           message: "🎉 You won! Your opponent ran out of time.",
+          roomStatus: "FINISHED",
+          gameStatus: "GAME_OVER"
         },
       });
 
@@ -312,6 +323,8 @@ class RoomManager {
           reason: RoomMessages.ROOM_TIME_EXCEEDED,
           winner: winnerColor,
           message: "⏱️ Time's up! You lost on time.",
+          roomStatus: "FINISHED",
+          gameStatus: "GAME_OVER"
         },
       });
 
@@ -405,6 +418,8 @@ class RoomManager {
         });
         
         const gameId = newGame.id;
+        const moves = await provideRoomValidMoves(chess.fen());
+        
         await redis
           .multi()
           .hSet(`room-game:${gameId}`, {
@@ -412,7 +427,7 @@ class RoomManager {
             user2: joinerId.toString(),
             status: RoomMessages.ROOM_GAME_ACTIVE,
             fen: chess.fen(),
-            whiteTimer: '30',
+            whiteTimer: '600',
             blackTimer: '600',
             moveCount: '0',
           })
@@ -427,10 +442,11 @@ class RoomManager {
             payload: {
               color: "w",
               fen: chess.fen(),
-              whiteTimer: 30,
+              whiteTimer: 600,
               blackTimer: 600,
               opponentId: joinerId,
-              roomGameId: gameId
+              roomGameId: gameId,
+              validMoves: moves
             },
           })
         );
@@ -443,9 +459,10 @@ class RoomManager {
               color: "b",
               fen: chess.fen(),
               opponentId: creatorId,
-              whiteTimer: 30,
+              whiteTimer: 600,
               blackTimer: 600,
-              roomGameId: gameId
+              roomGameId: gameId,
+              validMoves: []
             },
           })
         );
@@ -473,13 +490,71 @@ class RoomManager {
         return;
       }
       else if (type === RoomMessages.ROOM_CHAT) {
-        const { message, roomGameId } = payload;
-        const gameExists = await redis.exists(`room-game:${roomGameId}`);
-        if (!gameExists) {
-          await this.restoreGameFromDB(roomGameId);
+        const { message, roomGameId, roomId } = payload;
+        
+        if (roomGameId) {
+          const gameExists = await redis.exists(`room-game:${roomGameId}`);
+          if (!gameExists) {
+            await this.restoreGameFromDB(roomGameId);
+          }
+          await handleRoomChat(userId, userSocket, roomGameId, message, this.roomSocketManager);
+        } 
+        else if (roomId) {
+          const room = await pc.room.findUnique({
+            where: { code: roomId },
+            select: { createdById: true, joinedById: true, status: true }
+          });
+          
+          if (!room) {
+            userSocket.send(JSON.stringify({
+              type: RoomMessages.ROOM_NOT_FOUND,
+              payload: { message: "Room not found" }
+            }));
+            return;
+          }
+          
+          // Determine opponent
+          const opponentId = userId === room.createdById ? room.joinedById : room.createdById;
+          
+          if (!opponentId) {
+            userSocket.send(JSON.stringify({
+              type: RoomMessages.ROOM_CHAT,
+              payload: {
+                message: message,
+                sender: userId,
+                timestamp: Date.now()
+              }
+            }));
+            return;
+          }
+          
+          const opponentSocket = this.roomSocketManager.get(opponentId);
+          const timestamp = Date.now();
+          
+          // Send to opponent
+          opponentSocket?.send(JSON.stringify({
+            type: RoomMessages.ROOM_CHAT,
+            payload: {
+              message: message,
+              sender: userId,
+              timestamp: timestamp
+            }
+          }));
+          
+          userSocket.send(JSON.stringify({
+            type: RoomMessages.ROOM_CHAT,
+            payload: {
+              message: message,
+              sender: userId,
+              timestamp: timestamp
+            }
+          }));
+        } else {
+          userSocket.send(JSON.stringify({
+            type: ErrorMessages.PAYLOAD_ERROR,
+            payload: { message: "Either roomGameId or roomId is required for chat" }
+          }));
         }
-
-        await handleRoomChat(userId, userSocket, roomGameId, message, this.roomSocketManager);
         return;
       }
       else if (type === RoomMessages.ROOM_LEAVE_GAME) {

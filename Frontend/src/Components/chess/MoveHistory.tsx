@@ -1,3 +1,4 @@
+
 import { memo, useMemo } from "react";
 import { useGameStore } from "../../stores/useGameStore";
 
@@ -40,25 +41,27 @@ const MoveRow = memo(
 
 MoveRow.displayName = "MoveRow";
 
+// Piece SVG Component - memoized to prevent re-creation
+const PieceSVG = memo(({ piece }: { piece: string }) => {
+  const svgPath = `/pieces/${piece}.svg`;
+  return (
+    <div className="w-6 h-6 flex-shrink-0">
+      <img
+        src={svgPath}
+        alt={`Chess piece ${piece}`}
+        className="w-full h-full object-contain pointer-events-none select-none"
+        title={`Captured ${piece}`}
+      />
+    </div>
+  );
+});
+PieceSVG.displayName = "PieceSVG";
+
 // Captured Pieces Component
 const CapturedPieces = memo(() => {
   // Dummy data for captured pieces - will be replaced with real data later
   const capturedByWhite = ["bP", "bP", "bN", "bB"]; // Black pieces captured by white
   const capturedByBlack = ["wP", "wP", "wR"]; // White pieces captured by black
-
-  const PieceSVG = ({ piece }: { piece: string }) => {
-    const svgPath = `/pieces/${piece}.svg`;
-    return (
-      <div className="w-6 h-6 flex-shrink-0">
-        <img
-          src={svgPath}
-          alt={`Chess piece ${piece}`}
-          className="w-full h-full object-contain pointer-events-none select-none"
-          title={`Captured ${piece}`}
-        />
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-3 mb-4">
@@ -102,28 +105,8 @@ const CapturedPieces = memo(() => {
 CapturedPieces.displayName = "CapturedPieces";
 
 const MoveHistoryComponent = () => {
+  // Only subscribe to moves, nothing else
   const moves = useGameStore((state) => state.moves);
-//  const moves = [
-//   { from: "e2", to: "e4", promotion: null },
-//   { from: "e7", to: "e5", promotion: null },
-//   { from: "g1", to: "f3", promotion: null },
-//   { from: "b8", to: "c6", promotion: null },
-//   { from: "f1", to: "c4", promotion: null },
-//   { from: "g8", to: "f6", promotion: null },
-//   { from: "d2", to: "d3", promotion: null },
-//   { from: "f8", to: "c5", promotion: null },
-//   { from: "c1", to: "g5", promotion: null },
-//   { from: "h7", to: "h6", promotion: null },
-//   { from: "g5", to: "h4", promotion: null },
-//   { from: "d7", to: "d6", promotion: null },
-//   { from: "b1", to: "c3", promotion: null },
-//   { from: "c8", to: "g4", promotion: null },
-//   { from: "h4", to: "g3", promotion: null },
-//   { from: "g4", to: "f3", promotion: null },
-//   { from: "g2", to: "f3", promotion: null },
-//   { from: "c5", to: "b4", promotion: null },
-// ];
-
 
   const moveRows = useMemo(
     () =>
@@ -167,5 +150,6 @@ const MoveHistoryComponent = () => {
   );
 };
 
-export const MoveHistory = memo(MoveHistoryComponent, () => false);
+// Proper memoization - only re-render when component actually needs to update
+export const MoveHistory = memo(MoveHistoryComponent);
 MoveHistory.displayName = "MoveHistory";

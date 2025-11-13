@@ -1,15 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo, useCallback } from "react";
 import { Handshake, X, Clock } from "lucide-react";
 import { useGameStore } from "../../stores/useGameStore";
 import { Button } from "../Button";
 import { motion, AnimatePresence } from "framer-motion";
 
-export function DrawOfferDialog() {
-  const drawOfferReceived = useGameStore((state) => state.drawOfferReceived);
-  const acceptDraw = useGameStore((state) => state.acceptDraw);
-  const rejectDraw = useGameStore((state) => state.rejectDraw);
+// Memoized Timer Progress Bar Component
+const TimerProgress = memo(({ timeLeft }: { timeLeft: number }) => {
+  const progress = (timeLeft / 30) * 100;
+  
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-center text-sm text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-1">
+          <Clock className="w-4 h-4 text-amber-500" />
+          <span>{timeLeft}s remaining</span>
+        </div>
+      </div>
 
+      <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+        <motion.div
+          className={`h-full bg-amber-500 ${
+            timeLeft <= 10 ? "animate-pulse" : ""
+          }`}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.3 }}
+        />
+      </div>
+    </div>
+  );
+});
+TimerProgress.displayName = "TimerProgress";
+
+function DrawOfferDialogComponent() {
+  const drawOfferReceived = useGameStore((state) => state.drawOfferReceived);
   const [timeLeft, setTimeLeft] = useState(30);
+
+  const acceptDraw = useCallback(() => {
+    const { acceptDraw } = useGameStore.getState();
+    acceptDraw();
+  }, []);
+
+  const rejectDraw = useCallback(() => {
+    const { rejectDraw } = useGameStore.getState();
+    rejectDraw();
+  }, []);
 
   useEffect(() => {
     if (!drawOfferReceived) return;
@@ -30,8 +64,6 @@ export function DrawOfferDialog() {
   }, [drawOfferReceived, rejectDraw]);
 
   if (!drawOfferReceived) return null;
-
-  const progress = (timeLeft / 30) * 100;
 
   return (
     <AnimatePresence>
@@ -84,24 +116,7 @@ export function DrawOfferDialog() {
               </p>
 
               {/* Timer */}
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center text-sm text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-amber-500" />
-                    <span>{timeLeft}s remaining</span>
-                  </div>
-                </div>
-
-                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full bg-amber-500 ${
-                      timeLeft <= 10 ? "animate-pulse" : ""
-                    }`}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 1, ease: "linear" }}
-                  />
-                </div>
-              </div>
+              <TimerProgress timeLeft={timeLeft} />
             </div>
 
             {/* Actions */}
@@ -127,3 +142,6 @@ export function DrawOfferDialog() {
     </AnimatePresence>
   );
 }
+
+export const DrawOfferDialog = memo(DrawOfferDialogComponent);
+DrawOfferDialog.displayName = "DrawOfferDialog";

@@ -1,5 +1,4 @@
 import { Chess } from "chess.js";
-// import { CHECK, ILLEGAL_ROOM_MOVE, INIT_GAME, LEAVE_ROOM, OPP_ROOM_RECONNECTED, ROOM_CHAT, ROOM_DRAW, ROOM_GAME_ACTIVE, ROOM_GAME_NOT_FOUND, ROOM_GAME_OVER, ROOM_LEAVE_GAME, ROOM_LEFT, ROOM_MOVE, ROOM_NOT_FOUND, ROOM_OPPONENT_LEFT, ROOM_RECONNECT, RoomMessages, SERVER_ERROR, WRONG_PLAYER_MOVE } from "../messages";
 import pc from "../prismaClient";
 import { redis } from "../redisClient";
 import { Move } from "./GameServices";
@@ -114,8 +113,8 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         const winnerId = winnerColor === "w" ? existingGame.user1 : existingGame.user2;
         const loserId = winnerColor === "b" ? existingGame.user2 : existingGame.user1;
         
-    const finalGameData = await redis.hGetAll(`room-game:${gameId}`) as Record<string, string>;
-    await saveGameProgress(gameId, finalGameData, chess.fen(), movingPlayerColor);
+        const finalGameData = await redis.hGetAll(`room-game:${gameId}`) as Record<string, string>;
+        await saveGameProgress(gameId, finalGameData, chess.fen(), movingPlayerColor);
     
 
       
@@ -126,33 +125,35 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
             winner: winnerColor
         });
         await redis.expire(`room-game:${gameId}`, 86400);
-
+        await redis.sRem(`room-active-games`,gameId.toString())
           await pc.$transaction([
-      pc.game.update({
-        where: { id: gameId },
-        data: {
-          winnerId,
-          loserId,
-          draw: false,
-            endedAt:new Date(Date.now())
-        },
-      }),
-      pc.room.update({
-        where: { gameId },
-        data: {
-          status: "FINISHED",
+            pc.game.update({
+              where: { id: gameId },
+              data: {
+                winnerId,
+                loserId,
+                draw: false,
+                  endedAt:new Date(Date.now())
+              },
+            }),
+            pc.room.update({
+              where: { gameId },
+              data: {
+                status: "FINISHED",
 
-        },
-      }),
-    ]);
+              },
+            }),
+        ]);
         // --- Construct clear payloads ---
         const winnerMessage = JSON.stringify({
             type: RoomMessages.ROOM_GAME_OVER,
             payload: {
                 result: "win",
-                message: "🏆 Congratulations! You’ve won the game.",
+                message: "🏆 Congratulations! You've won the game.",
                 winner: winnerColor,
-                loser:loserColor
+                loser: loserColor,
+                roomStatus: "FINISHED",
+                gameStatus: "GAME_OVER"
             },
         });
     
@@ -160,9 +161,11 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
             type: RoomMessages.ROOM_GAME_OVER,
             payload: {
                 result: "lose",
-                message: "💔 Game over. You’ve been checkmated.",
+                message: "💔 Game over. You've been checkmated.",
                 winner: winnerColor,
-                loser:loserColor
+                loser: loserColor,
+                roomStatus: "FINISHED",
+                gameStatus: "GAME_OVER"
             },
         });
     
@@ -172,7 +175,7 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         return;
     }
     
-    const validMoves= await provideRoomValidMove(chess.fen())
+    const validMoves= await provideRoomValidMoves(chess.fen())
     
         const oppPayload={
                     type: RoomMessages.ROOM_MOVE,
@@ -231,10 +234,14 @@ export async function handleRoomDraw(
   reason: string
 ): Promise<void> {
   try {
-    // --- Construct the draw message ---
+   
     const message = JSON.stringify({
       type: RoomMessages.ROOM_DRAW,
-      payload: { reason },
+      payload: { 
+        reason,
+        roomStatus: "FINISHED",
+        gameStatus: "GAME_OVER"
+      },
     });
 
     userSocket.send(message);
@@ -245,9 +252,23 @@ export async function handleRoomDraw(
       winner: "draw",
       drawReason: reason,
     });
-
+    await redis.sRem(`room-active-games`,gameId.toString())
     await redis.expire(`room-game:${gameId}`, 86400);
-
+    await pc.$transaction([
+      pc.game.update({
+        where:{id:gameId},
+        data:{
+          draw:true
+        }
+      }),
+      pc.room.update({
+        where:{gameId},
+        data:{
+          status:"FINISHED",
+          updatedAt:new Date()
+        }
+      })
+    ])
     console.log(`GameDraw ${gameId}: ${reason}`);
   } catch (error) {
     console.error(`Error handling draw for game ${gameId}:`, error);
@@ -349,7 +370,7 @@ export async function handleRoomChat(userId:number ,
             timestamp: timestamp
         }
     };
-
+    userSocket.send(JSON.stringify(chatPayload));
     // Send to opponent only - sender will see their own message from frontend
     opponentSocket?.send(JSON.stringify(chatPayload));
 
@@ -380,7 +401,8 @@ export function validatePayload(type:string,payload:any):string | null{
             if(!payload.to || !payload.from ||!payload.roomGameId) return "Missing Move or GameId";
             break;
         case RoomMessages.ROOM_CHAT:
-            if(!payload.message || !payload.roomGameId) return "Missing Message or GameId";
+            if(!payload.message) return "Missing message";
+            if(!payload.roomGameId && !payload.roomId) return "Missing roomGameId or roomId";
             break;
         case RoomMessages.ROOM_LEAVE_GAME:
           if (!payload.roomGameId) return "Missing field: gameId";
@@ -478,14 +500,28 @@ export async function handleRoomGameLeave(
 
     // --- Notify sockets ---
     const oppSocket = socketManager.get(winnerId!);
+    
+    // Send game over message to winner with confetti
     oppSocket?.send(JSON.stringify({
-      type: RoomMessages.ROOM_OPPONENT_LEFT,
-      payload: { message: "Opponent left - you win!" },
+      type: RoomMessages.ROOM_GAME_OVER,
+      payload: { 
+        message: "🎉 You won! Your opponent resigned.",
+        winner: winnerId,
+        loser: userId,
+        reason: "resignation",
+        roomStatus: "FINISHED",
+        gameStatus: "GAME_OVER"
+      },
     }));
 
+    // Send resignation confirmation to the user who left
     userSocket.send(JSON.stringify({
-      type: RoomMessages.ROOM_GAME_OVER,
-      payload: { message: "You left the game." },
+      type: RoomMessages.ROOM_LEFT,
+      payload: { 
+        message: "You have resigned from the game",
+        roomStatus: "FINISHED",
+        gameStatus: "GAME_OVER"
+      },
     }));
 
     // --- Redis cleanup ---
@@ -596,22 +632,21 @@ else if(room.status === "FULL" && isJoiner){
     }
 }
 
-async function provideRoomValidMove(fen:string) {
+export async function provideRoomValidMoves(fen:string) {
             const chess=new Chess(fen)
-                    const moves=chess.moves({ verbose: true }); 
+            const moves=chess.moves({ verbose: true }); 
         // console.log(moves)
-        const validMoves=moves.map(m=>({
-            from:m.from,
-            to:m.to,
-            promotion:m.promotion ?? null
-        }))
+            const validMoves=moves.map(m=>({
+                from:m.from,
+                to:m.to,
+                promotion:m.promotion ?? null
+            }))
 
 
-        return validMoves
-
-
-    
+            return validMoves
 }
+
+
 async function saveGameProgress(gameId:number,game:Record<string,string>,currentFen:string,lastMoveBy:'w'|'b'){
     try {  
         const movesRaw=await redis.lRange(`room-game:${gameId}:moves`,0,-1)

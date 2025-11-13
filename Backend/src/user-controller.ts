@@ -517,7 +517,9 @@ router.patch('/room/:roomId/status',async (req:Request,res:Response) => {
     return
   }
   await pc.room.update({where:{id:room.id},data:{
-    status:"CANCELLED"
+    status:"CANCELLED",
+    joinedById:null,
+    gameId:null
   }})
   res.status(200).json({success:true,message:"Room Is cancelled successfully"})
   return

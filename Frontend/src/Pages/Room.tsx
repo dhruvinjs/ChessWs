@@ -7,6 +7,8 @@ import { showMessage } from "../Components/ToastMessages"
 import { useNavigate } from "react-router-dom"
 import { useGameStore } from "../stores/useGameStore"
 import { AlertTriangle, X } from "lucide-react"
+import { SocketManager } from "../lib/socketManager"
+import { useUserQuery } from "../hooks/useUserQuery"
 
 export function Room() {
   const [roomCode, setRoomCode] = useState("")
@@ -16,6 +18,7 @@ export function Room() {
   const [existingRoomId, setExistingRoomId] = useState<string | null>(null)
   const navigate = useNavigate()
   const setRoomInfo = useGameStore((state) => state.setRoomInfo)
+  const { data: user } = useUserQuery()
 
   const handleJoinRoom = async () => {
     const trimmedRoomCode = roomCode.trim();
@@ -44,6 +47,13 @@ export function Room() {
         
         // ✅ Store room info in Zustand
         setRoomInfo(roomInfo);
+        
+        // ✅ Immediately establish WebSocket connection if user is available
+        if (user?.id) {
+          const socketManager = SocketManager.getInstance();
+          socketManager.init("room", user.id);
+          console.log(`🔌 WebSocket connected early for joiner: ${user.id}`);
+        }
         
         showMessage("Room Joined!", `${response.message}. Status: ${roomInfo.status} (${roomInfo.playerCount}/2 players). Redirecting...`, { type: "success" });
         
@@ -95,6 +105,13 @@ export function Room() {
         
         // ✅ Store room info in Zustand
         setRoomInfo(roomInfo);
+        
+        // ✅ Immediately establish WebSocket connection if user is available  
+        if (user?.id) {
+          const socketManager = SocketManager.getInstance();
+          socketManager.init("room", user.id);
+          console.log(`🔌 WebSocket connected early for creator: ${user.id}`);
+        }
         
         showMessage("Room Created!", `Room ${createdRoomId} created successfully! Status: ${roomInfo.status} (${roomInfo.playerCount}/2 players). Redirecting...`, { type: "success" });
         
@@ -155,7 +172,9 @@ export function Room() {
     
     setIsLoading(true);
     try {
+      console.log(`🔴 Attempting to cancel room: ${existingRoomId}`);
       const response = await roomApis.cancelRoom(existingRoomId);
+      console.log("📡 Cancel room API response:", response);
       
       if (response.success) {
         showMessage(
@@ -168,16 +187,17 @@ export function Room() {
         setShowExistingRoomDialog(false);
         setExistingRoomId(null);
         
-        // Clear persisted room data from Zustand
-        setRoomInfo({
-          code: "",
-          status: "CANCELLED",
-          playerCount: 0,
-          isCreator: false,
+        // Clear persisted room data from Zustand by resetting to empty state
+        useGameStore.setState({
+          roomId: "",
+          isRoomCreator: false,
           opponentId: null,
           opponentName: null,
-          gameId: null,
+          roomGameId: null,
+          roomStatus: null,
         });
+        
+        console.log("✅ Room state cleared from store");
         
         // Now allow user to create a new room
         showMessage(
@@ -186,10 +206,11 @@ export function Room() {
           { type: "info" }
         );
       } else {
+        console.error("❌ Cancel room failed:", response.message);
         showMessage("Error", response.message || "Failed to cancel room", { type: "error" });
       }
     } catch (error: any) {
-      console.error("Cancel room error:", error);
+      console.error("❌ Cancel room error:", error);
       const errorMessage = error.response?.data?.message || "Failed to cancel room";
       showMessage("Error", errorMessage, { type: "error" });
     } finally {
@@ -250,7 +271,7 @@ export function Room() {
                   <input
                     type="text"
                     value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8))}
+                    onChange={(e) => setRoomCode(e.target.value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 8))}
                     className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider text-slate-900 dark:text-white transition-all focus:ring-2 focus:ring-amber-400 focus:outline-none"
                     placeholder="Enter 8-character room code"
                     maxLength={8}
@@ -265,6 +286,20 @@ export function Room() {
                   onClick={handleJoinRoom}
                   disabled={isLoading}
                 />
+                
+                {/* Host Room Option */}
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <p className="text-sm text-center text-slate-600 dark:text-slate-400 mb-3">
+                    Don't have a room code?
+                  </p>
+                  <Button 
+                    size="md" 
+                    variant="outline" 
+                    text="Create Your Own Room" 
+                    className="w-full" 
+                    onClick={() => setMode("host")}
+                  />
+                </div>
               </>
             ) : (
               <>
@@ -308,6 +343,22 @@ export function Room() {
                     <p className="text-sm text-center text-slate-600 dark:text-slate-400">
                       Share this code with your opponent, then enter the room to start playing!
                     </p>
+                  </div>
+                )}
+                
+                {/* Join Another Room Option */}
+                {!roomCode && (
+                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-sm text-center text-slate-600 dark:text-slate-400 mb-3">
+                      Or join an existing room instead
+                    </p>
+                    <Button 
+                      size="md" 
+                      variant="outline" 
+                      text="Switch to Join Room" 
+                      className="w-full" 
+                      onClick={() => setMode("join")}
+                    />
                   </div>
                 )}
               </>

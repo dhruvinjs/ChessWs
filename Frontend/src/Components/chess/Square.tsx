@@ -3,6 +3,41 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { SquareProps } from "../../types/chess";
 import { Piece } from "./Piece";
 
+// Shatter particles component
+const ShatterParticles = memo(() => {
+  const particles = Array.from({ length: 8 }, (_, i) => {
+    const angle = (i * 360) / 8;
+    const distance = 50 + Math.random() * 30;
+    const x = Math.cos((angle * Math.PI) / 180) * distance;
+    const y = Math.sin((angle * Math.PI) / 180) * distance;
+    
+    return (
+      <motion.div
+        key={i}
+        className="absolute top-1/2 left-1/2 w-2 h-2 -translate-x-1/2 -translate-y-1/2"
+        initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
+        animate={{
+          x,
+          y,
+          opacity: 0,
+          scale: [1, 0.8, 0],
+          rotate: Math.random() * 720 - 360,
+        }}
+        exit={{ opacity: 0 }}
+        transition={{
+          duration: 0.6,
+          ease: "easeOut",
+        }}
+      >
+        <div className="w-full h-full bg-gradient-to-br from-amber-500 to-red-600 rounded-sm shadow-lg" />
+      </motion.div>
+    );
+  });
+
+  return <div className="absolute inset-0 pointer-events-none">{particles}</div>;
+});
+ShatterParticles.displayName = "ShatterParticles";
+
 const SquareComponent = ({
   piece,
   isLight,
@@ -12,7 +47,7 @@ const SquareComponent = ({
   onClick,
 }: SquareProps) => {
   const baseClasses =
-    "aspect-square flex items-center justify-center relative";
+    "aspect-square flex items-center justify-center relative overflow-visible";
   const colorClasses = isLight
     ? "bg-amber-100 dark:bg-amber-200/80"
     : "bg-amber-700 dark:bg-amber-800/80";
@@ -25,34 +60,69 @@ const SquareComponent = ({
         {isLastMove && <HighlightRing color="yellow" />}
       </AnimatePresence>
 
-      {/* --- Chess Piece with pointer cursor --- */}
-      <AnimatePresence>
+      {/* --- Chess Piece with death animation --- */}
+      <AnimatePresence mode="wait">
         {piece && (
           <motion.div
             key={piece}
-            className="w-full h-full p-1 cursor-pointer" // Replaced cursor-grab with cursor-pointer
-            initial={{ opacity: 0, y: -15, scale: 0.8 }}
+            className="absolute inset-0 p-1 cursor-pointer z-10"
+            initial={{ 
+              opacity: 0, 
+              scale: 0, 
+              rotate: -180 
+            }}
             animate={{
               opacity: 1,
-              y: 0,
               scale: 1,
-              x:2,
-              transition: { type: "spring", stiffness: 250, damping: 25 },
+              rotate: 0,
+              transition: { 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 20,
+                duration: 0.6
+              },
             }}
             exit={{
               opacity: 0,
-              y: 15,
-              scale: 0.8,
-              transition: { duration: 0.15 },
+              scale: [1, 1.3, 0],
+              rotate: [0, 15, -15, 180],
+              y: [0, -10, 20],
+              filter: [
+                "brightness(1)", 
+                "brightness(1.5)", 
+                "brightness(0)"
+              ],
+              transition: { 
+                duration: 0.5,
+                scale: { 
+                  times: [0, 0.3, 1], 
+                  ease: "easeOut" 
+                },
+                rotate: { 
+                  times: [0, 0.2, 0.4, 1], 
+                  ease: "easeInOut" 
+                },
+                y: { 
+                  times: [0, 0.3, 1], 
+                  ease: "easeIn" 
+                },
+                filter: { 
+                  duration: 0.5 
+                }
+              },
             }}
             whileHover={{
               scale: 1.1,
               y: -5,
               filter: "brightness(1.2)",
+              rotate: [0, -5, 5, 0],
+              transition: { 
+                rotate: { duration: 0.3 } 
+              }
             }}
-            layout
           >
             <Piece piece={piece} className="w-full h-full drop-shadow-md" />
+            <ShatterParticles />
           </motion.div>
         )}
       </AnimatePresence>
@@ -90,19 +160,36 @@ const HighlightRing = memo(({ color }: { color: "blue" | "yellow" }) => (
   <motion.div
     className={`absolute inset-0 border-4 rounded-sm ${ringColors[color]}`}
     initial={{ opacity: 0, scale: 1.1 }}
-    animate={{ opacity: 1, scale: 1 }}
+    animate={{ 
+      opacity: color === "yellow" ? [0.7, 1, 0.7] : 1,
+      scale: 1 
+    }}
     exit={{ opacity: 0, scale: 1.1 }}
-    transition={{ duration: 0.2, ease: "easeInOut" }}
+    transition={{ 
+      duration: color === "yellow" ? 1.5 : 0.2,
+      repeat: color === "yellow" ? Infinity : 0,
+      ease: "easeInOut" 
+    }}
   />
 ));
 HighlightRing.displayName = "HighlightRing";
 
 const ValidMoveDot = memo(() => (
   <motion.div
-    className="w-1/4 h-1/4 bg-green-600/50 rounded-full"
+    className="w-1/4 h-1/4 bg-green-600/60 rounded-full"
     initial={{ opacity: 0, scale: 0 }}
-    animate={{ opacity: 1, scale: 1 }}
+    animate={{ 
+      opacity: 1, 
+      scale: [1, 1.2, 1]
+    }}
     exit={{ opacity: 0, scale: 0 }}
+    transition={{
+      scale: {
+        duration: 1,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }}
   />
 ));
 ValidMoveDot.displayName = "ValidMoveDot";
