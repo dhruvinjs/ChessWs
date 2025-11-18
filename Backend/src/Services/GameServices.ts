@@ -11,7 +11,9 @@ export async function getGameState(gameId: string) {
     if (Object.keys(existingGame).length === 0) return null;
     const board = new Chess(existingGame.fen);
     const movesRaw = await redis.lRange(`game:${gameId}:moves`, 0, -1);
-  const moves = movesRaw.map(m => JSON.parse(m));
+    const moves = movesRaw.map(m => JSON.parse(m));
+    const capturedPieces = await redis.lRange(`game:${gameId}:capturedPieces`, 0, -1);
+
     return {
         user1: existingGame.user1,
         user2: existingGame.user2,
@@ -23,7 +25,8 @@ export async function getGameState(gameId: string) {
         blackTimer: existingGame.blackTimer,
         gameStarted: existingGame.status === GameMessages.GAME_ACTIVE,
         gameEnded: existingGame.status === GameMessages.GAME_OVER,
-        moves
+        moves,
+        capturedPieces
     };
 }
 
@@ -71,9 +74,9 @@ export async function makeMove(
     }
 
     const board = gameState.board;
-
+    let capturedPiece=null
         try {
-                board.move({
+            const boardMove=board.move({
                     from: move.from,
                     to: move.to,
                     promotion: move.promotion || "q"
@@ -81,7 +84,19 @@ export async function makeMove(
 
             await redis.rPush(`game:${gameId}:moves`, JSON.stringify(move));
             await redis.hSet(`game:${gameId}`, "fen", board.fen());
-            
+            if(boardMove.captured){
+                const capturedColor=boardMove.color === "b" ? "w" : "b"
+                const pieceCaptured=boardMove.captured.toUpperCase() // p=> P
+                const capturedCode= `${capturedColor}${pieceCaptured}`
+                capturedPiece = capturedCode
+
+                await redis.rPush(
+                    `game:${gameId}:capturedPieces`,
+                    capturedPiece
+                );
+                console.log('Captured Piece Block: ',capturedPiece)
+           
+            }
 
         } catch (err) {
             //if illegal moves is attempted direct this block will be executed 
@@ -114,7 +129,7 @@ export async function makeMove(
         return;
     }
 
-    // Game Over logic
+    
     if (board.isGameOver()) {
     const winnerColor = board.turn() === "w" ? "b" : "w";
     const winnerId = winnerColor === "w" ? gameState.user1 : gameState.user2;
@@ -123,19 +138,17 @@ export async function makeMove(
     const winnerSocket = socketMap.get(winnerId);
     const loserSocket = socketMap.get(loserId);
 
-    // --- Redis update ---
     await redis.hSet(`game:${gameId}`, {
         status: GameMessages.GAME_OVER,
         winner: winnerColor
     });
     await redis.expire(`game:${gameId}`, 600);
 
-    // --- Construct clear payloads ---
     const winnerMessage = JSON.stringify({
         type: GameMessages.GAME_OVER,
         payload: {
             result: "win",
-            message: "🏆 Congratulations! You’ve won the game.",
+            message: "🏆 Congratulations! You've won the game.",
             winner: winnerColor,
             loser:loserColor
         },
@@ -145,13 +158,12 @@ export async function makeMove(
         type: GameMessages.GAME_OVER,
         payload: {
             result: "lose",
-            message: "💔 Game over. You’ve been checkmated.",
+            message: "💔 Game over. You've been checkmated.",
             winner: winnerColor,
             loser:loserColor
         },
     });
 
-    // --- Send to each player ---
     winnerSocket?.send(winnerMessage);
     loserSocket?.send(loserMessage);
 
@@ -165,7 +177,8 @@ export async function makeMove(
                 move,
                 turn: board.turn(),
                 fen: board.fen(),
-                validMoves
+                validMoves,
+                capturedPiece
                 }
             }
             const currentPlayerPayload={
@@ -174,7 +187,8 @@ export async function makeMove(
                 move,
                 turn: board.turn(),
                 fen: board.fen(),
-                validMoves:[]
+                validMoves:[],
+                capturedPiece
                 }
             }
     const currentPlayerSocket = playerId === gameState.user1 ? user1Socket : user2Socket;
@@ -260,6 +274,7 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
     console.log("sending the current moves to ", playerId);
     const validMoves = await provideValidMoves(gameId);
     const drawCount=redis.get(`drawOffers:${gameId}:${playerId}`)
+
     socket.send(JSON.stringify({
         type: GameMessages.RECONNECT,
         payload: {
@@ -273,7 +288,8 @@ export async function reconnectPlayer(playerId: string, gameId: string, socket: 
                 validMoves: validMoves || [],
                 moves:game.moves,
                 status:game.status,
-                count:Number(drawCount)
+                count:Number(drawCount),
+                capturedPieces:game.capturedPieces
             }
         }));
 

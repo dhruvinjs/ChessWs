@@ -42,11 +42,9 @@ export class SocketManager {
         // SILENT / CONSOLE ONLY - Internal Setup
         // ========================================
         case GameMessages.ASSIGN_ID:
-          console.log("✅ Guest ID assigned");
           break;
 
         case GameMessages.ASSIGN_ID_FOR_ROOM:
-          console.log("✅ Room WebSocket connected");
           break;
 
         // ========================================
@@ -163,7 +161,8 @@ export class SocketManager {
             blackTimer,
             validMoves,
             moves, 
-            count
+            count,
+            capturedPieces
           } = payload;
 
           console.log("[RECONNECT] restoring game state", payload);
@@ -176,7 +175,8 @@ export class SocketManager {
             blackTimer,
             validMoves,
             moves,
-            count
+            count,
+            capturedPieces
           });
           console.log("🔄 Reconnected to game");
           break;
@@ -333,14 +333,20 @@ export class SocketManager {
         // ROOM GAME MECHANICS - No Toast
         // ========================================
         case GameMessages.ROOM_MOVE:
-          const { move: roomMove, fen: roomMoveFen, validMoves: roomMoveValidMoves } = payload;
+          const { move: roomMove, fen: roomMoveFen, validMoves: roomMoveValidMoves, capturedPiece: roomCapturedPiece } = payload;
           
-          // Update game state with new position
-          const currentMoves = useGameStore.getState().moves || [];
+          // Update game state with new position and captured piece
+          const roomGameState = useGameStore.getState();
+          const currentMoves = roomGameState.moves || [];
+          const currentCapturedPieces = roomGameState.capturedPieces || [];
+          
           useGameStore.setState({
             fen: roomMoveFen,
             validMoves: roomMoveValidMoves || [],
             moves: roomMove ? [...currentMoves, roomMove] : currentMoves,
+            capturedPieces: roomCapturedPiece 
+              ? [...currentCapturedPieces, roomCapturedPiece]
+              : currentCapturedPieces,
             selectedSquare: null,
           });
           break;
@@ -645,7 +651,9 @@ export class SocketManager {
     return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
   }
 
-  public init(type: GameModes, userId?: number): void {
+  public init(type: GameModes, userId?: number | string): void {
+    console.log(`🔧 SocketManager.init called with type: ${type}, userId: ${userId}`);
+    
     // If already connected to the same type, don't reconnect
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       console.log(`✅ Already connected to ${type} WebSocket`);
@@ -660,6 +668,7 @@ export class SocketManager {
 
     // Close existing socket if any
     if (this.socket) {
+      console.log(`🔌 Closing existing socket before reconnecting...`);
       this.closeSocket();
     }
 
@@ -667,39 +676,43 @@ export class SocketManager {
 
     switch (type) {
       case "guest":
-        if (!userId || typeof userId !== 'number') {
-          console.warn("⚠️ No valid user ID provided for guest.");
+        if (!userId) {
+          console.error("❌ No valid ID provided for guest. userId:", userId);
           return;
         }
         wsUrl = `${this.wsBaseUrl}/guest?id=${userId}`;
+        console.log(`🎮 Creating guest WebSocket connection to: ${wsUrl}`);
         break;
 
       case "room":
         if (!userId || typeof userId !== 'number') {
-          console.warn("⚠️ No valid user ID provided for room game.");
+          console.error("❌ No valid user ID provided for room game. userId:", userId);
           return;
         }
         wsUrl = `${this.wsBaseUrl}/room?userId=${userId}`;
+        console.log(`🏠 Creating room WebSocket connection to: ${wsUrl}`);
         break;
 
       case "computer":
         wsUrl = `${this.wsBaseUrl}/computer`;
+        console.log(`🤖 Creating computer WebSocket connection to: ${wsUrl}`);
         break;
 
       default:
-        console.error("❌ Invalid game type");
+        console.error("❌ Invalid game type:", type);
         return;
     }
 
     try {
+      console.log(`🚀 Attempting to create WebSocket...`);
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
-        console.log(`✅ Connected to ${type} WebSocket:`, wsUrl);
+        console.log(`✅ Successfully connected to ${type} WebSocket:`, wsUrl);
       };
 
       this.socket.onclose = (event) => {
-        console.log(`🔌 ${type} WebSocket closed`, event.reason);
+        console.log(`🔌 ${type} WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
         this.socket = null;
       };
 
@@ -708,9 +721,10 @@ export class SocketManager {
       };
 
       this.socket.onmessage = this.handleMessage.bind(this);
+      
+      console.log(`📡 WebSocket instance created, waiting for connection...`);
     } catch (error) {
-      console.error(`❌ Failed to connect ${type} socket:`, error);
-      this.socket = null;
+      console.error(`❌ Failed to create WebSocket:`, error);
     }
   }
 

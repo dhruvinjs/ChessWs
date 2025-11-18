@@ -27,6 +27,9 @@ interface GameState {
   blackTimer: number;
   selectedSquare: string | null;
 
+  // ✅ Captured pieces state
+  capturedPieces: string[];
+
   // ✅ Draw offer state
   drawOfferReceived: boolean;
   drawOfferSent: boolean;
@@ -46,6 +49,7 @@ interface GameState {
   }>;
 
   // Actions
+  initGuestConnection: (guestId: string) => void;
   initGame: (payload: any) => void;
   processServerMove: (payload: any) => void;
   reconnect: (payload: any) => void;
@@ -106,6 +110,9 @@ export const useGameStore = create<GameState>()(
   blackTimer: 600,
   selectedSquare: null,
 
+  // ✅ Initial captured pieces state
+  capturedPieces: [],
+
   // ✅ Initial draw state
   drawOfferReceived: false,
   drawOfferSent: false,
@@ -120,6 +127,21 @@ export const useGameStore = create<GameState>()(
   roomStatus: null,
   chatMsg: [],
 
+  // ✅ Initialize guest connection - stores guestId and initializes WebSocket
+  initGuestConnection: (guestId: string) => {
+    const currentGuestId = get().guestId;
+    
+    // Only initialize if guestId is different or not set
+    if (currentGuestId !== guestId) {
+      console.log(`🎮 Zustand: Initializing guest connection with ID: ${guestId}`);
+      set({ guestId });
+      const socketManager = SocketManager.getInstance();
+      socketManager.init("guest", guestId);
+    } else {
+      console.log(`⏭️ Zustand: Guest ID unchanged, skipping WebSocket init`);
+    }
+  },
+
   initGame: (payload) =>
     set({
       ...payload,
@@ -127,6 +149,7 @@ export const useGameStore = create<GameState>()(
       gameStatus: GameMessages.GAME_ACTIVE,
       gameStarted: true,
       moves: [],
+      capturedPieces: [],
       winner: null,
       loser: null,
       drawOfferReceived: false,
@@ -142,6 +165,9 @@ export const useGameStore = create<GameState>()(
       whiteTimer: payload.whiteTimer ?? state.whiteTimer,
       blackTimer: payload.blackTimer ?? state.blackTimer,
       selectedSquare: null,
+      capturedPieces: payload.capturedPiece 
+        ? [...state.capturedPieces, payload.capturedPiece]
+        : state.capturedPieces,
     }));
   },
 
@@ -152,6 +178,7 @@ export const useGameStore = create<GameState>()(
       gameId: payload.gameId,
       validMoves: payload.validMoves || [],
       moves: payload.moves || [],
+      capturedPieces: payload.capturedPieces || [],
       whiteTimer: payload.whiteTimer,
       blackTimer: payload.blackTimer,
       gameStatus: GameMessages.GAME_ACTIVE,
@@ -199,6 +226,7 @@ export const useGameStore = create<GameState>()(
       whiteTimer: 600,
       blackTimer: 600,
       selectedSquare: null,
+      capturedPieces: [],
       drawOfferReceived: false,
       drawOfferSent: false,
       drawOfferCount: 0,
@@ -391,7 +419,7 @@ export const useGameStore = create<GameState>()(
 
   // ✅ Leave room (before game starts) - ONLY CALLS CANCEL API
   leaveRoom: async () => {
-    const { roomId, roomStatus, isRoomCreator } = get();
+    const { roomId } = get();
     
     // console.log("🚪 leaveRoom called with:", { roomId, roomStatus, isRoomCreator });
     

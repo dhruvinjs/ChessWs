@@ -4,6 +4,7 @@ export { Square } from './Square';
 export { GameHeader } from './GameHeader';
 export { GameStatus } from './GameStatus';
 export { MoveHistory } from './MoveHistory';
+export { CapturedPieces } from './CapturedPieces';
 export { Piece} from './Piece';
 export {showMessage} from '../ToastMessages'
 export {GameControls} from './GameControls'

@@ -14,6 +14,8 @@ export async function getRoomGameState(gameId: number) {
   
   const chatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
   const chat = chatRaw.map(c => JSON.parse(c));
+  
+  const capturedPieces = await redis.lRange(`room-game:${gameId}:capturedPieces`, 0, -1);
 
   if (!gameExists || Object.keys(gameExists).length === 0 || gameExists.status === RoomMessages.ROOM_GAME_OVER) {
     const restoredGame = await roomManager.restoreGameFromDB(gameId);
@@ -32,7 +34,8 @@ export async function getRoomGameState(gameId: number) {
     moves: moves,
     moveCount: Number(gameExists.moveCount),
     status: gameExists.status,
-    chat: chat  // FIX: Return actual chat array
+    chat: chat,  // FIX: Return actual chat array
+    capturedPieces: capturedPieces  // Include captured pieces
   };
 }
 
@@ -66,13 +69,29 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         return null;
     }
 
+    let capturedPiece = null;
     try {
-        chess.move({
-            to:move.to,
-            from:move.from,
-        })
-            await redis.rPush(`room-game:${gameId}:moves`, JSON.stringify(move));
-            await redis.hSet(`room-game:${gameId}`, "fen", chess.fen());
+        const boardMove = chess.move({
+            to: move.to,
+            from: move.from,
+        });
+        
+        await redis.rPush(`room-game:${gameId}:moves`, JSON.stringify(move));
+        await redis.hSet(`room-game:${gameId}`, "fen", chess.fen());
+        
+        // Handle captured pieces
+        if (boardMove.captured) {
+            const capturedColor = boardMove.color === "b" ? "w" : "b";
+            const pieceCaptured = boardMove.captured.toUpperCase(); // p => P
+            const capturedCode = `${capturedColor}${pieceCaptured}`;
+            capturedPiece = capturedCode;
+
+            await redis.rPush(
+                `room-game:${gameId}:capturedPieces`,
+                capturedPiece
+            );
+            console.log('Room Captured Piece:', capturedPiece);
+        }
             const updatedMoveCnt=await redis.hIncrBy(`room-game:${gameId}`,"moveCount",1)
             if(updatedMoveCnt % roomManager.MOVES_BEFORE_SAVE === 0){
                const updatedGameData = await redis.hGetAll(`room-game:${gameId}`) as Record<string, string>;
@@ -126,6 +145,14 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         });
         await redis.expire(`room-game:${gameId}`, 86400);
         await redis.sRem(`room-active-games`,gameId.toString())
+        
+        // Get final game data including captured pieces
+        const finalMovesRaw = await redis.lRange(`room-game:${gameId}:moves`, 0, -1);
+        const finalMoves = finalMovesRaw.map(m => JSON.parse(m));
+        const finalChatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
+        const finalChat = finalChatRaw.map(c => JSON.parse(c));
+        const finalCapturedPieces = await redis.lRange(`room-game:${gameId}:capturedPieces`, 0, -1);
+        
           await pc.$transaction([
             pc.game.update({
               where: { id: gameId },
@@ -133,7 +160,11 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
                 winnerId,
                 loserId,
                 draw: false,
-                  endedAt:new Date(Date.now())
+                endedAt: new Date(Date.now()),
+                moves: finalMoves,
+                chat: finalChat,
+                capturedPieces: finalCapturedPieces,
+                currentFen: chess.fen()
               },
             }),
             pc.room.update({
@@ -183,7 +214,8 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
                     move,
                     turn: chess.turn(),
                     fen: chess.fen(),
-                    validMoves
+                    validMoves,
+                    capturedPiece
                     }
                 }
                 const currentPlayerPayload={
@@ -192,7 +224,8 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
                     move,
                     turn: chess.turn(),
                     fen: chess.fen(),
-                    validMoves:[]
+                    validMoves:[],
+                    capturedPiece
                     }
                 }
 
@@ -323,6 +356,7 @@ export async function handleRoomReconnection(userId:number, userSocket:WebSocket
             moves: existingGame.moves,
             count: existingGame.moveCount,
             chat: chatArr,
+            capturedPieces: existingGame.capturedPieces || [],
             // Add room context for proper state sync
             roomCode: room?.code,
             isCreator: isCreator,
@@ -653,6 +687,7 @@ async function saveGameProgress(gameId:number,game:Record<string,string>,current
         const moves=movesRaw.map(m=>JSON.parse(m))
         const chatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
         const chat = chatRaw.map(c => JSON.parse(c));
+        const capturedPiecesRaw = await redis.lRange(`room-game:${gameId}:capturedPieces`, 0, -1);
         await pc.$transaction([
             pc.game.update({where:{id:gameId},data:{
                 moves:moves,
@@ -661,7 +696,8 @@ async function saveGameProgress(gameId:number,game:Record<string,string>,current
                 whiteTimeLeft:Number(game.whiteTimer),
                 blackTimeLeft:Number(game.blackTimer),
                 chat:chat,
-                currentFen:currentFen
+                currentFen:currentFen,
+                capturedPieces:capturedPiecesRaw
             }})
         ])
         console.log(`Game ${gameId}: Progress saved to DB at move count ${moves.length}`);

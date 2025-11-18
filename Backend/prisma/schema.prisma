@@ -63,6 +63,7 @@ model Game {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt 
   endedAt DateTime? 
+  capturedPieces String[] @default([])
 
 
 }

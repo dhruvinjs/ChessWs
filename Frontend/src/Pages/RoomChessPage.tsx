@@ -5,7 +5,7 @@ import { ConfirmDialog } from "../Components/ConfirmDialog";
 import { GameMessages } from "../types/chess";
 import { useGameStore } from "../stores/useGameStore";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, memo, useCallback, useState } from "react";
+import { useEffect, useMemo, memo, useCallback, useState, useRef } from "react";
 import { SocketManager } from "../lib/socketManager";
 import { useUserQuery } from "../hooks/useUserQuery";
 
@@ -62,6 +62,7 @@ function RoomChessPageComponent() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const { data: user } = useUserQuery();
+  const socketInitialized = useRef(false);
   
   // State for resign confirmation dialog
   const [showResignConfirm, setShowResignConfirm] = useState(false);
@@ -130,15 +131,8 @@ function RoomChessPageComponent() {
   // Validate room ID and sync with store
   useEffect(() => {
     if (!roomId) {
-      console.error("No room ID provided");
       navigate("/room");
       return;
-    }
-
-    // ✅ CRITICAL: Initialize WebSocket connection if user is available
-    if (user?.id) {
-      const socketManager = SocketManager.getInstance();
-      socketManager.init("room", user.id);
     }
 
     // ✅ Sync room ID from URL if store doesn't have it or it's different
@@ -146,7 +140,19 @@ function RoomChessPageComponent() {
       const { syncRoomId } = useGameStore.getState();
       syncRoomId(roomId);
     }
-  }, [roomId, navigate, roomCode, user]);
+
+    // ✅ Initialize room WebSocket for authenticated users only
+    if (user?.id && typeof user.id === 'number' && !socketInitialized.current) {
+      const socketManager = SocketManager.getInstance();
+      socketManager.init("room", user.id);
+      socketInitialized.current = true;
+    }
+
+    // Cleanup on unmount
+    return () => {
+      socketInitialized.current = false;
+    };
+  }, [roomId, roomCode, navigate, user?.id]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 p-4">
@@ -223,5 +229,4 @@ function RoomChessPageComponent() {
   );
 }
 
-export const RoomChessPage = memo(RoomChessPageComponent);
-RoomChessPage.displayName = "RoomChessPage";
+export { RoomChessPageComponent as RoomChessPage };

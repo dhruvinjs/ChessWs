@@ -89,11 +89,11 @@ const ChessBoardComponent = () => {
 
   // 🎨 Coordinates: same gradient/light/dark card style as MoveHistory
   const coordClasses =
-    "flex justify-center items-center text-sm font-semibold text-slate-900 dark:text-white bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 select-none";
+    "flex justify-center items-center text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 select-none";
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl shadow-lg">
-      <div className="grid grid-cols-[24px_1fr_24px] grid-rows-[24px_1fr_24px] aspect-square">
+    <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 p-2 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl shadow-lg">
+      <div className="grid grid-cols-[20px_1fr_20px] sm:grid-cols-[24px_1fr_24px] grid-rows-[20px_1fr_20px] sm:grid-rows-[24px_1fr_24px] aspect-square">
         {/* Top Files */}
         <div className="col-start-2 row-start-1 grid grid-cols-8">
           {files.map((f) => (

@@ -25,6 +25,7 @@ interface RestoredGameState {
   moveCount: number;
   status: string;
   chat: string[];
+  capturedPieces: string[];
 }
 
 class RoomManager {
@@ -708,6 +709,15 @@ class RoomManager {
         }
       }
 
+      // Restore captured pieces
+      const capturedPiecesArray = (Array.isArray(gameFromDB.capturedPieces) ? gameFromDB.capturedPieces : []) as string[];
+      if (capturedPiecesArray.length > 0) {
+        await redis.del(`room-game:${gameId}:capturedPieces`);
+        for (const piece of capturedPiecesArray) {
+          await redis.rPush(`room-game:${gameId}:capturedPieces`, piece);
+        }
+      }
+
       await redis.sAdd("room-active-games", gameId.toString());
 
       return {
@@ -719,7 +729,8 @@ class RoomManager {
         moves: movesArray,
         moveCount: movesArray.length,
         status: RoomMessages.ROOM_GAME_ACTIVE,
-        chat: chatArray
+        chat: chatArray,
+        capturedPieces: gameFromDB.capturedPieces || []
       };
     } catch (error) {
       console.error("Failed to restore game from DB:", error);
