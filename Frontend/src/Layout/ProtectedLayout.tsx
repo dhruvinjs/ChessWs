@@ -10,55 +10,60 @@ const AUTH_ONLY_ROUTES = ["/profile", "/home", "/room"];
 export function ProtectedLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: user, isLoading } = useUserQuery();
+  const { data: user, isLoading, isFetching } = useUserQuery();
   const hasRedirected = useRef(false);
 
-  // ⏳ Show loading while checking auth
-  if (isLoading) {
+  // ⏳ Show loading while checking auth OR while actively fetching
+  if (isLoading || isFetching) {
     return <LoadingScreen />;
   }
 
   // 🚫 If no user at all, redirect to login
   useEffect(() => {
-    if (!user && !hasRedirected.current) {
+    if (!user && !hasRedirected.current && !isFetching) {
       hasRedirected.current = true;
       console.log("No user found, redirecting to login");
       navigate("/login", { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, isFetching]);
 
   // 🚫 If guest tries to access auth-only routes, show message and redirect
   useEffect(() => {
-    if (user?.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname) && !hasRedirected.current) {
-      hasRedirected.current = true;
-      
-      // Show toast message for different protected routes
-      const messages: Record<string, { title: string; message: string }> = {
-        "/room": { title: "Access Denied", message: "Create an account to access Room Games!" },
-        "/profile": { title: "Access Denied", message: "Create an account to access your Profile!" },
-        "/home": { title: "Access Denied", message: "Create an account to access the Dashboard!" },
-      };
+    // Don't run redirect logic while fetching
+    if (isFetching) return;
 
-      const msg = messages[location.pathname] || { 
-        title: "Access Denied", 
-        message: "Create an account to access this page!" 
-      };
+    if (user?.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname)) {
+      if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        
+        // Show toast message for different protected routes
+        const messages: Record<string, { title: string; message: string }> = {
+          "/room": { title: "Access Denied", message: "Create an account to access Room Games!" },
+          "/profile": { title: "Access Denied", message: "Create an account to access your Profile!" },
+          "/home": { title: "Access Denied", message: "Create an account to access the Dashboard!" },
+        };
 
-      showMessage(msg.title, msg.message, {
-        type: "error",
-        position: "top-right",
-        duration: 4000,
-      });
-      
-      navigate("/", { replace: true });
+        const msg = messages[location.pathname] || { 
+          title: "Access Denied", 
+          message: "Create an account to access this page!" 
+        };
+
+        showMessage(msg.title, msg.message, {
+          type: "error",
+          position: "top-right",
+          duration: 4000,
+        });
+        
+        navigate("/", { replace: true });
+      }
     } else {
-      // Reset redirect flag when on allowed routes
+      // Reset redirect flag when user is authenticated or on allowed routes
       hasRedirected.current = false;
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, location.pathname, navigate, isFetching]);
 
-  // If redirecting, show nothing to prevent flash
-  if (!user || (user.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname))) {
+  // If redirecting or fetching, show nothing to prevent flash
+  if (!user || isFetching || (user.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname))) {
     return null;
   }
 

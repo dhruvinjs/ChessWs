@@ -32,8 +32,10 @@ export function useUserQuery() {
     },
     retry: false,
     staleTime: Infinity,
+    gcTime: Infinity, // Keep in cache forever
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
+    refetchOnMount: false, // ⚠️ Changed from true to false
+    refetchOnReconnect: false,
     // Ensure query never fails - always return data
     throwOnError: false,
   });

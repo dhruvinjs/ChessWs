@@ -5,6 +5,9 @@ import { authApis } from "../api/api";
 import { useNavigate } from "react-router-dom";
 import { User } from "../types/user";
 
+// Helper function to add delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   const nav = useNavigate();
@@ -22,11 +25,13 @@ export function useLoginMutation() {
         isGuest: false,
       };
       
-      // ✅ Update react-query cache and invalidate to trigger refetch
+      // ✅ Set the data
       queryClient.setQueryData(["user"], user);
-      await queryClient.invalidateQueries({ queryKey: ["user"] });
       
-      // ✅ Use replace to avoid back button issues
+      // ✅ Wait a tiny bit for React Query to sync (50ms is usually enough)
+      await sleep(50);
+      
+      // ✅ Navigate after sync
       nav("/home", { replace: true });
     },
     onError: (err: any) => {
@@ -52,11 +57,13 @@ export function useRegisterMutation() {
         isGuest: false,
       };
 
-      // ✅ Update react-query cache and invalidate to trigger refetch
+      // ✅ Set the data
       queryClient.setQueryData(["user"], user);
-      await queryClient.invalidateQueries({ queryKey: ["user"] });
       
-      // ✅ Use replace to avoid back button issues
+      // ✅ Wait a tiny bit for React Query to sync
+      await sleep(50);
+      
+      // ✅ Navigate after sync
       nav("/home", { replace: true });
     },
     onError: (err: any) => {
@@ -83,11 +90,16 @@ export function useLogoutMutation() {
       
       try {
         const guestData = await authApis.getOrCreateGuest();
-        queryClient.setQueryData(["user"], guestData.user || guestData);
-        // Redirect to landing page (not /home)
+        const guestUser = {
+          ...(guestData.user || guestData),
+          isGuest: true
+        };
+        queryClient.setQueryData(["user"], guestUser);
+        
+        // Small delay before redirect
+        await sleep(50);
         window.location.href = "/";
       } catch (error) {
-        // If guest creation fails, remove user data
         queryClient.removeQueries({ queryKey: ["user"] });
         window.location.href = "/";
       }
