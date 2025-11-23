@@ -6,3 +6,4 @@ export { About } from "./About";
 export { ChessGame } from "./ChessGame";
 export {Home}from './Home'
 export {NotFound} from './NotFound'
+export { ComputerChessPage } from './ComputerChessPage'

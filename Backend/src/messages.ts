@@ -8,7 +8,7 @@ export const GameMessages = {
   ACCEPT_DRAW: "accept_draw",
   REJECT_DRAW: "reject_draw",
   REQUEST_VALID_MOVES: "request_valid_moves",
-  
+
   // Server -> Client
   ASSIGN_ID: "assign_id",
   GAME_ACTIVE: "ongoing_game",
@@ -33,7 +33,22 @@ export const GameMessages = {
   NO_ACTIVE_GAMES: "no_active_games",
   DRAW_LIMIT_REACHED: "draw_limit_reached",
 } as const;
+export const ComputerGameMessages = {
+  //No Draw offers are there either you win or lose
+  COMPUTER_GAME_ACTIVE: "computer_game_started",
+  COMPUTER_GAME_OVER: "computer_game_over",
+  INIT_COMPUTER_GAME: "init_computer_game",
+  PLAYER_MOVE: "player_move",
+  PLAYER_QUIT: "player_quit",
+  PLAYER_WON: "player_won",
+  COMPUTER_WON: "computer_won",
+  COMPUTER_LOST: "computer_lost",
+  COMPUTER_MOVE: "computer_move",
+  NOT_YOUR_TURN:"not_your_turn",
+  PLAYER_CHECK:"player_check",
+  COMPUTER_CHECK:"computer_check"
 
+} as const
 export const RoomMessages = {
   // Client -> Server
   INIT_ROOM_GAME: "init_room_game",
@@ -41,7 +56,7 @@ export const RoomMessages = {
   LEAVE_ROOM: "leave_room",
   ROOM_CHAT: "room_chat",
   ROOM_LEAVE_GAME: "room_leave_game",
-  
+
   // Server -> Client
   ASSIGN_ID_FOR_ROOM: "assign_id_for_room",
   ROOM_GAME_ACTIVE: "room_game_active",

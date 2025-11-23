@@ -9,11 +9,11 @@ export function Home() {
 
   const options = [
     {
-      title: "Play with Bots",
-      description: "Train your skills against AI opponents at different difficulty levels.",
+      title: "Play vs Computer",
+      description: "Train your skills against AI opponents powered by Stockfish engine.",
       icon: <Cpu className="h-8 w-8 text-indigo-500 dark:text-amber-400" />,
       gradient: "from-indigo-500 to-purple-500",
-      onClick: () => nav("/bot"),
+      onClick: () => nav("/computer"),
     },
     {
       title: "Random Match",
@@ -64,9 +64,9 @@ export function Home() {
             </p>
             <Button
               variant="primary"
-              text="Start"
+              text={opt.title.includes("Computer") ? "🎮 Play Now" : "Start"}
               size="md"
-              className="w-full bg-gradient-to-r from-indigo-500 to-amber-500 hover:from-indigo-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-lg"
+              className="w-full bg-gradient-to-r from-indigo-500 to-amber-500 hover:from-indigo-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200"
               onClick={opt.onClick}
             />
           </motion.div>

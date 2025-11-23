@@ -407,7 +407,7 @@ export function calculateTime(lastMoveTime: number) {
 }
 
 export interface Move{
-    to:Square,from:Square,promotion?:PieceSymbol|null
+    to:string,from:string,promotion?:PieceSymbol|null
 }
 export type Moves=Move[]
 export async function provideValidMoves(gameId:string):Promise<Moves | null> {

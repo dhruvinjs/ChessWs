@@ -2,10 +2,9 @@ import dotenv from 'dotenv'
 dotenv.config({
    path:'./env'
 })
-import jwt from "jsonwebtoken"
 import cookieParser from "cookie-parser";
-import { WebSocketServer,WebSocket } from "ws";   
-import { gameManager, GameManager } from "./Classes/GameManager";
+import { WebSocketServer} from "ws";   
+import { gameManager } from "./Classes/GameManager";
 import { router  } from "./user-controller";
 import express from 'express'
 import http from 'http'
@@ -15,6 +14,7 @@ import { gameRouter } from './game-controllers';
 import { ErrorMessages } from './messages';
 import { redis } from './redisClient';
 import { roomManager } from './Classes/RoomManager';
+import { computerGameManager } from './Classes/ComputerGameManager';
 
 
 const port=process.env.PORT
@@ -50,6 +50,7 @@ wss.on("connection",async(socket,req:Request)=>{
    const id = typeof query.id === "string" ? query.id : undefined
    const userId = query.userId ? parseInt(query.userId as string) : undefined
    try {
+      //Room Path
       if(pathname === "/room"){
          if(!userId || isNaN(userId)){
             socket.send(JSON.stringify({
@@ -66,13 +67,32 @@ wss.on("connection",async(socket,req:Request)=>{
 
          socket.on("close", async () => {
         try {
-          await roomManager.handleDisconnection(userId, socket);
+          await roomManager.handleDisconnection(userId);
           console.log(`Room player ${userId} disconnected`);
         } catch (err) {
           console.error("Error handling room disconnect:", err);
         }
       });
+      } 
+      //Human vs Computer
+      else if(pathname === "/computer"){
+         if(!userId || isNaN(userId)){
+            if(!userId || isNaN(userId)){
+            socket.send(JSON.stringify({
+               type : ErrorMessages.NO_AUTH,
+               payload:{
+                  message:"No Valid User ID Provided for the room!"
+               }
+            }))
+            return
+         }
       }
+
+      console.log("computer ws-server connection: ",userId)
+      computerGameManager.addForComputerGame(userId,socket)
+
+      }
+      //Quick Guest Match
       else if(pathname === "/guest" ){
          if(!id){
             socket.send(JSON.stringify({

@@ -8,40 +8,21 @@
     import { useUserQuery } from "./hooks/useUserQuery"; 
     import { LoadingScreen } from "./Components/LoadingScreen";
 import { RoomChessPage } from "./Pages/RoomChessPage";
+import { ComputerChessPage } from "./Pages/ComputerChessPage";
 import { useAppSetup } from "./hooks/useAppTheme";
 
     export function App() {
       useAppSetup()
-      const { data: user, isLoading, isError, error } = useUserQuery();
+      const { isLoading } = useUserQuery();
 
-      // ✅ Don't auto-connect here - let individual game pages handle their own connections
-      // This prevents conflicts between guest mode and room mode connections
-
-      if (isLoading) return <LoadingScreen />;
-
-      if (isError) {
-        return (
-          <div
-            className="flex flex-col items-center justify-center h-screen gap-4 
-                      bg-gradient-to-b from-slate-50 to-white 
-                      dark:from-slate-900 dark:to-slate-800 
-                      border-t border-slate-200 dark:border-slate-700"
-          >
-            <p className="text-slate-800 dark:text-slate-100 text-lg font-semibold">
-              Error fetching user: {error?.message || "Unknown error"}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 
-                        text-white font-medium transition-colors duration-150"
-            >
-              Retry
-            </button>
-          </div>
-        );
+      // ✅ Show loading screen while fetching user data
+      if (isLoading) {
+        return <LoadingScreen />;
       }
 
-      if (!user) return <LoadingScreen />;
+      // ✅ If there's an error OR no user data, still render the app
+      // The layouts will handle authentication and redirects
+      // This prevents white screen for unauthorized users
 
       return (
         <BrowserRouter>
@@ -61,6 +42,7 @@ import { useAppSetup } from "./hooks/useAppTheme";
               <Route path="/game" element={<ChessGame />} />
               <Route path="/room" element={<Room />} />
               <Route path="/room/:roomId" element={<RoomChessPage />} />
+              <Route path="/computer" element={<ComputerChessPage />} />
             </Route>
 
 

@@ -26,6 +26,7 @@ interface RestoredGameState {
   status: string;
   chat: string[];
   capturedPieces: string[];
+  roomCode: string;
 }
 
 class RoomManager {
@@ -36,7 +37,7 @@ class RoomManager {
   
   async addRoomUser(userId: number, userSocket: WebSocket) {
     this.roomSocketManager.set(userId, userSocket);
-    this.addHandlerForRoom(userId, userSocket);
+    this.messageHandlerForRoom(userId, userSocket);
 
     userSocket.send(
       JSON.stringify({
@@ -272,7 +273,35 @@ class RoomManager {
       const loserSocket = this.roomSocketManager.get(loserId);
 
       const moves = game.moves ? JSON.parse(game.moves) : [];
+      const roomCode = game.roomCode;
       
+      if (!roomCode) {
+        console.error(`[handleRoomTimeExpired] Room code not found in Redis for game ${gameId}`);
+        
+        // Still notify clients even if room code not found
+        const errorMessage = JSON.stringify({
+          type: RoomMessages.ROOM_GAME_OVER,
+          payload: {
+            result: "error",
+            reason: "ROOM_CODE_MISSING",
+            message: "Game ended due to time, but room data is missing",
+            gameId: gameId
+          },
+        });
+        
+        winnerSocket?.send(errorMessage);
+        loserSocket?.send(errorMessage);
+        
+        // Clean up Redis anyway
+        await redis.del(`user:${winnerId}:room-game`);
+        await redis.del(`user:${loserId}:room-game`);
+        await redis.del(`room-game:${gameId}`);
+        await redis.sRem("room-active-games", gameId);
+        
+        return;
+      }
+
+      // Use roomCode directly - much simpler!
       await pc.$transaction([
         pc.game.update({
           where: { id: Number(gameId) },
@@ -287,16 +316,17 @@ class RoomManager {
             lastMoveAt: new Date(),
             lastMoveBy: whiteTimer <= 0 ? "w" : "b",
             endedAt: new Date(),
+            status: "FINISHED"
           },
         }),
 
         pc.room.update({
-          where: { gameId: Number(gameId) },
+          where: { code: roomCode },
           data: { status: "FINISHED" },
         }),
       ]);
 
-      // Clean up Redis entries for finished game
+   
       await redis.del(`user:${winnerId}:room-game`);
       await redis.del(`user:${loserId}:room-game`);
       await redis.hSet(`room-game:${gameId}`, {
@@ -331,12 +361,43 @@ class RoomManager {
 
       winnerSocket?.send(winnerMessage);
       loserSocket?.send(loserMessage);
+      
     } catch (error) {
-      console.log("Error handling time expiration:", error);
+      console.error("[handleRoomTimeExpired] Error handling time expiration:", error);
+      
+      // Get user IDs from game data
+      const user1Id = Number(game.user1);
+      const user2Id = Number(game.user2);
+      const socket1 = this.roomSocketManager.get(user1Id);
+      const socket2 = this.roomSocketManager.get(user2Id);
+      
+      // Notify both players of the error
+      const errorMessage = JSON.stringify({
+        type: RoomMessages.ROOM_GAME_OVER,
+        payload: {
+          result: "error",
+          reason: "TIME_HANDLER_ERROR",
+          message: "Game ended due to time, but there was an error processing the result. Please refresh.",
+          gameId: gameId
+        },
+      });
+      
+      socket1?.send(errorMessage);
+      socket2?.send(errorMessage);
+      
+      // Try to clean up Redis even if DB transaction failed
+      try {
+        await redis.del(`user:${user1Id}:room-game`);
+        await redis.del(`user:${user2Id}:room-game`);
+        await redis.del(`room-game:${gameId}`);
+        await redis.sRem("room-active-games", gameId);
+      } catch (redisError) {
+        console.error("[handleRoomTimeExpired] Redis cleanup failed:", redisError);
+      }
     }
   }
 
-  async addHandlerForRoom(userId: number, userSocket: WebSocket) {
+  async messageHandlerForRoom(userId: number, userSocket: WebSocket) {
     userSocket.on("message", async (message: string) => {
       const msg = JSON.parse(message);
       const { type, payload } = msg;
@@ -355,9 +416,9 @@ class RoomManager {
       if (type === RoomMessages.INIT_ROOM_GAME) {
         const chess = new Chess();
         
-        const { roomId } = msg.payload;
+        const { roomCode} = msg.payload;
         const room = await pc.room.findUnique({
-          where: { code: roomId },
+          where: { code: roomCode },
           select: { id: true, createdById: true, joinedById: true, game: true }
         });
         
@@ -401,18 +462,19 @@ class RoomManager {
             data: {
               moves: [],
               currentFen: chess.fen(),
-              roomId: roomId,
+              roomId: room.id,
               blackTimeLeft: 600,
               whiteTimeLeft: 30,
               lastMoveAt: new Date(),
               type: "ROOM",
+              status:"ACTIVE"
             },
             select: { id: true },
           });
 
           await tx.room.update({
-            where: { code: roomId },
-            data: { gameId: game.id, status: "ACTIVE" },
+            where: { id: room.id },
+            data: { status: "ACTIVE" },
           });
 
           return game;
@@ -431,6 +493,7 @@ class RoomManager {
             whiteTimer: '600',
             blackTimer: '600',
             moveCount: '0',
+            roomCode: roomCode
           })
           .setEx(`user:${creatorId}:room-game`, 86400, gameId.toString())
           .setEx(`user:${joinerId}:room-game`, 86400, gameId.toString())
@@ -693,6 +756,7 @@ class RoomManager {
         whiteTimer: whiteTimeLeft.toString(),
         blackTimer: blackTimeLeft.toString(),
         moveCount: movesCountStr,
+        roomCode: gameFromDB.room.code
       });
       
       if (movesArray.length > 0) {
@@ -730,7 +794,8 @@ class RoomManager {
         moveCount: movesArray.length,
         status: RoomMessages.ROOM_GAME_ACTIVE,
         chat: chatArray,
-        capturedPieces: gameFromDB.capturedPieces || []
+        capturedPieces: gameFromDB.capturedPieces || [],
+        roomCode: gameFromDB.room.code
       };
     } catch (error) {
       console.error("Failed to restore game from DB:", error);
@@ -738,7 +803,7 @@ class RoomManager {
     }
   }
 
-  async handleDisconnection(userId: number, userSocket: WebSocket) {
+  async handleDisconnection(userId: number) {
     try {
       this.roomSocketManager.delete(userId);
 

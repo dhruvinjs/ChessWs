@@ -34,8 +34,9 @@ export async function getRoomGameState(gameId: number) {
     moves: moves,
     moveCount: Number(gameExists.moveCount),
     status: gameExists.status,
-    chat: chat,  // FIX: Return actual chat array
-    capturedPieces: capturedPieces  // Include captured pieces
+    chat: chat,
+    capturedPieces: capturedPieces,
+    roomCode: gameExists.roomCode
   };
 }
 
@@ -79,11 +80,11 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         await redis.rPush(`room-game:${gameId}:moves`, JSON.stringify(move));
         await redis.hSet(`room-game:${gameId}`, "fen", chess.fen());
         
-        // Handle captured pieces
+      
         if (boardMove.captured) {
             const capturedColor = boardMove.color === "b" ? "w" : "b";
-            const pieceCaptured = boardMove.captured.toUpperCase(); // p => P
-            const capturedCode = `${capturedColor}${pieceCaptured}`;
+            const pieceCaptured = boardMove.captured.toUpperCase(); // p => P, k=> K 
+            const capturedCode = `${capturedColor}${pieceCaptured}`; //bK=> for frontend display of piece
             capturedPiece = capturedCode;
 
             await redis.rPush(
@@ -152,7 +153,7 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         const finalChatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
         const finalChat = finalChatRaw.map(c => JSON.parse(c));
         const finalCapturedPieces = await redis.lRange(`room-game:${gameId}:capturedPieces`, 0, -1);
-        
+          
           await pc.$transaction([
             pc.game.update({
               where: { id: gameId },
@@ -164,18 +165,18 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
                 moves: finalMoves,
                 chat: finalChat,
                 capturedPieces: finalCapturedPieces,
-                currentFen: chess.fen()
+                currentFen: chess.fen(),
+                status: "FINISHED"
               },
             }),
             pc.room.update({
-              where: { gameId },
+              where: { code: existingGame.roomCode },
               data: {
                 status: "FINISHED",
-
               },
             }),
         ]);
-        // --- Construct clear payloads ---
+       
         const winnerMessage = JSON.stringify({
             type: RoomMessages.ROOM_GAME_OVER,
             payload: {
@@ -287,21 +288,27 @@ export async function handleRoomDraw(
     });
     await redis.sRem(`room-active-games`,gameId.toString())
     await redis.expire(`room-game:${gameId}`, 86400);
+    
+    // Get roomCode from Redis for DB update
+    const gameData = await redis.hGetAll(`room-game:${gameId}`) as Record<string, string>;
+    const roomCode = gameData.roomCode as string;
+    
     await pc.$transaction([
       pc.game.update({
         where:{id:gameId},
         data:{
-          draw:true
+          draw:true,
+          status:"FINISHED"
         }
       }),
       pc.room.update({
-        where:{gameId},
+        where:{code: roomCode},
         data:{
           status:"FINISHED",
           updatedAt:new Date()
         }
       })
-    ])
+    ]);
     console.log(`GameDraw ${gameId}: ${reason}`);
   } catch (error) {
     console.error(`Error handling draw for game ${gameId}:`, error);
@@ -324,12 +331,9 @@ export async function handleRoomReconnection(userId:number, userSocket:WebSocket
     const chatArr=existingGame.chat ? existingGame.chat : []
     await redis.sAdd("room-active-games", gameId.toString());
 
-    // Get room info to determine host status (exclude finished/cancelled rooms)
-    const room = await pc.room.findFirst({
-        where: { 
-            gameId: gameId,
-            status: { notIn: ["FINISHED", "CANCELLED"] }
-        },
+    // Get room info using roomCode from existingGame
+    const room = await pc.room.findUnique({
+        where: { code: existingGame.roomCode },
         include: {
             createdBy: { select: { id: true, name: true } },
             joinedBy: { select: { id: true, name: true } }
@@ -357,8 +361,7 @@ export async function handleRoomReconnection(userId:number, userSocket:WebSocket
             count: existingGame.moveCount,
             chat: chatArr,
             capturedPieces: existingGame.capturedPieces || [],
-            // Add room context for proper state sync
-            roomCode: room?.code,
+            roomCode: existingGame.roomCode,
             isCreator: isCreator,
             opponentId: opponentId,
             opponentName: opponentInfo?.name || null,
@@ -426,7 +429,7 @@ export function validatePayload(type:string,payload:any):string | null{
     }
     switch(type){
         case RoomMessages.INIT_ROOM_GAME:
-            if (!payload.roomId) return "Missing roomId";
+            if (!payload.roomCode) return "Missing roomCode";
             break;
         case RoomMessages.ROOM_RECONNECT:
             if(!payload.roomGameId) return "Missing GameId";
@@ -462,7 +465,7 @@ export async function handleRoomGameLeave(
     // --- Fetch room and game details (exclude finished/cancelled rooms) ---
     const room = await pc.room.findFirst({
       where: { 
-        gameId,
+        game: { id: gameId },
         status: { notIn: ["FINISHED", "CANCELLED"] }
       },
       include: { game: true },
@@ -662,7 +665,8 @@ else if(room.status === "FULL" && isJoiner){
 
 
     } catch (error) {
-        
+        console.log("error in room game leave method: ",error)
+        return null
     }
 }
 
@@ -724,8 +728,7 @@ export async function resetCancelledRoom(roomCode: string, newCreatorId: number)
       data: {
         status: "WAITING",
         createdById: newCreatorId,
-        joinedById: null,
-        gameId: null
+        joinedById: null
       }
     });
 

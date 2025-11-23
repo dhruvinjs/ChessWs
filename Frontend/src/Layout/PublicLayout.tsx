@@ -5,44 +5,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "../Components/Navbar";
 import { useUserQuery } from "../hooks/useUserQuery";
 import { LoadingScreen } from "../Components/LoadingScreen";
-import { showMessage } from "../Components/ToastMessages";
 
 export function PublicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: user, isLoading, error } = useUserQuery();
+  const { data: user, isLoading } = useUserQuery();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Check if user should be redirected (before any rendering)
   const publicPages = ["/", "/login", "/register", "/about"];
   const shouldRedirect = user && !user.isGuest && publicPages.includes(location.pathname);
-
-  // Handle expired token edge case
-  useEffect(() => {
-    if (error) {
-      // Check if it's an authentication error
-      const isAuthError = error?.message?.includes('401') || 
-                         error?.message?.includes('403') ||
-                         error?.message?.includes('token') ||
-                         error?.message?.includes('expired');
-      
-      if (isAuthError && !location.pathname.includes('/login')) {
-        showMessage(
-          "Session Expired", 
-          "Your session has expired. Please login again to continue.", 
-          { type: "warning", duration: 6000 }
-        );
-        
-        // Clear expired cookie
-        document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-        
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          navigate("/login", { replace: true });
-        }, 2000);
-      }
-    }
-  }, [error, location.pathname, navigate]);
 
   // ✅ Redirect authenticated (non-guest) users away from all public pages
   useEffect(() => {

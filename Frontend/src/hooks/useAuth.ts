@@ -11,7 +11,7 @@ export function useLoginMutation() {
 
   return useMutation({
     mutationFn: authApis.login,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(data.message || "Login successful");
 
       const user: User = {
@@ -21,10 +21,13 @@ export function useLoginMutation() {
         email: data.email,
         isGuest: false,
       };
-      // console.log(data);
-      // ✅ Update react-query cache
+      
+      // ✅ Update react-query cache and invalidate to trigger refetch
       queryClient.setQueryData(["user"], user);
-      nav("/home");
+      await queryClient.invalidateQueries({ queryKey: ["user"] });
+      
+      // ✅ Use replace to avoid back button issues
+      nav("/home", { replace: true });
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message || err.message || "Login failed");
@@ -38,7 +41,7 @@ export function useRegisterMutation() {
 
   return useMutation({
     mutationFn: authApis.register,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(data.message || "Registration successful");
 
       const user: User = {
@@ -49,9 +52,12 @@ export function useRegisterMutation() {
         isGuest: false,
       };
 
-      // ✅ Update react-query cache
+      // ✅ Update react-query cache and invalidate to trigger refetch
       queryClient.setQueryData(["user"], user);
-      nav("/home");
+      await queryClient.invalidateQueries({ queryKey: ["user"] });
+      
+      // ✅ Use replace to avoid back button issues
+      nav("/home", { replace: true });
     },
     onError: (err: any) => {
       // Handle Zod validation errors specifically

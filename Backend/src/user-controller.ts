@@ -311,7 +311,6 @@ router.post("/room/create", authMiddleware, async (req: Request, res: Response) 
         status: "WAITING",
         createdById: userId,
         joinedById: null,
-        gameId: null
       }
     });
       roomId = cancelledRoom.code;
@@ -361,10 +360,12 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
             
             }
         })
+
         if(!room){
             res.status(404).json({message: "Room does not exist or roomId is incorrect",success:false})
             return
         }
+       
        if (room.createdById === Number(userId)) {
             res.status(200).json({ 
                 success: true,
@@ -377,7 +378,6 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
                     currentUserId: userId,
                     opponentId: room.joinedById,
                     opponentName: room.joinedBy?.name || null,
-                    gameId: room.gameId,
                     createdBy: room.createdBy,
                     joinedBy: room.joinedBy
                 }
@@ -395,7 +395,6 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
               isCreator:false,
               opponentId:room.createdById,
               opponentName:room.createdBy.name,
-              gameId: room.gameId,
               createdBy: room.createdBy,
               joinedBy: room.joinedBy
             }
@@ -443,7 +442,6 @@ router.post('/room/join',authMiddleware,async(req:Request,res:Response)=>{
                 currentUserId: userId,
                 opponentId: updatedRoom.createdById,
                 opponentName: updatedRoom.createdBy.name,
-                gameId: updatedRoom.gameId,
                 createdBy: updatedRoom.createdBy,
                 joinedBy: updatedRoom.joinedBy
             }
@@ -518,8 +516,7 @@ router.patch('/room/:roomId/status',async (req:Request,res:Response) => {
   }
   await pc.room.update({where:{id:room.id},data:{
     status:"CANCELLED",
-    joinedById:null,
-    gameId:null
+    joinedById:null
   }})
   res.status(200).json({success:true,message:"Room Is cancelled successfully"})
   return
