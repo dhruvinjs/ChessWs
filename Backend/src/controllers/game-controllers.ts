@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express'
-import {v4 as uuidv4} from "uuid"
-import { getGamesCount } from './Services/GameServices'
+// import {v4 as uuidv4} from "uuid"
+import { getGamesCount } from '../Services/GameServices'
 const gameRouter=express.Router()
 
 gameRouter.get('/guest-games/total',async(req:Request,res:Response)=>{

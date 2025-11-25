@@ -1,7 +1,8 @@
 import { WebSocket } from 'ws';
-import {GameMessages,ErrorMessages} from '../messages';
-import { redis } from '../redisClient';
+import {GameMessages,ErrorMessages} from '../utils/messages';
+import { redis } from '../clients/redisClient';
 import { Chess, PieceSymbol, Square } from 'chess.js';
+import provideValidMoves from '../utils/chessUtils';
 import { gameManager } from '../Classes/GameManager';
 
 //This Method Will Help To return the gameState to reconnected player
@@ -366,8 +367,7 @@ export async function playerLeft(
     },
   };
 
-  // ✅ CRITICAL FIX: Use individual hSet calls in transaction
-  // Object syntax doesn't work properly in Redis MULTI
+
   try {
     await redis
       .multi()
@@ -410,26 +410,7 @@ export interface Move{
     to:string,from:string,promotion?:PieceSymbol|null
 }
 export type Moves=Move[]
-export async function provideValidMoves(gameId:string):Promise<Moves | null> {
-        const gameState=await getGameState(gameId)
-        if(!gameState?.fen){
-            console.log("Fen Missing in Game State IN provideMove")
-            return null
-        }   
-        const chess=new Chess(gameState.fen)
 
-        const moves=chess.moves({ verbose: true }); 
-        // console.log(moves)
-        const validMoves=moves.map(m=>({
-            from:m.from,
-            to:m.to,
-            promotion:m.promotion ?? null
-        }))
-
-
-        return validMoves
-
-}
 
 export async function offerDraw(playerId:string,gameId:string,offerSenderSocket:WebSocket,socketMap:Map<string,WebSocket>) {
     const game=await getGameState(gameId)

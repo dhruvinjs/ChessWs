@@ -1,8 +1,8 @@
 import WebSocket from "ws";
-import { GameMessages, RoomMessages, ErrorMessages } from "../messages";
+import { GameMessages, RoomMessages, ErrorMessages } from "../utils/messages";
 import { Chess } from "chess.js";
-import { redis } from "../redisClient";
-import pc from "../prismaClient";
+import { redis } from "../clients/redisClient";
+import pc from "../clients/prismaClient";
 import { handleRoomChat, 
   handleRoomGameLeave, 
   handleRoomLeave, 
@@ -12,7 +12,8 @@ import { handleRoomChat,
   handleRoomDrawOffer,
   handleRoomDrawAcceptance,
   handleRoomDrawRejection,
-  provideRoomValidMoves } from "../Services/RoomGameServices";
+  } from "../Services/RoomGameServices";
+import provideValidMoves from "../utils/chessUtils";
 
 
 interface RestoredGameState {
@@ -481,7 +482,7 @@ class RoomManager {
         });
         
         const gameId = newGame.id;
-        const moves = await provideRoomValidMoves(chess.fen());
+        const moves = provideValidMoves(chess.fen());
         
         await redis
           .multi()

@@ -35,7 +35,7 @@ export const GameMessages = {
 } as const;
 export const ComputerGameMessages = {
   //No Draw offers are there either you win or lose
-  COMPUTER_GAME_ACTIVE: "computer_game_started",
+  COMPUTER_GAME_ACTIVE: "computer_game_actives",
   COMPUTER_GAME_OVER: "computer_game_over",
   INIT_COMPUTER_GAME: "init_computer_game",
   PLAYER_MOVE: "player_move",
@@ -46,8 +46,8 @@ export const ComputerGameMessages = {
   COMPUTER_MOVE: "computer_move",
   NOT_YOUR_TURN:"not_your_turn",
   PLAYER_CHECK:"player_check",
-  COMPUTER_CHECK:"computer_check"
-
+  COMPUTER_CHECK:"computer_check",
+  EXISTING_COMPUTER_GAME:"existing_computer_game"
 } as const
 export const RoomMessages = {
   // Client -> Server

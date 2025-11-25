@@ -1,10 +1,11 @@
 import { Chess } from "chess.js";
-import pc from "../prismaClient";
-import { redis } from "../redisClient";
+import pc from "../clients/prismaClient";
+import { redis } from "../clients/redisClient";
 import { Move } from "./GameServices";
 import { roomManager } from "../Classes/RoomManager";
 import { WebSocket } from "ws";
-import {ErrorMessages, GameMessages,RoomMessages}from "../messages"
+import {ErrorMessages, GameMessages,RoomMessages}from "../utils/messages"
+import provideValidMoves from "../utils/chessUtils";
 
 export async function getRoomGameState(gameId: number) {
   const gameExists = await redis.hGetAll(`room-game:${gameId}`) as Record<string, string>;
@@ -207,7 +208,7 @@ export async function handleRoomMove(userId:Number,userSocket:WebSocket,move:Mov
         return;
     }
     
-    const validMoves= await provideRoomValidMoves(chess.fen())
+    const validMoves= provideValidMoves(chess.fen())
     
         const oppPayload={
                     type: RoomMessages.ROOM_MOVE,
@@ -670,19 +671,7 @@ else if(room.status === "FULL" && isJoiner){
     }
 }
 
-export async function provideRoomValidMoves(fen:string) {
-            const chess=new Chess(fen)
-            const moves=chess.moves({ verbose: true }); 
-        // console.log(moves)
-            const validMoves=moves.map(m=>({
-                from:m.from,
-                to:m.to,
-                promotion:m.promotion ?? null
-            }))
 
-
-            return validMoves
-}
 
 
 async function saveGameProgress(gameId:number,game:Record<string,string>,currentFen:string,lastMoveBy:'w'|'b'){

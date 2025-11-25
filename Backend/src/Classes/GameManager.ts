@@ -1,10 +1,11 @@
 import {v4 as uuidv4} from "uuid"
-import { redis } from "../redisClient"
+import { redis } from "../clients/redisClient"
 import { WebSocket } from "ws"
-import { GameMessages, ErrorMessages } from "../messages";
-import { acceptDraw,  getGameState, makeMove, offerDraw, playerLeft, provideValidMoves, reconnectPlayer, rejectDraw } from "../Services/GameServices"
+import { GameMessages, ErrorMessages } from "../utils/messages";
+import { acceptDraw,  getGameState, makeMove, offerDraw, playerLeft,  reconnectPlayer, rejectDraw } from "../Services/GameServices"
 import { insertPlayerInQueue, matchingPlayer } from "../Services/MatchMaking"
 import { Chess } from "chess.js"
+import provideValidMoves from "../utils/chessUtils";
 export class GameManager{
     private socketMap:Map<string,WebSocket>=new Map()
     private globalSetInterval:NodeJS.Timeout | null = null
@@ -226,7 +227,7 @@ export class GameManager{
                 .exec();
 
             // Precompute valid moves
-            const moves = await provideValidMoves(newGameId);
+            const moves = provideValidMoves(chess.fen());
 
             console.log("New game started:", newGameId);
 

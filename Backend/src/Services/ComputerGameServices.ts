@@ -1,12 +1,13 @@
 import path from "path";
 import { computerGameManager } from "../Classes/ComputerGameManager";
-import { ComputerGameMessages, ErrorMessages } from "../messages";
-import { redis } from "../redisClient";
+import { ComputerGameMessages, ErrorMessages } from "../utils/messages";
+import { redis } from "../clients/redisClient";
 import { Move } from "./GameServices";
 import {spawn} from "child_process"
 import { WebSocket } from "ws";
 import { Chess } from "chess.js";
-import pc from "../prismaClient";
+import pc from "../clients/prismaClient";
+import provideValidMoves from "../utils/chessUtils";
 // this are the depthLevels according to which the computer will calculate the best-move
 const ComputerGameLevels:Record<string,number>={
   "EASY":3,
@@ -16,7 +17,8 @@ const ComputerGameLevels:Record<string,number>={
 // Use path relative to project root, not dist folder
 const stockfish_path=path.join(process.cwd(),"bin","stockfish")
 
-function getComputerMove(fen:string,depth:number):Promise<Move>{
+export function getComputerMove(fen:string,difficulty:string):Promise<Move>{
+  const depthLevel=ComputerGameLevels[difficulty.toUpperCase()]
   return new Promise((resolve,reject)=>{
 
     const engine=spawn(stockfish_path);
@@ -56,7 +58,7 @@ function getComputerMove(fen:string,depth:number):Promise<Move>{
 
     engine.stdin.write(`uci\n`)
     engine.stdin.write(`position fen ${fen}\n`)
-    engine.stdin.write(`go depth ${depth}\n`)
+    engine.stdin.write(`go depth ${depthLevel}\n`)
 
 
   })
@@ -167,9 +169,6 @@ export  async function handlePlayerMove(userId:number,userSocket:WebSocket,compu
               return;
             }
             
-            // Don't send player move confirmation - player already knows their move
-            // Valid moves will be sent with computer's move
-
             // Check if player put computer in check
             if(board.isCheck()){
               userSocket.send(JSON.stringify({
@@ -234,13 +233,9 @@ export  async function handlePlayerMove(userId:number,userSocket:WebSocket,compu
                 }))
                 return
               }
-              const depthLevel = ComputerGameLevels[gameState.difficulty.toUpperCase()]
-              console.log(`[ComputerGame] Getting computer move at depth ${depthLevel}`);
-              const computerMove:Move = await getComputerMove(board.fen(), depthLevel);
+              const computerMove:Move = await getComputerMove(board.fen(), gameState.difficulty);
               console.log(`[ComputerGame] Computer move calculated:`, computerMove);
               await handleComputerMove(userSocket, computerMove, computerGameId, userId)
-
-
 
 }
 export async function handleComputerMove(userSocket:WebSocket,move:Move,computerGameId:number,userId:number) {
@@ -288,7 +283,7 @@ export async function handleComputerMove(userSocket:WebSocket,move:Move,computer
             }
             
             // Calculate valid moves for player after computer's move (it's now player's turn)
-            const validMovesAfterComputerMove = await provideComputerValidMoves(board.fen());
+            const validMovesAfterComputerMove = provideValidMoves(board.fen());
             
             // Send computer move confirmation
             console.log(`[ComputerGame] Sending computer move to client`);
@@ -497,17 +492,4 @@ try {
 }
 
 
-}
-
-export async function provideComputerValidMoves(fen: string) {
-  const chess = new Chess(fen);
-  const moves = chess.moves({ verbose: true });
-  
-  const validMoves = moves.map(m => ({
-    from: m.from,
-    to: m.to,
-    promotion: m.promotion ?? null
-  }));
-  
-  return validMoves;
 }

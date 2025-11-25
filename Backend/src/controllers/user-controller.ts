@@ -1,16 +1,15 @@
 import express, { Request, Response } from 'express'
-
 import bcrypt from 'bcrypt'
 import { z } from "zod";
 import jwt from 'jsonwebtoken'
 import {v4 as uuidv4} from "uuid"
-import pc  from './prismaClient';
-import { authMiddleware } from './middleware';
+import pc  from '../clients/prismaClient';
+import { authMiddleware } from '../middleware';
 const router=express.Router()
 import {nanoid } from 'nanoid';
-import { redis } from './redisClient';
-import { roomManager } from './Classes/RoomManager';
-// import { verifyCookie } from './Services/GameServices';
+import { redis } from '../clients/redisClient';
+import { roomManager } from '../Classes/RoomManager';
+
 export enum ChessLevel {
   BEGINNER,
   INTERMEDIATE,
@@ -528,6 +527,9 @@ router.patch('/room/:roomId/status',async (req:Request,res:Response) => {
      });
   }
 })
+
+// router.patch()
+
 
 
 export {router}

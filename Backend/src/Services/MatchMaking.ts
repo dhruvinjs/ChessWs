@@ -1,6 +1,5 @@
-import { WebSocket } from 'ws';
-import {redis} from '../redisClient'
-import { Chess } from 'chess.js';
+import {redis} from '../clients/redisClient'
+
 
 const MATCHMAKING_KEY = process.env.MATCHMAKING_KEY || 'matchmaking:queue';
 

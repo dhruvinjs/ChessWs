@@ -3,18 +3,21 @@ dotenv.config({
    path:'./env'
 })
 import cookieParser from "cookie-parser";
-import { WebSocketServer} from "ws";   
+import {  WebSocketServer} from "ws";   
 import { gameManager } from "./Classes/GameManager";
-import { router  } from "./user-controller";
-import express from 'express'
+import { router  } from "./controllers/user-controller";
+import express, { Request } from 'express'
 import http from 'http'
 import cors from 'cors'
 import { parse } from "url";
-import { gameRouter } from './game-controllers';
-import { ErrorMessages } from './messages';
-import { redis } from './redisClient';
+import { gameRouter } from './controllers/game-controllers';
+import { ErrorMessages } from './utils/messages';
+import { redis } from './clients/redisClient';
 import { roomManager } from './Classes/RoomManager';
 import { computerGameManager } from './Classes/ComputerGameManager';
+import jwt from 'jsonwebtoken';
+import * as cookie from "cookie";
+
 
 
 const port=process.env.PORT
@@ -24,7 +27,7 @@ app.use(cookieParser());
 app.use(express.json()); 
 const server = http.createServer(app);
 
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer:true });
 
 
 app.use(cors({
@@ -40,109 +43,164 @@ const userRoutes=router
 app.use('/api/v1/user',userRoutes)
 app.use('/api/v1/game',gameRouter)
 
-
-
-wss.on("connection",async(socket,req:Request)=>{
-
-   const {pathname,query}=parse(req.url,true)
-
-
-   const id = typeof query.id === "string" ? query.id : undefined
-   const userId = query.userId ? parseInt(query.userId as string) : undefined
-   try {
-      //Room Path
-      if(pathname === "/room"){
-         if(!userId || isNaN(userId)){
-            socket.send(JSON.stringify({
-               type : ErrorMessages.NO_AUTH,
-               payload:{
-                  message:"No Valid User ID Provided for the room!"
-               }
-            }))
-            return
-         }
-   
-         console.log("Successful connection of auth user: ",userId);
-         roomManager.addRoomUser(userId,socket)
-
-         socket.on("close", async () => {
-        try {
-          await roomManager.handleDisconnection(userId);
-          console.log(`Room player ${userId} disconnected`);
-        } catch (err) {
-          console.error("Error handling room disconnect:", err);
+// Simple cookie parser for WebSocket upgrade
+function getCookieValue(cookieString: string, cookieName: string): string | null {
+    if (!cookieString) return null;
+    
+    const cookies = cookieString.split(';');
+    for (const cookie of cookies) {
+        const [name, ...valueParts] = cookie.split('=');
+        if (name.trim() === cookieName) {
+            return valueParts.join('=').trim();
         }
-      });
-      } 
-      //Human vs Computer
-      else if(pathname === "/computer"){
-         if(!userId || isNaN(userId)){
-            if(!userId || isNaN(userId)){
-            socket.send(JSON.stringify({
-               type : ErrorMessages.NO_AUTH,
-               payload:{
-                  message:"No Valid User ID Provided for the room!"
-               }
-            }))
-            return
-         }
-      }
+    }
+    return null;
+}
 
-      console.log("computer ws-server connection: ",userId)
-      computerGameManager.addForComputerGame(userId,socket)
-
-      }
-      //Quick Guest Match
-      else if(pathname === "/guest" ){
-         if(!id){
-            socket.send(JSON.stringify({
-               type:ErrorMessages.NO_AUTH,
-               payload:{
-                  message:"No Id Provided for the guest!"
-               }
-            }))
-            return
-         }
-
-
-         const verifiedId=await redis.exists(`guest:${id}`)
-         if(verifiedId){
-            gameManager.addUser(socket,id)
-            socket.on("close",()=>gameManager.handleDisconnection(id || "unknown"))
-            return
-         }
-         else{
-            socket.send(JSON.stringify({
-               message:ErrorMessages.INVALID_AUTH,
-               payload:{
-                  message:"Invalid Guest Id"
-               }
-            }))
-           socket.close()
-           return
-         }
-      }
-         
-         
-         
-
-   } catch (error) {
-      console.log("Invalid Auth Error: ",error)
-      socket.send(JSON.stringify({
-         type:ErrorMessages.INVALID_AUTH,
-         payload:{
-            message:"Invalid Auth Provided"
-         }
-      }))
-      
-      socket.close()
-   }
+server.on("upgrade", (req, socket, head) => {
+    try {
+        const cookieHeader = req.headers['cookie'];
+        
+        console.log("=== WebSocket Upgrade Request ===");
+        console.log("Cookie Header:", cookieHeader);
+        
+        if (!cookieHeader) {
+            console.log("❌ No cookie header found");
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+        
+        // Extract token from cookies
+     const cookies = cookie.parse(cookieHeader);
+     const token = cookies.token;
+        console.log("Extracted Token:", token ? "Found" : "Not Found");
+        
+        if (!token) {
+            console.log("❌ No token cookie found");
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+        
+        // Verify JWT
+        let decodedToken;
+        try {
+            decodedToken = jwt.verify(token, process.env.SECRET_TOKEN!) as { id: number };
+            console.log("✅ Token verified for user:", decodedToken.id);
+        } catch (jwtError) {
+            console.log("❌ JWT verification failed:", jwtError);
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+        
+        // Attach userId to request
+        //@ts-ignore
+        req.userId = decodedToken.id;
+        
+        // Complete the WebSocket upgrade
+        wss.handleUpgrade(req, socket, head, (ws) => {
+            //@ts-ignore
+            ws.userId = decodedToken.id;
+            wss.emit("connection", ws, req);
+        });
+        
+    } catch (error) {
+        console.error("❌ WebSocket upgrade error:", error);
+        socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+        socket.destroy();
+    }
+});
 
 
+wss.on("connection", async (socket, req: Request) => {
+    const { pathname, query } = parse(req.url, true);
 
+    // userId now ALWAYS COMES FROM JWT COOKIE
+    //@ts-ignore
+    const userId = socket.userId;
+    
+    console.log(`=== WebSocket Connected ===`);
+    console.log(`Path: ${pathname}`);
+    console.log(`User ID: ${userId}`);
 
+    try {
+        // Room
+        if (pathname === "/room") {
+            if (!userId) {
+                socket.send(JSON.stringify({
+                    type: ErrorMessages.NO_AUTH,
+                    payload: { message: "User not authenticated!" }
+                }));
+                socket.close();
+                return;
+            }
 
-})
+            console.log("Room authenticated user:", userId);
+            roomManager.addRoomUser(userId, socket);
+
+            socket.on("close", async () => {
+                try {
+                    await roomManager.handleDisconnection(userId);
+                } catch (err) {
+                    console.error("Room disconnection error:", err);
+                }
+            });
+        }
+
+        // Computer mode
+        else if (pathname === "/computer") {
+            if (!userId) {
+                socket.send(JSON.stringify({
+                    type: ErrorMessages.NO_AUTH,
+                    payload: { message: "User not authenticated!" }
+                }));
+                socket.close();
+                return;
+            }
+
+            console.log("✅ Computer mode connected for user:", userId);
+            computerGameManager.addForComputerGame(userId, socket);
+        }
+
+        // Guest mode (special case—no JWT)
+        else if (pathname === "/guest") {
+            const guestId = typeof query.id === "string" ? query.id : undefined;
+
+            if (!guestId) {
+                socket.send(JSON.stringify({
+                    type: ErrorMessages.NO_AUTH,
+                    payload: { message: "Guest ID required!" }
+                }));
+                socket.close();
+                return;
+            }
+
+            const exists = await redis.exists(`guest:${guestId}`);
+            if (!exists) {
+                socket.send(JSON.stringify({
+                    type: ErrorMessages.INVALID_AUTH,
+                    payload: { message: "Invalid Guest ID!" }
+                }));
+                socket.close();
+                return;
+            }
+
+            gameManager.addUser(socket, guestId);
+            socket.on("close", () => gameManager.handleDisconnection(guestId));
+        }
+
+    } catch (error) {
+        console.log("Auth error:", error);
+        socket.send(JSON.stringify({
+            type: ErrorMessages.INVALID_AUTH,
+            payload: { message: "Invalid authentication" }
+        }));
+        socket.close();
+    }
+});
+
 
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);

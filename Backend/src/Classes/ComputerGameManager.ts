@@ -1,9 +1,10 @@
 import WebSocket from "ws";
-import {  ErrorMessages,ComputerGameMessages } from "../messages";
+import {  ErrorMessages,ComputerGameMessages } from "../utils/messages";
 import { Chess } from "chess.js";
-import { redis } from "../redisClient";
-import pc from "../prismaClient";
-import { handlePlayerMove, handlePlayerQuit, validateComputerGamePayload } from "../Services/ComputerGameServices";
+import { redis } from "../clients/redisClient";
+import pc from "../clients/prismaClient";
+import { getComputerMove, handleComputerMove, handlePlayerMove, handlePlayerQuit, validateComputerGamePayload } from "../Services/ComputerGameServices";
+import { Move } from "../Services/GameServices";
 
 class ComputerGameManager{
     
@@ -158,7 +159,7 @@ class ComputerGameManager{
                     const gameExists = await redis.exists(`computer-game:${existingGameId}`);
                     if (gameExists) {
                         userSocket.send(JSON.stringify({
-                            type: ComputerGameMessages.COMPUTER_GAME_ACTIVE,
+                            type: ComputerGameMessages.EXISTING_COMPUTER_GAME,
                             payload: {
                                 message: "You already have an active game. Please finish it before starting a new one."
                             }
@@ -177,7 +178,7 @@ class ComputerGameManager{
                 
                 if (activeGameInDB) {
                     userSocket.send(JSON.stringify({
-                        type: ComputerGameMessages.COMPUTER_GAME_ACTIVE,
+                        type: ComputerGameMessages.EXISTING_COMPUTER_GAME,
                         payload: {
                             message: "You already have an active game. Please finish it before starting a new one."
                         }
@@ -218,15 +219,13 @@ class ComputerGameManager{
                         difficulty: difficulty
                     }
                 }));
+                if(playerColor === "b"){
+                  const computerMove:Move=await getComputerMove(chess.fen(),difficulty)
+                  console.log(`Got the ComputerMove:${computerMove}`);
+                  await handleComputerMove(userSocket,computerMove,newGame.id,userId);
+                  return
 
-                // If user is black, computer should make the first move
-                if (playerColor === "b") {
-                    const depthLevel = ComputerGameLevels[difficulty.toUpperCase()];
-                    const computerMove = await getComputerMove(chess.fen(), depthLevel);
-                    // Use the same handler as a normal computer move
-                    await handleComputerMove(userSocket, computerMove, newGame.id, userId);
                 }
-
                 return;
             }
             else if(type === ComputerGameMessages.PLAYER_MOVE){
