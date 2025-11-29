@@ -105,22 +105,24 @@ INIT_ROOM_GAME:"init_room_game",
 // Add this to your types/chess.ts file in frontend
 
 export const ComputerGameMessages = {
-  INIT_COMPUTER_GAME: "INIT_COMPUTER_GAME",
-  CHECK_ACTIVE_GAME: "CHECK_ACTIVE_GAME", // NEW
-  NO_ACTIVE_GAME: "NO_ACTIVE_GAME", // NEW
-  EXISTING_COMPUTER_GAME: "EXISTING_COMPUTER_GAME",
-  RECONNECT_COMPUTER_GAME: "RECONNECT_COMPUTER_GAME",
-  COMPUTER_GAME_ACTIVE: "COMPUTER_GAME_ACTIVE",
-  PLAYER_MOVE: "PLAYER_MOVE",
-  COMPUTER_MOVE: "COMPUTER_MOVE",
-  PLAYER_CHECK: "PLAYER_CHECK",
-  COMPUTER_CHECK: "COMPUTER_CHECK",
-  PLAYER_WON: "PLAYER_WON",
-  COMPUTER_WON: "COMPUTER_WON",
-  COMPUTER_GAME_OVER: "COMPUTER_GAME_OVER",
-  NOT_YOUR_TURN: "NOT_YOUR_TURN",
-  PLAYER_QUIT: "PLAYER_QUIT",
-} as const;
+  //No Draw offers are there either you win or lose
+  COMPUTER_GAME_ACTIVE: "computer_game_active",
+  COMPUTER_GAME_OVER: "computer_game_over",
+  INIT_COMPUTER_GAME: "init_computer_game",
+  NO_ACTIVE_GAME:"no_active_game",
+  CHECK_ACTIVE_GAME:"check_active_game",
+  RECONNECT_COMPUTER_GAME:"reconnect_computer_game",
+  PLAYER_MOVE: "player_move",
+  PLAYER_QUIT: "player_quit",
+  PLAYER_WON: "player_won",
+  COMPUTER_WON: "computer_won",
+  COMPUTER_LOST: "computer_lost",
+  COMPUTER_MOVE: "computer_move",
+  NOT_YOUR_TURN:"not_your_turn",
+  PLAYER_CHECK:"player_check",
+  COMPUTER_CHECK:"computer_check",
+  EXISTING_COMPUTER_GAME:"existing_computer_game"
+} as const
 
 // Unicode chess pieces
 export const PIECE_SYMBOLS: Record<string, string> = {

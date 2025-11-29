@@ -1,6 +1,6 @@
 import { User } from "../types/user";
 import { ChessLevel } from "../types/chess";
-import { userApi } from "./axios";
+import { gamesApi, userApi } from "./axios";
 
 export interface RegisterPayload {
   name: string;
@@ -100,4 +100,22 @@ export const roomApis = {
     console.log('API: Cancel room response:', res.data);
     return res.data;
   },
+}
+
+export const computerGameApi={
+  createComputerGame:async(difficulty:string,playerColor:string)=>{
+     const res = await gamesApi.post('/computer/create',{
+       difficulty,
+       playerColor
+     });
+    console.log('API: Create room response:', res.data); // Debug log
+    return res.data;
+  },
+  cancelComputerGame:async(computerGameId:number)=>{
+    const res = await gamesApi.patch('/computer/finish',{
+      computerGameId       
+     });
+    console.log('API: Create room response:', res.data); // Debug log
+    return res.data;
+  }
 }

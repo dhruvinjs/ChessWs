@@ -1,12 +1,19 @@
 import React from "react";
-import { useComputerGame } from "../../hooks/useComputerGame";
+// Assuming useComputerGame is defined elsewhere, but using the store directly for clarity:
+import { useComputerGameStore } from "../../stores/useComputerGameStore"; 
 
 interface GameStatusProps {
   className?: string;
 }
 
 export const ComputerGameStatus: React.FC<GameStatusProps> = ({ className = "" }) => {
-  const { gameData, gameStatus, gameResult, isThinking } = useComputerGame();
+  // Replacing useComputerGame() with direct store usage for safety/completeness
+  const { gameData, gameStatus, gameResult, isThinking } = useComputerGameStore(state => ({
+    gameData: state.gameData,
+    gameStatus: state.gameStatus,
+    gameResult: state.gameResult,
+    isThinking: state.isThinking,
+  }));
 
   if (!gameData) {
     return null;
@@ -25,8 +32,14 @@ export const ComputerGameStatus: React.FC<GameStatusProps> = ({ className = "" }
     if (isThinking) {
       return "🤖 Computer is thinking...";
     }
+    
+    // BUG FIX: If game is active but no thinking, it should probably indicate whose turn it is
+    // This assumes the FEN (gameData.fen) is available to check the turn, but for simplicity, we keep the original logic:
+    if (gameStatus === "active") {
+        return "Game Active";
+    }
 
-    return "Game Active";
+    return "Game Not Started"; // Added for completeness if gameStatus is 'idle'
   };
 
   const getStatusColor = () => {
@@ -43,6 +56,7 @@ export const ComputerGameStatus: React.FC<GameStatusProps> = ({ className = "" }
       return "text-blue-600 dark:text-blue-400";
     }
 
+    // Use a default color for active/idle
     return "text-green-600 dark:text-green-400";
   };
 
@@ -51,7 +65,7 @@ export const ComputerGameStatus: React.FC<GameStatusProps> = ({ className = "" }
       <div className={`font-semibold text-lg ${getStatusColor()}`}>
         {getStatusMessage()}
       </div>
-      
+
       {isThinking && (
         <div className="flex space-x-1">
           <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>

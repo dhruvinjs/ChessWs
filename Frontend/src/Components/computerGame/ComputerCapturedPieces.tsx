@@ -1,24 +1,9 @@
 import { memo } from "react";
-import { useComputerGame } from "../../hooks/useComputerGame";
-
-// Piece SVG Component
-const PieceSVG = memo(({ piece }: { piece: string }) => {
-  const svgPath = `/pieces/${piece}.svg`;
-  return (
-    <div className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0">
-      <img
-        src={svgPath}
-        alt={`Chess piece ${piece}`}
-        className="w-full h-full object-contain pointer-events-none select-none"
-        title={`Captured ${piece}`}
-      />
-    </div>
-  );
-});
-PieceSVG.displayName = "PieceSVG";
+import { useComputerGameStore } from "../../stores/useComputerGameStore";
+import { Piece } from "../chess/Piece";
 
 const ComputerCapturedPiecesComponent = () => {
-  const { gameData } = useComputerGame();
+  const gameData = useComputerGameStore((state) => state.gameData);
   
   if (!gameData) return null;
   
@@ -68,7 +53,9 @@ const ComputerCapturedPiecesComponent = () => {
             {capturedByPlayer.length > 0 ? (
               capturedByPlayer.map(({ piece, count }, index) => (
                 <div key={`player-${index}`} className="relative flex items-center gap-1 bg-slate-50 dark:bg-slate-700 p-2 rounded-lg shadow-md border border-green-200 dark:border-green-700 hover:shadow-lg transition-shadow">
-                  <PieceSVG piece={piece} />
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0">
+                    <Piece piece={piece} />
+                  </div>
                   {count > 1 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
                       <span className="text-[10px] font-black leading-none px-1">
@@ -93,7 +80,9 @@ const ComputerCapturedPiecesComponent = () => {
             {capturedByComputer.length > 0 ? (
               capturedByComputer.map(({ piece, count }, index) => (
                 <div key={`computer-${index}`} className="relative flex items-center gap-1 bg-slate-50 dark:bg-slate-700 p-2 rounded-lg shadow-md border border-orange-200 dark:border-orange-700 hover:shadow-lg transition-shadow">
-                  <PieceSVG piece={piece} />
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0">
+                    <Piece piece={piece} />
+                  </div>
                   {count > 1 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
                       <span className="text-[10px] font-black leading-none px-1">

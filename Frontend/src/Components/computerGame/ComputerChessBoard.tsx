@@ -1,30 +1,23 @@
-import { useMemo, memo, useCallback, useState } from "react";
-import { Chess } from "chess.js";
-import { useComputerGame } from "../../hooks/useComputerGame";
-import { computerSocketManager } from "../../lib/computerGame/ComputerSocketManager";
+import { useMemo, memo, useCallback } from "react";
+import { useComputerGameStore } from "../../stores/useComputerGameStore";
+import { useComputerChess } from "../../hooks/useComputerChess";
 import { getSquare, getSquareColor } from "../../utils/chessUtils";
-import { Square } from "./Square";
+import {Square} from '../chess/Square'
 
 const ComputerChessBoardComponent = () => {
-  const { gameData, gameStatus } = useComputerGame();
-  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-  
-  // Get valid moves from backend (stored in gameData)
+  const gameData = useComputerGameStore((state) => state.gameData);
+  const { selectedSquare, handleSquareClick } = useComputerChess();
+
+  const fen = gameData?.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const moves = gameData?.moves || [];
   const validMoves = gameData?.validMoves || [];
-
-  const chess = useMemo(() => {
-    if (!gameData) return new Chess();
-    return new Chess(gameData.fen);
-  }, [gameData]);
-
   const playerColor = gameData?.playerColor || "w";
-  const isPlayerTurn = chess.turn() === playerColor;
 
   const lastMoveSquares = useMemo(() => {
-    if (!gameData || gameData.moves.length === 0) return null;
-    const lastMove = gameData.moves[gameData.moves.length - 1];
+    if (moves.length === 0) return null;
+    const lastMove = moves[moves.length - 1];
     return { from: lastMove.from, to: lastMove.to };
-  }, [gameData]);
+  }, [moves]);
 
   const validDestinationSquares = useMemo(() => {
     if (!selectedSquare) return new Set<string>();
@@ -35,46 +28,6 @@ const ComputerChessBoardComponent = () => {
     );
   }, [selectedSquare, validMoves]);
 
-  const handleSquareClick = useCallback(
-    (squareName: string, pieceString: string | null) => {
-      if (gameStatus !== "active" || !isPlayerTurn || !gameData) return;
-      
-      // If clicking the same square again, deselect it
-      if (selectedSquare === squareName) {
-        setSelectedSquare(null);
-        return;
-      }
-
-      // If clicking on own piece, select it (valid moves from backend)
-      if (pieceString && pieceString.startsWith(playerColor)) {
-        setSelectedSquare(squareName);
-        return;
-      }
-
-      // If a square is selected and clicking a different square, try to move
-      if (selectedSquare) {
-        // Check if this is a valid move (from backend validMoves)
-        const isValidDestination = validDestinationSquares.has(squareName);
-        
-        if (isValidDestination) {
-          // Send move to server - backend will validate
-          computerSocketManager.makeMove(gameData.computerGameId, {
-            from: selectedSquare,
-            to: squareName,
-            promotion: "q", // Always promote to queen for now
-          });
-          
-          setSelectedSquare(null);
-          return;
-        }
-        
-        // If clicked on empty square or invalid move, deselect
-        setSelectedSquare(null);
-      }
-    },
-    [gameStatus, isPlayerTurn, gameData, playerColor, selectedSquare, validDestinationSquares]
-  );
-
   const createSquareClickHandler = useCallback(
     (squareName: string, pieceString: string | null) => {
       return () => handleSquareClick(squareName, pieceString);
@@ -83,8 +36,7 @@ const ComputerChessBoardComponent = () => {
   );
 
   const board = useMemo(() => {
-    const fenToRender = gameData?.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    const rows = fenToRender.split(" ")[0].split("/");
+    const rows = fen.split(" ")[0].split("/");
 
     return Array.from({ length: 8 }, (_, row) =>
       Array.from({ length: 8 }, (_, col) => {
@@ -122,7 +74,7 @@ const ComputerChessBoardComponent = () => {
         };
       })
     ).flat();
-  }, [gameData?.fen, playerColor, selectedSquare, lastMoveSquares, validDestinationSquares]);
+  }, [fen, playerColor, selectedSquare, lastMoveSquares, validDestinationSquares]);
 
   const files = useMemo(() => {
     const f = ["a", "b", "c", "d", "e", "f", "g", "h"];

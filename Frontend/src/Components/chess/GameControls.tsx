@@ -1,5 +1,3 @@
-// Components/chess/GameControls.tsx
-// Updated version with proper draw functionality
 
 import { useState, useCallback, memo } from 'react';
 import { ArrowLeft, Play, Handshake, Flag } from 'lucide-react';

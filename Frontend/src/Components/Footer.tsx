@@ -10,7 +10,7 @@ export function Footer() {
       id="contact"
       className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-orange-50 to-slate-100 
                  dark:from-black dark:via-gray-900 dark:to-amber-950 text-slate-800 dark:text-white 
-                 py-16 px-6 transition-colors duration-500"
+                 py-16 px-6 transition-colors duration-500 dark:bg-black" 
     >
       {/* Ambient glowing background orbs */}
       <motion.div
@@ -99,13 +99,34 @@ export function Footer() {
         whileInView={{ scaleX: 1 }}
         transition={{ duration: 1, ease: "easeOut" }}
       />
+      
+      {/* Subtle link to About page */}
+      <motion.div
+        className="text-center mb-6 relative z-10"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.6 }}
+      >
+        <motion.a
+          href="/about"
+          className="text-lg font-bold bg-gradient-to-r from-orange-600 to-amber-600 
+                     dark:from-orange-400 dark:to-amber-400 bg-clip-text text-transparent 
+                     hover:brightness-125 transition-all duration-300 border-b-2 border-transparent 
+                     hover:border-orange-500 dark:hover:border-amber-500 pb-0.5"
+          whileHover={{ scale: 1.05 }}
+          transition={{ type: 'spring', stiffness: 400 }}
+        >
+          Learn about the Technology & Developer
+        </motion.a>
+      </motion.div>
+
 
       {/* Footer text */}
       <motion.p
         className="text-center text-sm opacity-90 tracking-wide relative z-10 text-slate-700 dark:text-slate-300"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.8 }}
+        transition={{ delay: 0.8, duration: 0.8 }} 
       >
         © {currentYear}{" "}
         <span className="font-semibold text-amber-700 dark:text-amber-300">Chess Masters</span>.{" "}

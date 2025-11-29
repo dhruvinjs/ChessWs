@@ -10,6 +10,7 @@
 import { RoomChessPage } from "./Pages/RoomChessPage";
 import { ComputerChessPage } from "./Pages/ComputerChessPage";
 import { useAppSetup } from "./hooks/useAppTheme";
+import { ComputerGameSetupPage } from "./Pages/ComputerGameSetupPage";
 
     export function App() {
       useAppSetup()
@@ -42,7 +43,8 @@ import { useAppSetup } from "./hooks/useAppTheme";
               <Route path="/game" element={<ChessGame />} />
               <Route path="/room" element={<Room />} />
               <Route path="/room/:roomId" element={<RoomChessPage />} />
-              <Route path="/computer" element={<ComputerChessPage />} />
+              <Route path="/computer" element={<ComputerGameSetupPage />} />
+              <Route path="/computer/game/" element={<ComputerChessPage />} />
             </Route>
 
 

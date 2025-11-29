@@ -9,11 +9,18 @@ import { ConfirmDialog } from "../Components/ConfirmDialog";
 import { useComputerGameStore } from "../stores/useComputerGameStore";
 import { computerSocketManager } from "../lib/ComputerSocketManager";
 
-export function Navbar() {
+// 🎯 FIX: Define a prop interface/type for better readability and safety (optional but good practice)
+interface NavbarProps {
+    variant?: 'about'; // Assuming you only pass 'about' or nothing
+}
+
+// 🎯 FIX: The component now accepts the 'variant' prop
+export function Navbar({ variant }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBackDialog, setShowBackDialog] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false); 
   
+  // initTheme is intentionally removed, as requested
   const { isDarkMode, toggleDarkMode } = useThemeStore();
   const { data: user, isLoading } = useUserQuery();
   const gameData = useComputerGameStore((state) => state.gameData);
@@ -22,19 +29,25 @@ export function Navbar() {
   const location = useLocation();
   const { mutate: logout, isPending } = useLogoutMutation();
 
-  // useEffect(() => {
-  //   initTheme();
-  // }, [initTheme]);
+  // useEffect hook is intentionally removed, as requested
 
-  const showLandingLinks = location.pathname === "/";
+  // Links only show up on the root landing page (/)
+  // This ensures no Features/Contact links show on /about
+  const showLandingLinks = location.pathname === "/"; 
   const isAuthenticated = user && !user.isGuest;
 
+  // 🎯 FIX: Updated logic to include the 'variant' prop check.
+  // The back button is shown if variant="about" OR if on a nested path.
   const showBackButton =
-    isAuthenticated &&
+    variant === "about" ||
+    (isAuthenticated &&
     location.pathname !== "/" &&
     location.pathname !== "/home" &&
     location.pathname !== "/login" &&
-    location.pathname !== "/register";
+    location.pathname !== "/register" && 
+    location.pathname !== "/computer/game"
+  
+  );
 
   const scrollToFooter = () => {
     const footer = document.getElementById("contact");
@@ -57,7 +70,6 @@ export function Navbar() {
     if (gameData && location.pathname === "/computer") {
       computerSocketManager.quitGame(gameData.computerGameId);
     }
-    computerSocketManager.clearSession();
     logout();
     setShowLogoutDialog(false);
     setIsMenuOpen(false);
@@ -66,7 +78,12 @@ export function Navbar() {
   const handleBackClick = () => {
     if (location.pathname === "/computer" && gameData && gameStatus === "active") {
       setShowBackDialog(true);
-    } else {
+    } 
+    // 🎯 FIX: If on the "about" page, navigate to the appropriate home route
+    else if (variant === "about") {
+        nav(isAuthenticated ? "/home" : "/");
+    }
+    else {
       nav("/home");
     }
   };
@@ -112,6 +129,7 @@ export function Navbar() {
             </div>
 
             {/* CENTER LINKS */}
+            {/* showLandingLinks is false on /about, so links are hidden here */}
             {showLandingLinks && (
               <nav className="hidden md:flex items-center space-x-8 lg:space-x-12 absolute left-1/2 -translate-x-1/2">
                 <a 
@@ -197,7 +215,7 @@ export function Navbar() {
                   />
                 </div>
 
-                {/* Landing Links */}
+                {/* Landing Links (Hidden on /about) */}
                 {showLandingLinks && (
                   <>
                     <a
