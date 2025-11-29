@@ -61,11 +61,11 @@ server.on("upgrade", (req, socket, head) => {
     try {
         const cookieHeader = req.headers['cookie'];
         
-        console.log("=== WebSocket Upgrade Request ===");
-        console.log("Cookie Header:", cookieHeader);
+        // console.log("=== WebSocket Upgrade Request ===");
+        // console.log("Cookie Header:", cookieHeader);
         
         if (!cookieHeader) {
-            console.log("❌ No cookie header found");
+            // console.log("❌ No cookie header found");
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
             return;
@@ -74,10 +74,10 @@ server.on("upgrade", (req, socket, head) => {
         // Extract token from cookies
      const cookies = cookie.parse(cookieHeader);
      const token = cookies.token;
-        console.log("Extracted Token:", token ? "Found" : "Not Found");
+        // console.log("Extracted Token:", token ? "Found" : "Not Found");
         
         if (!token) {
-            console.log("❌ No token cookie found");
+            // console.log("❌ No token cookie found");
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
             return;
@@ -87,9 +87,9 @@ server.on("upgrade", (req, socket, head) => {
         let decodedToken;
         try {
             decodedToken = jwt.verify(token, process.env.SECRET_TOKEN!) as { id: number };
-            console.log("✅ Token verified for user:", decodedToken.id);
+            // console.log("✅ Token verified for user:", decodedToken.id);
         } catch (jwtError) {
-            console.log("❌ JWT verification failed:", jwtError);
+            // console.log("❌ JWT verification failed:", jwtError);
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
             return;
@@ -107,7 +107,7 @@ server.on("upgrade", (req, socket, head) => {
         });
         
     } catch (error) {
-        console.error("❌ WebSocket upgrade error:", error);
+        // console.error("❌ WebSocket upgrade error:", error);
         socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
         socket.destroy();
     }
@@ -121,9 +121,9 @@ wss.on("connection", async (socket, req: Request) => {
     //@ts-ignore
     const userId = socket.userId;
     
-    console.log(`=== WebSocket Connected ===`);
-    console.log(`Path: ${pathname}`);
-    console.log(`User ID: ${userId}`);
+    // console.log(`=== WebSocket Connected ===`);
+    // console.log(`Path: ${pathname}`);
+    // console.log(`User ID: ${userId}`);
 
     try {
         // Room
@@ -137,7 +137,7 @@ wss.on("connection", async (socket, req: Request) => {
                 return;
             }
 
-            console.log("Room authenticated user:", userId);
+            // console.log("Room authenticated user:", userId);
             roomManager.addRoomUser(userId, socket);
 
             socket.on("close", async () => {
@@ -160,7 +160,7 @@ wss.on("connection", async (socket, req: Request) => {
                 return;
             }
 
-            console.log("✅ Computer mode connected for user:", userId);
+            // console.log("✅ Computer mode connected for user:", userId);
             computerGameManager.addForComputerGame(userId, socket);
         }
 

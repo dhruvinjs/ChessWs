@@ -1,13 +1,13 @@
 import path from "path";
 import { computerGameManager } from "../Classes/ComputerGameManager";
-import { ComputerGameMessages, ErrorMessages } from "../utils/messages";
+import { ComputerGameMessages, ErrorMessages, GameMessages } from "../utils/messages";
 import { redis } from "../clients/redisClient";
 import { Move } from "./GameServices";
 import {spawn} from "child_process"
 import { WebSocket } from "ws";
 import { Chess } from "chess.js";
 import pc from "../clients/prismaClient";
-import provideValidMoves from "../utils/chessUtils";
+import provideValidMoves, { delay } from "../utils/chessUtils";
 // this are the depthLevels according to which the computer will calculate the best-move
 const ComputerGameLevels:Record<string,number>={
   "EASY":3,
@@ -77,7 +77,7 @@ export function validateComputerGamePayload(type:string,payload:any):string | nu
             break;
        
         case ComputerGameMessages.PLAYER_MOVE:
-            if(!payload.to || !payload.from ||!payload.computerGameId) return "Missing Move or GameId";
+            if(!payload.computerGameId || !payload.move) return "Missing Move or GameId";
             break;
         case ComputerGameMessages.PLAYER_QUIT:
             if(!payload.computerGameId) return "Missing computerGameId";
@@ -148,18 +148,32 @@ export  async function handlePlayerMove(userId:number,userSocket:WebSocket,compu
                 from:move.from,
                 to:move.to
               })
+              if (!boardMove) {
+                userSocket.send(JSON.stringify({
+                  type: GameMessages.WRONG_MOVE,
+                  payload: { message: "Illegal move attempted!" }
+                }));
+                return;
+              }
               await redis.rPush(`computer-game:${computerGameId}:moves`,JSON.stringify(boardMove))
               await redis.hSet(`computer-game:${computerGameId}`,"fen",board.fen())
+              
               if(boardMove.captured){
                 const piece = boardMove.captured.toUpperCase() //Same logic as room game
-                const color=boardMove.color.toLowerCase()
+                const color=boardMove.color.toLowerCase() === "w" ?"b" :"w"
                 const capturedPiece=`${color}${piece}`
                 capturedPieceNotation = capturedPiece;
                 await redis.rPush(`computer-game:${computerGameId}:capturedPieces`,capturedPiece);
                 console.log(`Player Captured Piece: ${capturedPiece}`); 
               }
 
-
+              userSocket.send(JSON.stringify({
+                type:ComputerGameMessages.PLAYER_MOVE,
+                payload:{
+                  fen:board.fen(),
+                  capturedPiece:capturedPieceNotation || undefined,
+                }
+              }))
             } catch (err) {
               console.error("Error processing move:", err);
               userSocket.send(JSON.stringify({
@@ -235,6 +249,7 @@ export  async function handlePlayerMove(userId:number,userSocket:WebSocket,compu
               }
               const computerMove:Move = await getComputerMove(board.fen(), gameState.difficulty);
               console.log(`[ComputerGame] Computer move calculated:`, computerMove);
+              // await delay(2000)
               await handleComputerMove(userSocket, computerMove, computerGameId, userId)
 
 }
@@ -265,12 +280,25 @@ export async function handleComputerMove(userSocket:WebSocket,move:Move,computer
               await redis.hSet(`computer-game:${computerGameId}`,"fen",board.fen())
               if(boardMove.captured){
                 const piece = boardMove.captured.toUpperCase() //Same logic as room game
-                const color=boardMove.color.toLowerCase()
+                const color=boardMove.color.toLowerCase() === "w" ?"b" :"w"
                 const capturedPiece=`${color}${piece}`
                 capturedPieceNotation=capturedPiece
                 await redis.rPush(`computer-game:${computerGameId}:capturedPieces`,capturedPiece);
                 console.log(`Computer Captured Piece: ${capturedPiece}`); 
+              }  
+              const validMovesAfterComputerMove = provideValidMoves(board.fen());
+            
+            // Send computer move confirmation
+            console.log(`[ComputerGame] Sending computer move to client`);
+            userSocket.send(JSON.stringify({
+              type: ComputerGameMessages.COMPUTER_MOVE,
+              payload: {
+                move: move,
+                fen: board.fen(),
+                capturedPiece: capturedPieceNotation || undefined,
+                validMoves:validMovesAfterComputerMove
               }
+            }));
 
 
             } catch (err) {
@@ -283,19 +311,7 @@ export async function handleComputerMove(userSocket:WebSocket,move:Move,computer
             }
             
             // Calculate valid moves for player after computer's move (it's now player's turn)
-            const validMovesAfterComputerMove = provideValidMoves(board.fen());
-            
-            // Send computer move confirmation
-            console.log(`[ComputerGame] Sending computer move to client`);
-            userSocket.send(JSON.stringify({
-              type: ComputerGameMessages.COMPUTER_MOVE,
-              payload: {
-                move: move,
-                fen: board.fen(),
-                capturedPiece: capturedPieceNotation,
-                validMoves: validMovesAfterComputerMove || []
-              }
-            }));
+          
 
             // Check if computer put player in check
             if(board.isCheck()){

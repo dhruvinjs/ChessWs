@@ -15,3 +15,9 @@ export default function provideValidMoves(fen:string){
     return validMoves
 
 }
+
+export function delay(ms:number){
+  return new Promise((resolve)=>{
+    setTimeout(resolve,ms)
+  })
+}
