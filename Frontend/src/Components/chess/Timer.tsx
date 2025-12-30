@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo } from 'react';
 
 interface TimerProps {
   time: number;
@@ -10,13 +10,15 @@ export const Timer = memo(
     const formatTime = useMemo(() => {
       const mins = Math.floor(time / 60);
       const secs = time % 60;
-      return `${mins}:${secs.toString().padStart(2, "0")}`;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
     }, [time]);
 
     const colorIndicator = useMemo(
       () => (
         <div
-          className={`w-4 h-4 rounded-full ${label === "White" ? "bg-white" : "bg-slate-900"} shadow-sm`}
+          className={`w-4 h-4 rounded-full ${
+            label === 'White' ? 'bg-white' : 'bg-slate-900'
+          } shadow-sm`}
         />
       ),
       [label]
@@ -32,8 +34,10 @@ export const Timer = memo(
     );
   },
   (prevProps, nextProps) => {
-    return prevProps.time === nextProps.time && prevProps.label === nextProps.label;
+    return (
+      prevProps.time === nextProps.time && prevProps.label === nextProps.label
+    );
   }
 );
 
-Timer.displayName = "Timer";
+Timer.displayName = 'Timer';

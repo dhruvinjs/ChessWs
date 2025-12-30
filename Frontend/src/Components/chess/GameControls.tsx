@@ -1,4 +1,3 @@
-
 import { useState, useCallback, memo } from 'react';
 import { ArrowLeft, Play, Handshake, Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +8,7 @@ import { GameMessages } from '../../types/chess';
 
 const GameControlsComponent = () => {
   const navigate = useNavigate();
-  
+
   // Subscribe to necessary state
   const initGameRequest = useGameStore((state) => state.initGameRequest);
   const resign = useGameStore((state) => state.resign);
@@ -33,7 +32,7 @@ const GameControlsComponent = () => {
     } else {
       navigate('/');
     }
-  }, [ isGameActive, navigate]);
+  }, [isGameActive, navigate]);
 
   const confirmGoHome = useCallback(() => {
     setShowHomeConfirm(false);
@@ -69,15 +68,16 @@ const GameControlsComponent = () => {
 
   const getDrawButtonText = () => {
     if (drawOfferSent) {
-      return "Offer Sent";
+      return 'Offer Sent';
     }
     if (isGameActive) {
       return `Draw (${drawOfferCount}/3)`;
     }
-    return "Draw";
+    return 'Draw';
   };
-  
-  const isDrawDisabled = !isGameActive || drawOfferSent || isGameOver || drawOfferCount >= 3;
+
+  const isDrawDisabled =
+    !isGameActive || drawOfferSent || isGameOver || drawOfferCount >= 3;
 
   return (
     <>
@@ -89,7 +89,7 @@ const GameControlsComponent = () => {
           text="Home"
           icon={<ArrowLeft className="w-4 h-4" />}
         />
-        
+
         {/* Play button - centered CTA */}
         <Button
           variant="primary"
@@ -100,7 +100,7 @@ const GameControlsComponent = () => {
           loading={isWaitingForGame}
           disabled={isGameActive || isWaitingForGame}
         />
-        
+
         {/* Secondary game actions - positioned on right */}
         <div className="flex items-center gap-3 sm:gap-4">
           <Button
@@ -139,7 +139,9 @@ const GameControlsComponent = () => {
         onClose={() => setShowDrawConfirm(false)}
         onConfirm={confirmDraw}
         title="Offer Draw?"
-        message={`Are you sure you want to offer a draw? You have ${3 - drawOfferCount} offers remaining.`}
+        message={`Are you sure you want to offer a draw? You have ${
+          3 - drawOfferCount
+        } offers remaining.`}
         confirmText="Yes, Offer Draw"
         cancelText="Cancel"
       />

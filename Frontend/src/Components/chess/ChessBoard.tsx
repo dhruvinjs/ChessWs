@@ -1,8 +1,8 @@
-import { useMemo, memo, useCallback } from "react";
-import { useGameStore } from "../../stores/useGameStore";
-import { useChess } from "../../hooks/useChess";
-import { getSquare, getSquareColor } from "../../utils/chessUtils";
-import { Square } from "./Square";
+import { useMemo, memo, useCallback } from 'react';
+import { useGameStore } from '../../stores/useGameStore';
+import { useChess } from '../../hooks/useChess';
+import { getSquare, getSquareColor } from '../../utils/chessUtils';
+import { Square } from './Square';
 
 const ChessBoardComponent = () => {
   const fen = useGameStore((state) => state.fen);
@@ -21,9 +21,7 @@ const ChessBoardComponent = () => {
   const validDestinationSquares = useMemo(() => {
     if (!selectedSquare) return new Set<string>();
     return new Set(
-      validMoves
-        .filter((move) => move.from === selectedSquare)
-        .map((m) => m.to)
+      validMoves.filter((move) => move.from === selectedSquare).map((m) => m.to)
     );
   }, [selectedSquare, validMoves]);
 
@@ -36,16 +34,16 @@ const ChessBoardComponent = () => {
 
   const board = useMemo(() => {
     const fenToRender =
-      fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    const rows = fenToRender.split(" ")[0].split("/");
+      fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    const rows = fenToRender.split(' ')[0].split('/');
 
     return Array.from({ length: 8 }, (_, row) =>
       Array.from({ length: 8 }, (_, col) => {
-        const actualRow = playerColor === "b" ? 7 - row : row;
-        const actualCol = playerColor === "b" ? 7 - col : col;
+        const actualRow = playerColor === 'b' ? 7 - row : row;
+        const actualCol = playerColor === 'b' ? 7 - col : col;
 
-        const squareName = getSquare(actualRow, actualCol, "w");
-        const isLight = getSquareColor(actualRow, actualCol) === "light";
+        const squareName = getSquare(actualRow, actualCol, 'w');
+        const isLight = getSquareColor(actualRow, actualCol) === 'light';
 
         let pieceString: string | null = null;
         const fenRow = rows[actualRow];
@@ -55,7 +53,7 @@ const ChessBoardComponent = () => {
             colIndex += Number(char);
           } else {
             if (colIndex === actualCol) {
-              const pieceColor = char === char.toUpperCase() ? "w" : "b";
+              const pieceColor = char === char.toUpperCase() ? 'w' : 'b';
               pieceString = `${pieceColor}${char.toUpperCase()}`;
               break;
             }
@@ -75,21 +73,27 @@ const ChessBoardComponent = () => {
         };
       })
     ).flat();
-  }, [fen, playerColor, selectedSquare, lastMoveSquares, validDestinationSquares]);
+  }, [
+    fen,
+    playerColor,
+    selectedSquare,
+    lastMoveSquares,
+    validDestinationSquares,
+  ]);
 
   const files = useMemo(() => {
-    const f = ["a", "b", "c", "d", "e", "f", "g", "h"];
-    return playerColor === "b" ? f.slice().reverse() : f;
+    const f = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    return playerColor === 'b' ? f.slice().reverse() : f;
   }, [playerColor]);
 
   const ranks = useMemo(() => {
-    const r = ["1", "2", "3", "4", "5", "6", "7", "8"];
-    return playerColor === "w" ? r.slice().reverse() : r;
+    const r = ['1', '2', '3', '4', '5', '6', '7', '8'];
+    return playerColor === 'w' ? r.slice().reverse() : r;
   }, [playerColor]);
 
   // 🎨 Coordinates: same gradient/light/dark card style as MoveHistory
   const coordClasses =
-    "flex justify-center items-center text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 select-none";
+    'flex justify-center items-center text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 select-none';
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 p-2 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl shadow-lg">

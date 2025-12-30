@@ -8,10 +8,12 @@ import { GameTimers } from './GameTimers';
 const TurnIndicatorComponent = () => {
   const fen = useGameStore((state) => state.fen);
   const gameStatus = useGameStore((state) => state.gameStatus);
-  
+
   const turn = fen.split(' ')[1];
   const isGameOver = gameStatus === GameMessages.GAME_OVER;
-  const turnText = isGameOver ? 'Game Over' : `${turn === 'w' ? 'White' : 'Black'}'s Turn`;
+  const turnText = isGameOver
+    ? 'Game Over'
+    : `${turn === 'w' ? 'White' : 'Black'}'s Turn`;
 
   return (
     <div className="flex items-center gap-2">

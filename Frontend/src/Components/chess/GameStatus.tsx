@@ -9,7 +9,7 @@ const GameStatusComponent = () => {
   const moves = useGameStore((state) => state.moves);
   const fen = useGameStore((state) => state.fen);
   const gameStatus = useGameStore((state) => state.gameStatus);
-  
+
   const turn = fen.split(' ')[1] as 'w' | 'b';
 
   return (
@@ -20,7 +20,9 @@ const GameStatusComponent = () => {
       </h3>
       <div className="space-y-3">
         <div className="flex justify-between">
-          <span className="text-slate-600 dark:text-slate-300">Your Color:</span>
+          <span className="text-slate-600 dark:text-slate-300">
+            Your Color:
+          </span>
           <span
             className={`font-bold ${
               color === 'w'
@@ -38,7 +40,9 @@ const GameStatusComponent = () => {
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-600 dark:text-slate-300">Moves Played:</span>
+          <span className="text-slate-600 dark:text-slate-300">
+            Moves Played:
+          </span>
           <span className="font-bold text-slate-900 dark:text-white">
             {Math.ceil(moves.length / 2)}
           </span>

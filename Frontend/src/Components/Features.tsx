@@ -1,25 +1,25 @@
-import { motion } from "framer-motion";
-import { Globe, Zap, Trophy } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Globe, Zap, Trophy } from 'lucide-react';
 
 export function Features() {
   const features = [
     {
       icon: <Globe className="h-10 w-10" />,
-      title: "Global Multiplayer",
+      title: 'Global Multiplayer',
       description:
-        "Play against millions of players worldwide with our advanced matchmaking system.",
+        'Play against millions of players worldwide with our advanced matchmaking system.',
     },
     {
       icon: <Zap className="h-10 w-10" />,
-      title: "Lightning Fast",
+      title: 'Lightning Fast',
       description:
-        "Experience ultra-low latency and real-time move synchronization for seamless gameplay.",
+        'Experience ultra-low latency and real-time move synchronization for seamless gameplay.',
     },
     {
       icon: <Trophy className="h-10 w-10" />,
-      title: "Track Your Progress",
+      title: 'Track Your Progress',
       description:
-        "Climb the leaderboard and analyze your performance with detailed stats and history.",
+        'Climb the leaderboard and analyze your performance with detailed stats and history.',
     },
   ];
 
@@ -33,7 +33,7 @@ export function Features() {
         <div className="absolute -top-40 -left-40 w-80 h-80 bg-gradient-to-br from-indigo-300/20 to-amber-400/20 dark:from-indigo-700/20 dark:to-amber-600/20 rounded-full blur-3xl animate-pulse" />
         <div
           className="absolute -bottom-32 -right-32 w-96 h-96 bg-gradient-to-br from-indigo-400/15 to-amber-300/15 dark:from-indigo-800/25 dark:to-amber-700/25 rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "2s" }}
+          style={{ animationDelay: '2s' }}
         />
       </div>
 
@@ -56,8 +56,8 @@ export function Features() {
             Everything You Need to Master Chess
           </h2>
           <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
-            From real-time gameplay to detailed analytics, our features are built for players who
-            take chess seriously.
+            From real-time gameplay to detailed analytics, our features are
+            built for players who take chess seriously.
           </p>
         </motion.div>
 

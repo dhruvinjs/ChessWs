@@ -12,9 +12,10 @@ const GameTimersComponent = ({ layout = 'vertical' }: GameTimersProps) => {
   const whiteTimer = useGameStore((state) => state.whiteTimer);
   const blackTimer = useGameStore((state) => state.blackTimer);
 
-  const containerClass = layout === 'horizontal' 
-    ? 'flex flex-col sm:flex-row items-center gap-2'
-    : 'mb-6 space-y-3';
+  const containerClass =
+    layout === 'horizontal'
+      ? 'flex flex-col sm:flex-row items-center gap-2'
+      : 'mb-6 space-y-3';
 
   return (
     <div className={containerClass}>
