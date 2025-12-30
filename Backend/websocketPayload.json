@@ -8,7 +8,7 @@
     "5. Replace ROOM_CODE with actual code from step 1",
     "6. Replace GAME_ID with actual game ID returned after init_room_game"
   ],
-  
+
   "http_endpoints": {
     "create_room": {
       "method": "POST",
@@ -152,8 +152,8 @@
           "turn": "b",
           "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
           "validMoves": [
-            {"from": "a7", "to": "a6", "promotion": null},
-            {"from": "a7", "to": "a5", "promotion": null}
+            { "from": "a7", "to": "a6", "promotion": null },
+            { "from": "a7", "to": "a5", "promotion": null }
           ]
         }
       }
@@ -197,8 +197,8 @@
           "turn": "w",
           "fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
           "validMoves": [
-            {"from": "e4", "to": "e5", "promotion": null},
-            {"from": "e4", "to": "d5", "promotion": null}
+            { "from": "e4", "to": "e5", "promotion": null },
+            { "from": "e4", "to": "d5", "promotion": null }
           ]
         }
       }
@@ -291,8 +291,8 @@
           "color": "b",
           "opponentId": 1,
           "moves": [
-            {"from": "e2", "to": "e4"},
-            {"from": "d7", "to": "d5"}
+            { "from": "e2", "to": "e4" },
+            { "from": "d7", "to": "d5" }
           ]
         }
       },

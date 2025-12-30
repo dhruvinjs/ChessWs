@@ -57,7 +57,7 @@ export class SocketManager {
         // ========================================
         // GAME END - Keep Toasts (Important)
         // ========================================
-        case GameMessages.GAME_OVER:
+        case GameMessages.GAME_OVER: {
           if (payload.fen) setFen(payload.fen);
           endGame(payload.winner, payload.loser);
 
@@ -83,6 +83,7 @@ export class SocketManager {
             );
           }
           break;
+        }
 
         // ========================================
         // DRAW ACTIONS - Keep Toasts (Interactive)
@@ -131,7 +132,7 @@ export class SocketManager {
         // ========================================
         // GAME START - Keep Toast
         // ========================================
-        case GameMessages.INIT_GAME:
+        case GameMessages.INIT_GAME: {
           const isReconnection = payload.moves && payload.moves.length > 0;
           
           if (isReconnection) {
@@ -146,6 +147,7 @@ export class SocketManager {
             );
           }
           break;
+        }
 
         // ========================================
         // RECONNECTION - Silent (Just Restore State)
@@ -266,11 +268,9 @@ export class SocketManager {
           }
           break;
 
-        // ========================================
-        // ROOM UPDATES - UI State Only (No Toast)
-        // ========================================
 
-        case GameMessages.USER_HAS_JOINED:
+
+        case GameMessages.USER_HAS_JOINED: {
           const { 
             opponentId: joinedOpponentId, 
             opponentName, 
@@ -295,12 +295,13 @@ export class SocketManager {
           console.log(`✅ ${opponentName} joined room - isCreator=${finalIsCreator}`);
           // Room header will show this visually
           break;
+        }
 
         // ========================================
         // ROOM GAME START - Keep Toast
         // ========================================
 
-        case GameMessages.INIT_ROOM_GAME:
+        case GameMessages.INIT_ROOM_GAME: {
           const { color: roomColor, fen: roomFen, whiteTimer, blackTimer, opponentId: roomOppId, roomGameId, validMoves: initRoomValidMoves } = payload;
           
           // Preserve existing room state while starting game
@@ -328,11 +329,12 @@ export class SocketManager {
             { type: "success" }
           );
           break;
+        }
 
         // ========================================
         // ROOM GAME MECHANICS - No Toast
         // ========================================
-        case GameMessages.ROOM_MOVE:
+        case GameMessages.ROOM_MOVE: {
           const { move: roomMove, fen: roomMoveFen, validMoves: roomMoveValidMoves, capturedPiece: roomCapturedPiece } = payload;
           
           // Update game state with new position and captured piece
@@ -350,11 +352,12 @@ export class SocketManager {
             selectedSquare: null,
           });
           break;
+        }
 
         // ========================================
         // ROOM GAME END - Keep Toast
         // ========================================
-        case GameMessages.ROOM_GAME_OVER:
+        case GameMessages.ROOM_GAME_OVER: {
           const { winner: roomWinner, loser: roomLoser, message: gameOverMsg, reason, roomStatus, gameStatus } = payload;
           
           if (payload.fen) setFen(payload.fen);
@@ -403,6 +406,7 @@ export class SocketManager {
             }
           }, 5000);
           break;
+        }
 
         // ========================================
         // ROOM TIMERS - No Toast
@@ -416,7 +420,7 @@ export class SocketManager {
         // ========================================
         // ROOM ERRORS - Keep Toast
         // ========================================
-        case GameMessages.ROOM_TIME_EXCEEDED:
+        case GameMessages.ROOM_TIME_EXCEEDED: {
           const { winner: timeWinner, loser: timeLoser } = payload;
           endGame(timeWinner, timeLoser);
           showMessage(
@@ -425,6 +429,7 @@ export class SocketManager {
             { type: "error" }
           );
           break;
+        }
 
         case GameMessages.ILLEGAL_ROOM_MOVE:
           showMessage(
@@ -532,7 +537,7 @@ export class SocketManager {
           console.log("👋 Left room");
           break;
           
-        case GameMessages.ROOM_READY_TO_START:
+        case GameMessages.ROOM_READY_TO_START: {
           // Update room state to FULL while preserving creator status
           const currentStore = useGameStore.getState();
           useGameStore.setState({
@@ -542,6 +547,7 @@ export class SocketManager {
           console.log(`✅ Room ready - both players present`);
           // UI will show "Start Game" button - no toast needed
           break;
+        }
 
         // ========================================
         // ROOM CONNECTION STATUS - Keep Toast
@@ -616,7 +622,7 @@ export class SocketManager {
         // CHAT - Handle in UI (No Toast)
         // ========================================
 
-        case GameMessages.ROOM_CHAT:
+        case GameMessages.ROOM_CHAT: {
           // Add chat message to store
           const { sender, message: chatMessage, timestamp } = payload;
           const currentChatMessages = useGameStore.getState().chatMsg || [];
@@ -629,6 +635,7 @@ export class SocketManager {
           });
           console.log("💬 Chat message received from user:", sender);
           break;
+        }
 
         // ========================================
         // UNKNOWN MESSAGE TYPE

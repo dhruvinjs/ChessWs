@@ -1,43 +1,43 @@
-import {PrismaClient} from '@prisma/client'
-import bcrypt from "bcrypt";
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding database...");
+  console.log('Seeding database...');
 
   // --- 1. Create Users ---
-  const passwordHash = await bcrypt.hash("password123", 10);
+  const passwordHash = await bcrypt.hash('password123', 10);
 
   const alice = await prisma.user.create({
     data: {
-      name: "Alice",
-      email: "alice@example.com",
+      name: 'Alice',
+      email: 'alice@example.com',
       password: passwordHash,
-      chessLevel: "BEGINNER",
+      chessLevel: 'BEGINNER',
     },
   });
 
   const bob = await prisma.user.create({
     data: {
-      name: "Bob",
-      email: "bob@example.com",
+      name: 'Bob',
+      email: 'bob@example.com',
       password: passwordHash,
-      chessLevel: "INTERMEDIATE",
+      chessLevel: 'INTERMEDIATE',
     },
   });
 
   const charlie = await prisma.user.create({
     data: {
-      name: "Charlie",
-      email: "charlie@example.com",
+      name: 'Charlie',
+      email: 'charlie@example.com',
       // Google user without password
-      googleId: "google-uid-123",
-      chessLevel: "PRO",
+      googleId: 'google-uid-123',
+      chessLevel: 'PRO',
     },
   });
 
-  console.log("Seeding finished!");
+  console.log('Seeding finished!');
 }
 
 main()

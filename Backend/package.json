@@ -6,7 +6,8 @@
     "dev": "tsc -b && node ./dist/index.js",
     "prisma:migrate": "prisma migrate dev --schema ./prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
-    "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma"
+    "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma",
+    "format": "prettier --write \"./**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "prisma": {
     "seed": "ts-node ./src/seed.ts"
@@ -36,6 +37,7 @@
     "@types/express": "^5.0.1",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/ws": "^8.18.1",
+    "prettier": "^3.7.4",
     "prisma": "^6.17.1",
     "ts-node": "^10.9.2"
   }
