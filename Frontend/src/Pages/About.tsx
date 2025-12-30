@@ -1,9 +1,8 @@
-
-import { Navbar } from "../Components"
-import { motion } from "framer-motion"
-import { useMemo } from "react"
+import { Navbar } from '../Components';
+import { motion } from 'framer-motion';
+import { useMemo } from 'react';
 export function About() {
-  const floatingPieces = useMemo(() => ["♛", "♜", "♝", "♞", "♟", "♚"], [])
+  const floatingPieces = useMemo(() => ['♛', '♜', '♝', '♞', '♟', '♚'], []);
 
   const floatingPieceStyles = useMemo(
     () =>
@@ -14,13 +13,13 @@ export function About() {
         animationDuration: `${6 + index * 0.5}s`,
       })),
     [floatingPieces]
-  )
+  );
 
   const stats = [
-    { label: "Technologies Mastered", value: "6+" },
-    { label: "Commits", value: "500+" },
-    { label: "Hours", value: "1.2K+" },
-  ]
+    { label: 'Technologies Mastered', value: '6+' },
+    { label: 'Commits', value: '500+' },
+    { label: 'Hours', value: '1.2K+' },
+  ];
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 transition-colors duration-300 relative overflow-hidden">
@@ -31,7 +30,7 @@ export function About() {
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-amber-300/40 to-orange-400/40 dark:from-amber-600/50 dark:to-orange-700/50 rounded-full blur-3xl animate-pulse"></div>
         <div
           className="absolute top-20 -left-32 w-80 h-80 bg-gradient-to-br from-yellow-300/30 to-amber-400/30 dark:from-amber-700/60 dark:to-yellow-700/60 rounded-full blur-2xl animate-pulse"
-          style={{ animationDelay: "1s" }}
+          style={{ animationDelay: '1s' }}
         ></div>
 
         {floatingPieces.map((piece, index) => (
@@ -102,9 +101,12 @@ export function About() {
         <div className="max-w-4xl mx-auto">
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             {[
-              { title: "Real-Time", desc: "WebSocket-powered instant moves" },
-              { title: "Fast Cache", desc: "Redis for lightning-fast performance" },
-              { title: "Scalable", desc: "Node.js + PostgreSQL + Prisma" },
+              { title: 'Real-Time', desc: 'WebSocket-powered instant moves' },
+              {
+                title: 'Fast Cache',
+                desc: 'Redis for lightning-fast performance',
+              },
+              { title: 'Scalable', desc: 'Node.js + PostgreSQL + Prisma' },
             ].map((card, i) => (
               <motion.div
                 key={card.title}
@@ -117,7 +119,9 @@ export function About() {
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 group-hover:text-amber-700 dark:group-hover:text-amber-400">
                   {card.title}
                 </h3>
-                <p className="text-slate-600 dark:text-slate-300 text-sm">{card.desc}</p>
+                <p className="text-slate-600 dark:text-slate-300 text-sm">
+                  {card.desc}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -144,7 +148,10 @@ export function About() {
             viewport={{ once: true }}
             className="text-3xl font-bold text-slate-900 dark:text-white mb-4"
           >
-            Built by <span className="text-amber-700 dark:text-amber-400">Dhruvin Soni</span>
+            Built by{' '}
+            <span className="text-amber-700 dark:text-amber-400">
+              Dhruvin Soni
+            </span>
           </motion.h2>
 
           <motion.p
@@ -154,12 +161,19 @@ export function About() {
             viewport={{ once: true }}
             className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl mx-auto mb-8"
           >
-            Passionate full-stack developer exploring real-time applications and modern web technologies through
-            interactive gaming experiences.
+            Passionate full-stack developer exploring real-time applications and
+            modern web technologies through interactive gaming experiences.
           </motion.p>
 
           <div className="flex flex-wrap justify-center gap-3 mb-8">
-            {["React", "Node.js", "Redis", "PostgreSQL", "Prisma", "WebSockets"].map((tech, i) => (
+            {[
+              'React',
+              'Node.js',
+              'Redis',
+              'PostgreSQL',
+              'Prisma',
+              'WebSockets',
+            ].map((tech, i) => (
               <motion.span
                 key={tech}
                 initial={{ opacity: 0, y: 15 }}
@@ -185,5 +199,5 @@ export function About() {
         </div>
       </section>
     </div>
-  )
+  );
 }

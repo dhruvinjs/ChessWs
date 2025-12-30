@@ -1,21 +1,25 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Chess } from "chess.js";
-import { useComputerGameStore } from "../stores/useComputerGameStore";
-import { computerSocketManager } from "../lib/ComputerSocketManager";
-import { ComputerCapturedPieces } from "../Components/computerGame/ComputerCapturedPieces";
-import { ComputerMoveHistory } from "../Components/computerGame/ComputerMoveHistory";
-import { useUserQuery } from "../hooks/useUserQuery";
-import { ConfirmDialog } from "../Components/ConfirmDialog";
-import { useNavigate } from "react-router-dom";
-import { ComputerChessBoard } from "../Components/computerGame/ComputerChessBoard";
-import { LoadingScreen } from "../Components/LoadingScreen"; // 🎯 NEW: Import LoadingScreen
-import toast from "react-hot-toast";
+import React, { useEffect, useRef, useState } from 'react';
+import { Chess } from 'chess.js';
+import { useComputerGameStore } from '../stores/useComputerGameStore';
+import { computerSocketManager } from '../lib/ComputerSocketManager';
+import { ComputerCapturedPieces } from '../Components/computerGame/ComputerCapturedPieces';
+import { ComputerMoveHistory } from '../Components/computerGame/ComputerMoveHistory';
+import { useUserQuery } from '../hooks/useUserQuery';
+import { ConfirmDialog } from '../Components/ConfirmDialog';
+import { useNavigate } from 'react-router-dom';
+import { ComputerChessBoard } from '../Components/computerGame/ComputerChessBoard';
+import { LoadingScreen } from '../Components/LoadingScreen'; // 🎯 NEW: Import LoadingScreen
+import toast from 'react-hot-toast';
 
 export const ComputerChessPage: React.FC = () => {
   const gameData = useComputerGameStore((state) => state.gameData);
   const gameStatus = useComputerGameStore((state) => state.gameStatus);
-  const connectionStatus = useComputerGameStore((state) => state.connectionStatus);
-  const setConnectionStatus = useComputerGameStore((state) => state.setConnectionStatus);
+  const connectionStatus = useComputerGameStore(
+    (state) => state.connectionStatus
+  );
+  const setConnectionStatus = useComputerGameStore(
+    (state) => state.setConnectionStatus
+  );
   const isThinking = useComputerGameStore((state) => state.isThinking);
   const resetGame = useComputerGameStore((state) => state.resetGame);
 
@@ -30,41 +34,41 @@ export const ComputerChessPage: React.FC = () => {
   const loadingTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!user?.id || connectionStatus !== "disconnected") {
+    if (!user?.id || connectionStatus !== 'disconnected') {
       return;
     }
 
     if (hasConnected.current) {
-      console.log("Connection attempt already initiated, skipping re-trigger.");
+      console.log('Connection attempt already initiated, skipping re-trigger.');
       return;
     }
 
     hasConnected.current = true;
-    setConnectionStatus("connecting");
+    setConnectionStatus('connecting');
 
-    console.log("Initiating WebSocket connection");
-    computerSocketManager.connect()
+    console.log('Initiating WebSocket connection');
+    computerSocketManager
+      .connect()
       .then(() => {
-        console.log("WebSocket connected successfully");
-        setConnectionStatus("connected");
-        
+        console.log('WebSocket connected successfully');
+        setConnectionStatus('connected');
+
         loadingTimeoutRef.current = setTimeout(() => {
-          console.log("No game data received after 5s, showing setup screen");
+          console.log('No game data received after 5s, showing setup screen');
           setIsLoadingGame(false);
         }, 5000);
       })
       .catch((error) => {
-        console.error("Connection failed:", error);
-        setConnectionStatus("error");
+        console.error('Connection failed:', error);
+        setConnectionStatus('error');
         hasConnected.current = false;
         setIsLoadingGame(false);
       });
-
   }, [user?.id, connectionStatus, setConnectionStatus]);
 
   useEffect(() => {
-    if (gameData && gameStatus === "active") {
-      console.log("✅ Game data received, stopping loading");
+    if (gameData && gameStatus === 'active') {
+      console.log('✅ Game data received, stopping loading');
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
@@ -75,7 +79,7 @@ export const ComputerChessPage: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      console.log("ComputerChessPage unmounting - disconnecting WebSocket");
+      console.log('ComputerChessPage unmounting - disconnecting WebSocket');
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
@@ -96,16 +100,16 @@ export const ComputerChessPage: React.FC = () => {
     }
     resetGame();
     setShowQuitDialog(false);
-    toast.success("Game quit successfully");
-    navigate("/computer");
+    toast.success('Game quit successfully');
+    navigate('/computer');
   };
 
   const handleBackClick = () => {
-    if (gameData && gameStatus === "active") {
+    if (gameData && gameStatus === 'active') {
       setShowBackDialog(true);
     } else {
       resetGame();
-      navigate("/home");
+      navigate('/home');
     }
   };
 
@@ -115,18 +119,18 @@ export const ComputerChessPage: React.FC = () => {
     }
     resetGame();
     setShowBackDialog(false);
-    navigate("/home");
+    navigate('/home');
   };
 
   // 🎯 NEW: New Game button handlers
   const handleNewGameClick = () => {
-    if (gameStatus === "active") {
+    if (gameStatus === 'active') {
       // Show confirmation dialog if game is active
       setShowNewGameDialog(true);
     } else {
       // If game is finished, just reset and go to setup
       resetGame();
-      navigate("/computer");
+      navigate('/computer');
     }
   };
 
@@ -136,23 +140,37 @@ export const ComputerChessPage: React.FC = () => {
     }
     resetGame();
     setShowNewGameDialog(false);
-    toast.success("Starting new game setup");
-    navigate("/computer");
+    toast.success('Starting new game setup');
+    navigate('/computer');
   };
 
   // Show loading spinner
-  if (isLoadingGame && connectionStatus !== "error" && connectionStatus !== "disconnected") {
+  if (
+    isLoadingGame &&
+    connectionStatus !== 'error' &&
+    connectionStatus !== 'disconnected'
+  ) {
     return <LoadingScreen />; // 🎯 Use LoadingScreen component
   }
 
   // Show error state
-  if (connectionStatus === "error") {
+  if (connectionStatus === 'error') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-2">
@@ -162,7 +180,7 @@ export const ComputerChessPage: React.FC = () => {
             Unable to connect to game server
           </p>
           <button
-            onClick={() => navigate("/computer")}
+            onClick={() => navigate('/computer')}
             className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
           >
             Go Back
@@ -173,8 +191,8 @@ export const ComputerChessPage: React.FC = () => {
   }
 
   // Show setup if no game
-  if (!gameData || gameStatus === "idle") {
-    navigate("/computer");
+  if (!gameData || gameStatus === 'idle') {
+    navigate('/computer');
     return null;
   }
 
@@ -200,10 +218,10 @@ export const ComputerChessPage: React.FC = () => {
           ) : (
             <p
               className={`text-lg font-medium ${
-                isPlayerTurn ? "text-green-600" : "text-orange-600"
+                isPlayerTurn ? 'text-green-600' : 'text-orange-600'
               }`}
             >
-              {isPlayerTurn ? "Your turn" : "Computer's turn"}
+              {isPlayerTurn ? 'Your turn' : "Computer's turn"}
             </p>
           )}
         </div>
@@ -233,7 +251,7 @@ export const ComputerChessPage: React.FC = () => {
                   onClick={handleNewGameClick}
                   className="w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
                 >
-                  {gameStatus === "active" ? "New Game" : "Play Again"}
+                  {gameStatus === 'active' ? 'New Game' : 'Play Again'}
                 </button>
               </div>
             </div>
@@ -248,19 +266,25 @@ export const ComputerChessPage: React.FC = () => {
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Difficulty:</span>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Difficulty:
+                  </span>
                   <span className="font-medium text-gray-800 dark:text-white">
                     {gameData.difficulty}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Your Color:</span>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Your Color:
+                  </span>
                   <span className="font-medium text-gray-800 dark:text-white">
-                    {gameData.playerColor === "w" ? "White" : "Black"}
+                    {gameData.playerColor === 'w' ? 'White' : 'Black'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-300">Moves:</span>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Moves:
+                  </span>
                   <span className="font-medium text-gray-800 dark:text-white">
                     {gameData.moves.length}
                   </span>

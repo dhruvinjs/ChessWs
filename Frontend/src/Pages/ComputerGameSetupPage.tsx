@@ -1,6 +1,6 @@
-import React from "react";
-import { ComputerGameSetup } from "../Components/computerGame/ComputerGameSetup";
-import { FloatingPieces } from "../Components/FloatingPieces";
+import React from 'react';
+import { ComputerGameSetup } from '../Components/computerGame/ComputerGameSetup';
+import { FloatingPieces } from '../Components/FloatingPieces';
 
 export const ComputerGameSetupPage: React.FC = () => {
   return (

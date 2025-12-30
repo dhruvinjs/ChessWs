@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { User, Trophy, Clock, Target, Star, Edit3, Camera } from "lucide-react";
-import { Button, Input } from "../Components";
-import { useUserQuery } from "../hooks/useUserQuery";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from 'react';
+import { User, Trophy, Clock, Target, Star, Edit3, Camera } from 'lucide-react';
+import { Button, Input } from '../Components';
+import { useUserQuery } from '../hooks/useUserQuery';
+import { useNavigate } from 'react-router-dom';
 
 export function Profile() {
   // const { initTheme } = useThemeStore();
@@ -16,48 +16,75 @@ export function Profile() {
   // Redirect unauthorized users to login
   useEffect(() => {
     if (!isLoading && (!user || isError)) {
-      nav("/login");
+      nav('/login');
     }
   }, [user, isLoading, isError, nav]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
-    name: user?.name || "Guest",
-    username: user?.id || "guest_user",
-    email: user?.email || "guest@example.com",
+    name: user?.name || 'Guest',
+    username: user?.id || 'guest_user',
+    email: user?.email || 'guest@example.com',
     rating: 1200,
-    country: "Unknown",
-    chessLevel: user?.chessLevel || "BEGINNER",
+    country: 'Unknown',
+    chessLevel: user?.chessLevel || 'BEGINNER',
   });
 
   // Update profileData when user changes
   useEffect(() => {
     if (user) {
       setProfileData({
-        name: user.name || "Guest",
+        name: user.name || 'Guest',
         username: user.id,
-        email: user.email || "guest@example.com",
+        email: user.email || 'guest@example.com',
         rating: 1200,
-        country: "Unknown",
-        chessLevel: user.chessLevel || "BEGINNER",
+        country: 'Unknown',
+        chessLevel: user.chessLevel || 'BEGINNER',
       });
     }
   }, [user]);
 
   // Stats (temporary mock)
   const stats = [
-    { label: "Games Played", value: "1,247", icon: <Target className="w-5 h-5" /> },
-    { label: "Win Rate", value: "68%", icon: <Trophy className="w-5 h-5" /> },
-    { label: "Best Rating", value: "1,923", icon: <Star className="w-5 h-5" /> },
-    { label: "Time Played", value: "342h", icon: <Clock className="w-5 h-5" /> },
+    {
+      label: 'Games Played',
+      value: '1,247',
+      icon: <Target className="w-5 h-5" />,
+    },
+    { label: 'Win Rate', value: '68%', icon: <Trophy className="w-5 h-5" /> },
+    {
+      label: 'Best Rating',
+      value: '1,923',
+      icon: <Star className="w-5 h-5" />,
+    },
+    {
+      label: 'Time Played',
+      value: '342h',
+      icon: <Clock className="w-5 h-5" />,
+    },
   ];
 
   // Recent games (mock)
   const recentGames = [
-    { opponent: "AlexChess99", result: "Win", rating: "+12", time: "2 hours ago" },
-    { opponent: "QueenGambit", result: "Loss", rating: "-8", time: "5 hours ago" },
-    { opponent: "KnightRider", result: "Win", rating: "+15", time: "1 day ago" },
-    { opponent: "PawnStorm", result: "Draw", rating: "+2", time: "2 days ago" },
+    {
+      opponent: 'AlexChess99',
+      result: 'Win',
+      rating: '+12',
+      time: '2 hours ago',
+    },
+    {
+      opponent: 'QueenGambit',
+      result: 'Loss',
+      rating: '-8',
+      time: '5 hours ago',
+    },
+    {
+      opponent: 'KnightRider',
+      result: 'Win',
+      rating: '+15',
+      time: '1 day ago',
+    },
+    { opponent: 'PawnStorm', result: 'Draw', rating: '+2', time: '2 days ago' },
   ];
 
   const handleSave = () => setIsEditing(false);
@@ -91,15 +118,27 @@ export function Profile() {
             <div className="flex-1">
               {isEditing ? (
                 <div className="space-y-4">
-                  <Input type="email" placeholder="Email" value={profileData.email} required />
-                  <Input type="text" placeholder="Username" value={profileData.name} required />
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={profileData.email}
+                    required
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Username"
+                    value={profileData.name}
+                    required
+                  />
                 </div>
               ) : (
                 <div>
                   <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">
                     {profileData.name}
                   </h1>
-                  <p className="text-lg text-slate-600 dark:text-slate-400">{profileData.email}</p>
+                  <p className="text-lg text-slate-600 dark:text-slate-400">
+                    {profileData.email}
+                  </p>
                   <p className="mt-1 text-sm text-indigo-600 dark:text-indigo-400 font-semibold">
                     {profileData.chessLevel}
                   </p>
@@ -111,8 +150,18 @@ export function Profile() {
             <div className="flex gap-3">
               {isEditing ? (
                 <>
-                  <Button variant="primary" size="md" onClick={handleSave} text="Save Changes" />
-                  <Button variant="outline" size="md" onClick={() => setIsEditing(false)} text="Cancel" />
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={handleSave}
+                    text="Save Changes"
+                  />
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => setIsEditing(false)}
+                    text="Cancel"
+                  />
                 </>
               ) : (
                 <Button
@@ -129,16 +178,24 @@ export function Profile() {
 
         {/* Stats Section */}
         <div className="border border-slate-200 dark:border-slate-700 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 rounded-2xl shadow-xl p-6">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Statistics</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+            Statistics
+          </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat, index) => (
               <div
                 key={index}
                 className="text-center p-4 bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-700 rounded-xl border border-slate-200 dark:border-slate-700"
               >
-                <div className="text-indigo-600 dark:text-indigo-400 mb-2 flex justify-center">{stat.icon}</div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{stat.value}</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">{stat.label}</div>
+                <div className="text-indigo-600 dark:text-indigo-400 mb-2 flex justify-center">
+                  {stat.icon}
+                </div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                  {stat.value}
+                </div>
+                <div className="text-sm text-slate-600 dark:text-slate-400">
+                  {stat.label}
+                </div>
               </div>
             ))}
           </div>
@@ -146,7 +203,9 @@ export function Profile() {
 
         {/* Recent Games */}
         <div className="border border-slate-200 dark:border-slate-700 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 rounded-2xl shadow-xl p-6">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Recent Games</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+            Recent Games
+          </h2>
           <div className="space-y-4">
             {recentGames.map((game, index) => (
               <div
@@ -158,23 +217,29 @@ export function Profile() {
                     {game.opponent[0]}
                   </div>
                   <div>
-                    <div className="font-semibold text-slate-900 dark:text-white">vs {game.opponent}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">{game.time}</div>
+                    <div className="font-semibold text-slate-900 dark:text-white">
+                      vs {game.opponent}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {game.time}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
                   <div
                     className={`font-bold ${
-                      game.result === "Win"
-                        ? "text-green-600"
-                        : game.result === "Loss"
-                        ? "text-red-600"
-                        : "text-yellow-600"
+                      game.result === 'Win'
+                        ? 'text-green-600'
+                        : game.result === 'Loss'
+                        ? 'text-red-600'
+                        : 'text-yellow-600'
                     }`}
                   >
                     {game.result}
                   </div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{game.rating}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    {game.rating}
+                  </div>
                 </div>
               </div>
             ))}

@@ -1,17 +1,20 @@
-import { GameHeader, GameStatus, MoveHistory, ChessBoard } from "../Components";
-import { DrawOfferDialog } from "../Components/chess";
-import { GameMessages } from "../types/chess";
-import { useGameStore } from "../stores/useGameStore";
-import { useEffect } from "react";
-import { useUserQuery } from "../hooks/useUserQuery";
+import { GameHeader, GameStatus, MoveHistory, ChessBoard } from '../Components';
+import { DrawOfferDialog } from '../Components/chess';
+import { GameMessages } from '../types/chess';
+import { useGameStore } from '../stores/useGameStore';
+import { useEffect } from 'react';
+import { useUserQuery } from '../hooks/useUserQuery';
 
 export function ChessGame() {
   const gameStatus = useGameStore((state) => state.gameStatus);
-  const initGuestConnection = useGameStore((state) => state.initGuestConnection);
+  const initGuestConnection = useGameStore(
+    (state) => state.initGuestConnection
+  );
   const { data: user, isLoading: isUserLoading } = useUserQuery();
-  
+
   const isGameActive =
-    gameStatus !== GameMessages.SEARCHING && gameStatus !== GameMessages.GAME_OVER;
+    gameStatus !== GameMessages.SEARCHING &&
+    gameStatus !== GameMessages.GAME_OVER;
 
   // ✅ Simple: Just call Zustand action when user data is ready
   useEffect(() => {
@@ -27,7 +30,6 @@ export function ChessGame() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 p-2 sm:p-4">
       <div className="w-full max-w-7xl mx-auto flex flex-col gap-2 sm:gap-4">
-        
         {/* Game Header */}
         <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-full">
           <GameHeader />
@@ -35,7 +37,6 @@ export function ChessGame() {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 w-full min-h-[calc(100vh-8rem)]">
-          
           {/* Left Panel - Game Status */}
           <div className="lg:col-span-3 order-2 lg:order-1">
             <GameStatus />
@@ -51,7 +52,9 @@ export function ChessGame() {
                   Game Board
                 </h2>
                 <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
-                  {gameStatus === GameMessages.SEARCHING ? "Searching" : "Active"}
+                  {gameStatus === GameMessages.SEARCHING
+                    ? 'Searching'
+                    : 'Active'}
                 </div>
               </div>
             </div>
@@ -72,7 +75,6 @@ export function ChessGame() {
           <div className="lg:col-span-3 order-3 lg:order-3">
             {isGameActive && <MoveHistory />}
           </div>
-
         </div>
       </div>
 

@@ -1,10 +1,10 @@
-import { User } from "../types/user";
-import { ChessLevel } from "../types/chess";
-import { gamesApi, userApi } from "./axios";
+import { User } from '../types/user';
+import { ChessLevel } from '../types/chess';
+import { gamesApi, userApi } from './axios';
 
 export interface RegisterPayload {
   name: string;
-  chessLevel:ChessLevel
+  chessLevel: ChessLevel;
   email: string;
   password: string;
 }
@@ -13,40 +13,38 @@ export interface LoginPayload {
   email: string;
   password: string;
 }
-export interface LoginResponse{
-    success:boolean,
-    message:string,
-    user:User
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  user: User;
 }
-
-
 
 export const authApis = {
   register: async (payload: RegisterPayload) => {
-    const res = await userApi.post("/register", payload);
+    const res = await userApi.post('/register', payload);
     return res.data;
   },
 
-  login: async ({ email, password }: LoginPayload)=> {
-    const res = await userApi.post("/login", { email, password });
+  login: async ({ email, password }: LoginPayload) => {
+    const res = await userApi.post('/login', { email, password });
     return res.data;
   },
 
   logout: async () => {
-    const res = await userApi.post("/logout");
+    const res = await userApi.post('/logout');
     return res.data;
   },
 
   getProfile: async () => {
-    const res = await userApi.get("/getProfile");
+    const res = await userApi.get('/getProfile');
     return res.data.user;
   },
   checkAuth: async () => {
-    const res = await userApi.post("/checkAuth", {});
+    const res = await userApi.post('/checkAuth', {});
     return res.data;
   },
-   getOrCreateGuest: async () => {
-    const res = await userApi.get("/cookie", { withCredentials: true });
+  getOrCreateGuest: async () => {
+    const res = await userApi.get('/cookie', { withCredentials: true });
     return res.data;
   },
 };
@@ -84,7 +82,7 @@ export const roomApis = {
     console.log('API: Create room response:', res.data); // Debug log
     return res.data;
   },
-  
+
   joinRoom: async (roomId: string): Promise<JoinRoomResponse> => {
     // console.log('API: Joining room with ID:', roomId); // Debug log
     const payload = { roomId };
@@ -100,22 +98,22 @@ export const roomApis = {
     console.log('API: Cancel room response:', res.data);
     return res.data;
   },
-}
+};
 
-export const computerGameApi={
-  createComputerGame:async(difficulty:string,playerColor:string)=>{
-     const res = await gamesApi.post('/computer/create',{
-       difficulty,
-       playerColor
-     });
+export const computerGameApi = {
+  createComputerGame: async (difficulty: string, playerColor: string) => {
+    const res = await gamesApi.post('/computer/create', {
+      difficulty,
+      playerColor,
+    });
     console.log('API: Create room response:', res.data); // Debug log
     return res.data;
   },
-  cancelComputerGame:async(computerGameId:number)=>{
-    const res = await gamesApi.patch('/computer/finish',{
-      computerGameId       
-     });
+  cancelComputerGame: async (computerGameId: number) => {
+    const res = await gamesApi.patch('/computer/finish', {
+      computerGameId,
+    });
     console.log('API: Create room response:', res.data); // Debug log
     return res.data;
-  }
-}
+  },
+};

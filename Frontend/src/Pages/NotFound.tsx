@@ -1,13 +1,13 @@
-import { useLocation, Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { useEffect } from "react";
+import { useLocation, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { useEffect } from 'react';
 
-export function NotFound  ()  {
+export function NotFound() {
   const location = useLocation();
 
   useEffect(() => {
     console.error(
-      "404 Error: User attempted to access non-existent route:",
+      '404 Error: User attempted to access non-existent route:',
       location.pathname
     );
   }, [location.pathname]);
@@ -25,9 +25,9 @@ export function NotFound  ()  {
           animate={{ rotate: 10 }}
           transition={{
             repeat: Infinity,
-            repeatType: "reverse",
+            repeatType: 'reverse',
             duration: 2.5,
-            ease: "easeInOut",
+            ease: 'easeInOut',
           }}
           className="text-6xl mb-4"
         >
@@ -54,5 +54,4 @@ export function NotFound  ()  {
       </motion.div>
     </div>
   );
-};
-
+}

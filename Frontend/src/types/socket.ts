@@ -44,5 +44,5 @@ export type ServerMessage =
   | { type: typeof GameMessages.TIMER_UPDATE; payload: TimerUpdatePayload }; // <-- added
 export interface SocketMessage {
   type: string;
-  payload?: any; // Use `unknown` for type safety
+  payload?: unknown; // Use `unknown` for type safety
 }

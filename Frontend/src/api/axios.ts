@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from 'axios';
 
 const user_base_url = import.meta.env.VITE_USER_BASE_URL;
 const game_base_url = import.meta.env.VITE_GAME_BASE_URL;
@@ -13,7 +13,7 @@ export const gamesApi = axios.create({
   withCredentials: true,
 });
 
-export const roomApi=axios.create({
-    baseURL:`${user_base_url}/room`,
-    withCredentials:true
-})
+export const roomApi = axios.create({
+  baseURL: `${user_base_url}/room`,
+  withCredentials: true,
+});

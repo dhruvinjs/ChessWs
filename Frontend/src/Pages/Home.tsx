@@ -1,45 +1,48 @@
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Cpu, Swords, Users } from "lucide-react";
-import { Button } from "../Components/Button";
-import { FloatingPieces } from "../Components/FloatingPieces";
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Cpu, Swords, Users } from 'lucide-react';
+import { Button } from '../Components/Button';
+import { FloatingPieces } from '../Components/FloatingPieces';
 
 export function Home() {
   const nav = useNavigate();
 
   const options = [
     {
-      title: "Play vs Computer",
-      description: "Train your skills against AI opponents powered by Stockfish engine.",
+      title: 'Play vs Computer',
+      description:
+        'Train your skills against AI opponents powered by Stockfish engine.',
       icon: <Cpu className="h-8 w-8 text-indigo-500 dark:text-amber-400" />,
-      gradient: "from-indigo-500 to-purple-500",
-      onClick: () => nav("/computer"),
+      gradient: 'from-indigo-500 to-purple-500',
+      onClick: () => nav('/computer'),
     },
     {
-      title: "Random Match",
-      description: "Instantly find and play with another player online.",
+      title: 'Random Match',
+      description: 'Instantly find and play with another player online.',
       icon: <Swords className="h-8 w-8 text-amber-500 dark:text-amber-400" />,
-      gradient: "from-amber-500 to-orange-500",
-      onClick: () => nav("/game"),
+      gradient: 'from-amber-500 to-orange-500',
+      onClick: () => nav('/game'),
     },
     {
-      title: "Create or Join Room",
-      description: "Invite friends or join a private chess room to play together.",
+      title: 'Create or Join Room',
+      description:
+        'Invite friends or join a private chess room to play together.',
       icon: <Users className="h-8 w-8 text-rose-500 dark:text-amber-400" />,
-      gradient: "from-rose-500 to-pink-500",
-      onClick: () => nav("/room"),
+      gradient: 'from-rose-500 to-pink-500',
+      onClick: () => nav('/room'),
     },
   ];
 
   return (
     <section className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-gray-950 dark:via-gray-900 dark:to-amber-950 flex flex-col items-center justify-center px-4 py-16">
-      <FloatingPieces/>
+      <FloatingPieces />
       <motion.h1
         className="text-4xl sm:text-5xl font-bold mb-12 text-slate-900 dark:text-white text-center"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        Welcome Back to <span className="text-amber-600 dark:text-amber-400">ChessVerse</span>
+        Welcome Back to{' '}
+        <span className="text-amber-600 dark:text-amber-400">ChessVerse</span>
       </motion.h1>
 
       <div className="grid gap-8 md:grid-cols-3 w-full max-w-6xl">
@@ -64,7 +67,7 @@ export function Home() {
             </p>
             <Button
               variant="primary"
-              text={opt.title.includes("Computer") ? "🎮 Play Now" : "Start"}
+              text={opt.title.includes('Computer') ? '🎮 Play Now' : 'Start'}
               size="md"
               className="w-full bg-gradient-to-r from-indigo-500 to-amber-500 hover:from-indigo-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-200"
               onClick={opt.onClick}

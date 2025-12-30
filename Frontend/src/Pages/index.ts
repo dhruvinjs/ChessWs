@@ -1,9 +1,9 @@
-export { Room } from "./Room";
-export { Landing } from "./Landing";
-export {Login } from "./Login";
-export {Register} from './Register'
-export { About } from "./About";
-export { ChessGame } from "./ChessGame";
-export {Home}from './Home'
-export {NotFound} from './NotFound'
-export { ComputerChessPage } from './ComputerChessPage'
+export { Room } from './Room';
+export { Landing } from './Landing';
+export { Login } from './Login';
+export { Register } from './Register';
+export { About } from './About';
+export { ChessGame } from './ChessGame';
+export { Home } from './Home';
+export { NotFound } from './NotFound';
+export { ComputerChessPage } from './ComputerChessPage';

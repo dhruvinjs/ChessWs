@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { Button, Card, Input } from "../Components";
-import { toast } from "react-hot-toast";
-import { Eye, EyeOff } from "lucide-react";
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button, Card, Input } from '../Components';
+import { toast } from 'react-hot-toast';
+import { Eye, EyeOff } from 'lucide-react';
 
-import { useLoginMutation } from "../hooks/useAuth";
+import { useLoginMutation } from '../hooks/useAuth';
 
 export function Login() {
   const emailRef = useRef<HTMLInputElement>(null);
@@ -14,7 +14,7 @@ export function Login() {
   const { mutate: login, isPending } = useLoginMutation();
 
   const inputStyles =
-    "bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:outline-none text-slate-900 dark:text-slate-100 w-full transition-colors";
+    'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-400 focus:outline-none text-slate-900 dark:text-slate-100 w-full transition-colors';
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,17 +23,19 @@ export function Login() {
     const password = passwordRef.current?.value;
 
     if (!email || !password) {
-      toast.error("Please enter both email and password.");
+      toast.error('Please enter both email and password.');
       return;
     }
 
     login({ email, password });
   };
 
-
   return (
     <section className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-amber-50 dark:from-gray-900 dark:via-slate-900 dark:to-indigo-950">
-      <Card title="Welcome Back" subtitle="Log in to continue your chess journey.">
+      <Card
+        title="Welcome Back"
+        subtitle="Log in to continue your chess journey."
+      >
         <form className="space-y-6" onSubmit={handleLogin}>
           <Input
             type="email"
@@ -44,7 +46,7 @@ export function Login() {
           />
           <div className="relative">
             <Input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               inputRef={passwordRef}
               required
@@ -64,7 +66,7 @@ export function Login() {
           </div>
           <Button
             size="lg"
-            text={isPending ? "Logging in..." : "Login"}
+            text={isPending ? 'Logging in...' : 'Login'}
             variant="primary"
             loading={isPending}
             className="w-full bg-gradient-to-r from-indigo-500 to-amber-500 hover:from-indigo-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-lg"
@@ -72,7 +74,7 @@ export function Login() {
         </form>
         <div className="mt-6 text-center">
           <p className="text-slate-600 dark:text-slate-400">
-            Don't have an account?{" "}
+            Don't have an account?{' '}
             <Link
               to="/register"
               className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 font-semibold transition-colors "
