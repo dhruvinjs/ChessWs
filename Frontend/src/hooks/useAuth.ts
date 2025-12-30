@@ -1,12 +1,25 @@
 // hooks/useAuthMutations.ts
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "react-hot-toast";
-import { authApis } from "../api/api";
-import { useNavigate } from "react-router-dom";
-import { User } from "../types/user";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import { authApis } from '../api/api';
+import { useNavigate } from 'react-router-dom';
+import { User } from '../types/user';
+import axios from 'axios';
 
-// Helper function to add delay
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Helper to extract error message from unknown error types
+ */
+const getErrorMessage = (err: unknown): string => {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data?.message || err.message;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return 'An unexpected error occurred';
+};
 
 export function useLoginMutation() {
   const queryClient = useQueryClient();
@@ -15,7 +28,7 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: authApis.login,
     onSuccess: async (data) => {
-      toast.success(data.message || "Login successful");
+      toast.success(data.message || 'Login successful');
 
       const user: User = {
         id: data.id,
@@ -24,18 +37,13 @@ export function useLoginMutation() {
         email: data.email,
         isGuest: false,
       };
-      
-      // ✅ Set the data
-      queryClient.setQueryData(["user"], user);
-      
-      // ✅ Wait a tiny bit for React Query to sync (50ms is usually enough)
+
+      queryClient.setQueryData(['user'], user);
       await sleep(50);
-      
-      // ✅ Navigate after sync
-      nav("/home", { replace: true });
+      nav('/home', { replace: true });
     },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || err.message || "Login failed");
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err));
     },
   });
 }
@@ -47,7 +55,7 @@ export function useRegisterMutation() {
   return useMutation({
     mutationFn: authApis.register,
     onSuccess: async (data) => {
-      toast.success(data.message || "Registration successful");
+      toast.success(data.message || 'Registration successful');
 
       const user: User = {
         id: data.id,
@@ -57,24 +65,17 @@ export function useRegisterMutation() {
         isGuest: false,
       };
 
-      // ✅ Set the data
-      queryClient.setQueryData(["user"], user);
-      
-      // ✅ Wait a tiny bit for React Query to sync
+      queryClient.setQueryData(['user'], user);
       await sleep(50);
-      
-      // ✅ Navigate after sync
-      nav("/home", { replace: true });
+      nav('/home', { replace: true });
     },
-    onError: (err: any) => {
-      // Handle Zod validation errors specifically
-      if (err.response?.data?.errors) {
-        const errors = err.response.data.errors;
-        errors.forEach((error: any) => {
-          toast.error(error.message);
-        });
+    onError: (err: unknown) => {
+      // Handle Zod/Validation errors specifically if they exist
+      if (axios.isAxiosError(err) && err.response?.data?.errors) {
+        const errors = err.response.data.errors as Array<{ message: string }>;
+        errors.forEach((error) => toast.error(error.message));
       } else {
-        toast.error(err.response?.data?.message || err.message || "Registration failed");
+        toast.error(getErrorMessage(err));
       }
     },
   });
@@ -86,26 +87,27 @@ export function useLogoutMutation() {
   return useMutation({
     mutationFn: authApis.logout,
     onSuccess: async () => {
-      toast.success("Logged out successfully");
-      
+      toast.success('Logged out successfully');
+
       try {
         const guestData = await authApis.getOrCreateGuest();
         const guestUser = {
           ...(guestData.user || guestData),
-          isGuest: true
+          isGuest: true,
         };
-        queryClient.setQueryData(["user"], guestUser);
-        
-        // Small delay before redirect
+        queryClient.setQueryData(['user'], guestUser);
+
         await sleep(50);
-        window.location.href = "/";
-      } catch (error) {
-        queryClient.removeQueries({ queryKey: ["user"] });
-        window.location.href = "/";
+        window.location.href = '/';
+      } catch (error: unknown) {
+        // Log the error for debugging but don't crash
+        console.error('Guest profile restoration failed:', error);
+        queryClient.removeQueries({ queryKey: ['user'] });
+        window.location.href = '/';
       }
     },
-    onError: () => {
-      toast.error("Logout failed");
+    onError: (err: unknown) => {
+      toast.error(getErrorMessage(err) || 'Logout failed');
     },
   });
 }

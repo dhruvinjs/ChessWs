@@ -1,35 +1,42 @@
-import { useState } from "react"
-import { Button } from "../Components"
-import { motion } from "framer-motion"
-import { FloatingPieces } from "../Components/FloatingPieces"
-import { roomApis } from "../api/api"
-import { showMessage } from "../Components/ToastMessages"
-import { useNavigate } from "react-router-dom"
-import { useGameStore } from "../stores/useGameStore"
-import { SocketManager } from "../lib/socketManager"
-import { useUserQuery } from "../hooks/useUserQuery"
-import { ConfirmDialog } from "../Components/ConfirmDialog"
+import { useState } from 'react';
+import { Button } from '../Components';
+import { motion } from 'framer-motion';
+import { FloatingPieces } from '../Components/FloatingPieces';
+import { roomApis } from '../api/api';
+import axios from 'axios';
+import { showMessage } from '../Components/ToastMessages';
+import { useNavigate } from 'react-router-dom';
+import { useGameStore } from '../stores/useGameStore';
+import { SocketManager } from '../lib/socketManager';
+import { useUserQuery } from '../hooks/useUserQuery';
+import { ConfirmDialog } from '../Components/ConfirmDialog';
 
 export function Room() {
-  const [roomCode, setRoomCode] = useState("")
-  const [mode, setMode] = useState<"join" | "host">("join")
-  const [isLoading, setIsLoading] = useState(false)
-  const [showExistingRoomDialog, setShowExistingRoomDialog] = useState(false)
-  const [existingRoomId, setExistingRoomId] = useState<string | null>(null)
-  const [showCancelRoomDialog, setShowCancelRoomDialog] = useState(false)
+  const [roomCode, setRoomCode] = useState('');
+  const [mode, setMode] = useState<'join' | 'host'>('join');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showExistingRoomDialog, setShowExistingRoomDialog] = useState(false);
+  const [existingRoomId, setExistingRoomId] = useState<string | null>(null);
+  const [showCancelRoomDialog, setShowCancelRoomDialog] = useState(false);
 
-  const navigate = useNavigate()
-  const setRoomInfo = useGameStore((state) => state.setRoomInfo)
-  const { data: user } = useUserQuery()
+  const navigate = useNavigate();
+  const setRoomInfo = useGameStore((state) => state.setRoomInfo);
+  const { data: user } = useUserQuery();
 
   const handleJoinRoom = async () => {
     const trimmedRoomCode = roomCode.trim();
     if (!trimmedRoomCode) {
-      showMessage("Validation Error", "Please enter a room code", { type: "error" });
+      showMessage('Validation Error', 'Please enter a room code', {
+        type: 'error',
+      });
       return;
     }
     if (trimmedRoomCode.length !== 8) {
-      showMessage("Validation Error", "Room code must be exactly 8 characters", { type: "error" });
+      showMessage(
+        'Validation Error',
+        'Room code must be exactly 8 characters',
+        { type: 'error' }
+      );
       return;
     }
     setIsLoading(true);
@@ -40,19 +47,25 @@ export function Room() {
         setRoomInfo(roomInfo);
         if (user?.id) {
           const socketManager = SocketManager.getInstance();
-          socketManager.init("room", user.id);
+          socketManager.init('room', user.id);
         }
-        showMessage("Room Joined!", response.message, { type: "success" });
-        setRoomCode("");
+        showMessage('Room Joined!', response.message, { type: 'success' });
+        setRoomCode('');
         setTimeout(() => navigate(`/room/${trimmedRoomCode}`), 1000);
       } else {
-        showMessage("Join Failed", response.message, { type: "error" });
+        showMessage('Join Failed', response.message, { type: 'error' });
       }
-    } catch (error: any) {
-      let errorMessage = error.response?.data?.message || error.message || "Failed to join room";
-      if (error.response?.status === 404) errorMessage = "Room not found.";
-      if (error.response?.status === 400) errorMessage = error.response.data.message;
-      showMessage("Error", errorMessage, { type: "error" });
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to join room';
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+        if (error.response?.status === 404) errorMessage = 'Room not found.';
+        if (error.response?.status === 400)
+          errorMessage = error.response.data.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      showMessage('Error', errorMessage, { type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -69,19 +82,34 @@ export function Room() {
         setRoomInfo(roomInfo);
         if (user?.id) {
           const socketManager = SocketManager.getInstance();
-          socketManager.init("room", user.id);
+          socketManager.init('room', user.id);
         }
-        showMessage("Room Created!", `Room ${createdRoomId} created successfully!`, { type: "success" });
+        showMessage(
+          'Room Created!',
+          `Room ${createdRoomId} created successfully!`,
+          { type: 'success' }
+        );
         setTimeout(() => navigate(`/room/${createdRoomId}`), 1500);
       } else {
-        showMessage("Creation Failed", response.message ?? "Something went wrong", { type: "error" });
+        showMessage(
+          'Creation Failed',
+          response.message ?? 'Something went wrong',
+          { type: 'error' }
+        );
       }
-    } catch (error: any) {
-      if (error.response?.status === 400 && error.response.data?.roomId) {
+    } catch (error: unknown) {
+      if (
+        axios.isAxiosError(error) &&
+        error.response?.status === 400 &&
+        error.response.data?.roomId
+      ) {
         setExistingRoomId(error.response.data.roomId);
         setShowExistingRoomDialog(true);
       } else {
-        showMessage("Error", error.response?.data?.message || "Failed to create room", { type: "error" });
+        const errorMessage = axios.isAxiosError(error)
+          ? error.response?.data?.message || 'Failed to create room'
+          : 'Failed to create room';
+        showMessage('Error', errorMessage, { type: 'error' });
       }
     } finally {
       setIsLoading(false);
@@ -90,16 +118,12 @@ export function Room() {
 
   const handleRejoinExistingRoom = () => {
     if (existingRoomId) {
-      showMessage("Rejoining Room", `Redirecting to ${existingRoomId}`, { type: "info" });
+      showMessage('Rejoining Room', `Redirecting to ${existingRoomId}`, {
+        type: 'info',
+      });
       setShowExistingRoomDialog(false);
       navigate(`/room/${existingRoomId}`);
     }
-  };
-
-  const handleCancelRejoin = () => {
-    setShowExistingRoomDialog(false);
-    setExistingRoomId(null);
-    showMessage("Cancelled", "Please finish or leave your existing room first.", { type: "info" });
   };
 
   const handleCancelExistingRoom = async () => {
@@ -108,10 +132,14 @@ export function Room() {
     try {
       const response = await roomApis.cancelRoom(existingRoomId);
       if (response.success) {
-        showMessage("Room Cancelled", `Room ${existingRoomId} has been cancelled.`, { type: "success" });
+        showMessage(
+          'Room Cancelled',
+          `Room ${existingRoomId} has been cancelled.`,
+          { type: 'success' }
+        );
 
         useGameStore.setState({
-          roomId: "",
+          roomId: '',
           isRoomCreator: false,
           opponentId: null,
           opponentName: null,
@@ -121,12 +149,17 @@ export function Room() {
 
         setShowExistingRoomDialog(false);
         setExistingRoomId(null);
-        showMessage("Ready", "You can now create a new room.", { type: "info" });
+        showMessage('Ready', 'You can now create a new room.', {
+          type: 'info',
+        });
       } else {
-        showMessage("Error", response.message, { type: "error" });
+        showMessage('Error', response.message, { type: 'error' });
       }
-    } catch (error: any) {
-      showMessage("Error", error.response?.data?.message || "Failed to cancel room", { type: "error" });
+    } catch (error: unknown) {
+      const errorMessage = axios.isAxiosError(error)
+        ? error.response?.data?.message || 'Failed to cancel room'
+        : 'Failed to cancel room';
+      showMessage('Error', errorMessage, { type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +176,6 @@ export function Room() {
         className="relative z-10 w-full max-w-md"
       >
         <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg rounded-3xl shadow-2xl border border-amber-200/50 dark:border-amber-800/50 p-10 space-y-6">
-
           <h1 className="text-4xl font-extrabold text-center bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
             Chess Room
           </h1>
@@ -153,12 +185,24 @@ export function Room() {
           </p>
 
           <div className="flex gap-3 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-            <Button size="sm" variant={mode === "join" ? "outline" : "secondary"} text="Join Room" className="flex-1" onClick={() => setMode("join")} />
-            <Button size="sm" variant={mode === "host" ? "outline" : "secondary"} text="Host Room" className="flex-1" onClick={() => setMode("host")} />
+            <Button
+              size="sm"
+              variant={mode === 'join' ? 'outline' : 'secondary'}
+              text="Join Room"
+              className="flex-1"
+              onClick={() => setMode('join')}
+            />
+            <Button
+              size="sm"
+              variant={mode === 'host' ? 'outline' : 'secondary'}
+              text="Host Room"
+              className="flex-1"
+              onClick={() => setMode('host')}
+            />
           </div>
 
           <div className="space-y-5">
-            {mode === "join" ? (
+            {mode === 'join' ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -168,19 +212,36 @@ export function Room() {
                     type="text"
                     value={roomCode}
                     onChange={(e) =>
-                      setRoomCode(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 8))
+                      setRoomCode(
+                        e.target.value
+                          .replace(/[^a-zA-Z0-9_-]/g, '')
+                          .slice(0, 8)
+                      )
                     }
                     className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider"
                     placeholder="Enter 8-character room code"
                   />
                 </div>
-                <Button size="lg" variant="primary" text={isLoading ? "Joining..." : "Join Room"} className="w-full" onClick={handleJoinRoom} disabled={isLoading} />
+                <Button
+                  size="lg"
+                  variant="primary"
+                  text={isLoading ? 'Joining...' : 'Join Room'}
+                  className="w-full"
+                  onClick={handleJoinRoom}
+                  disabled={isLoading}
+                />
 
                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700 text-center">
                   <p className="text-sm mb-3 text-slate-600 dark:text-slate-400">
                     Don't have a room code?
                   </p>
-                  <Button size="md" variant="outline" text="Create Your Own Room" className="w-full" onClick={() => setMode("host")} />
+                  <Button
+                    size="md"
+                    variant="outline"
+                    text="Create Your Own Room"
+                    className="w-full"
+                    onClick={() => setMode('host')}
+                  />
                 </div>
               </>
             ) : (
@@ -190,16 +251,26 @@ export function Room() {
                     Your Room Code
                   </label>
                   <div className="w-full p-4 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700 rounded-xl text-center text-lg font-mono tracking-wider text-amber-800 dark:text-amber-200">
-                    {roomCode || "Click to generate"}
+                    {roomCode || 'Click to generate'}
                   </div>
                 </div>
 
                 <Button
                   size="lg"
                   variant="primary"
-                  text={isLoading ? "Loading..." : roomCode ? "Join Your Room" : "Host New Room"}
+                  text={
+                    isLoading
+                      ? 'Loading...'
+                      : roomCode
+                      ? 'Join Your Room'
+                      : 'Host New Room'
+                  }
                   className="w-full"
-                  onClick={roomCode ? () => navigate(`/room/${roomCode}`) : handleHostRoom}
+                  onClick={
+                    roomCode
+                      ? () => navigate(`/room/${roomCode}`)
+                      : handleHostRoom
+                  }
                   disabled={isLoading}
                 />
 
@@ -213,10 +284,18 @@ export function Room() {
                         className="flex-1"
                         onClick={() => {
                           navigator.clipboard.writeText(roomCode);
-                          showMessage("Copied", "Room code copied!", { type: "success" });
+                          showMessage('Copied', 'Room code copied!', {
+                            type: 'success',
+                          });
                         }}
                       />
-                      <Button size="sm" variant="outline" text="Enter Room" className="flex-1" onClick={() => navigate(`/room/${roomCode}`)} />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        text="Enter Room"
+                        className="flex-1"
+                        onClick={() => navigate(`/room/${roomCode}`)}
+                      />
                     </div>
 
                     <p className="text-sm text-center text-slate-600 dark:text-slate-400">
@@ -233,26 +312,32 @@ export function Room() {
       {/* REJOIN EXISTING ROOM DIALOG */}
       <ConfirmDialog
         isOpen={showExistingRoomDialog}
-        onClose={handleCancelRejoin}
+        onClose={() => {
+          setShowExistingRoomDialog(false);
+          setShowCancelRoomDialog(true);
+        }}
         onConfirm={handleRejoinExistingRoom}
         title="Active Room Found"
-        message={`You already have an active room: ${existingRoomId}.`}
+        message={`You already have an active room: ${existingRoomId}. Would you like to rejoin it or cancel it?`}
         confirmText="Rejoin Room"
-        cancelText="Go Back"
+        cancelText="Cancel Room"
       />
 
       <ConfirmDialog
         isOpen={showCancelRoomDialog}
-        onClose={() => setShowCancelRoomDialog(false)}
+        onClose={() => {
+          setShowCancelRoomDialog(false);
+          setExistingRoomId(null);
+        }}
         onConfirm={() => {
           setShowCancelRoomDialog(false);
           handleCancelExistingRoom();
         }}
         title="Cancel Room?"
-        message={`Do you really want to cancel room ${existingRoomId}?`}
+        message={`Do you really want to cancel room ${existingRoomId}? This action cannot be undone.`}
         confirmText="Yes, Cancel"
-        cancelText="No"
+        cancelText="No, Go Back"
       />
     </div>
-  )
+  );
 }

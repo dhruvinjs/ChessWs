@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { gamesApi } from "../api/axios";
+import { useQuery } from '@tanstack/react-query';
+import { gamesApi } from '../api/axios';
 
 async function fetchGuestGamesTotal(): Promise<number> {
-  const response = await gamesApi.get("/guest-games/total");
+  const response = await gamesApi.get('/guest-games/total');
   if (response.data.success) {
     return response.data.count;
   }
@@ -11,9 +11,8 @@ async function fetchGuestGamesTotal(): Promise<number> {
 
 export function useGuestGamesTotalQuery() {
   return useQuery({
-    queryKey: ["guestGamesTotal"],
+    queryKey: ['guestGamesTotal'],
     queryFn: fetchGuestGamesTotal,
     staleTime: 1000 * 60 * 5, // cache for 5 minutes
   });
 }
-

@@ -1,4 +1,4 @@
-import confetti from "canvas-confetti";
+import confetti from 'canvas-confetti';
 
 export function launchConfetti() {
   const duration = 3 * 1000; // 3 seconds
@@ -6,7 +6,7 @@ export function launchConfetti() {
 
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
 
-  const interval: any = setInterval(() => {
+  const interval = setInterval(() => {
     const timeLeft = animationEnd - Date.now();
 
     if (timeLeft <= 0) {
@@ -21,8 +21,8 @@ export function launchConfetti() {
       particleCount,
       origin: {
         x: Math.random(),
-        y: Math.random() - 0.2
-      }
+        y: Math.random() - 0.2,
+      },
     });
   }, 200);
 }
