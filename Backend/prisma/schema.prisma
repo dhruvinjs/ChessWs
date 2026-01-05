@@ -54,6 +54,9 @@ model User {
   computerGames ComputerGame[] @relation("UserComputerGames")
   computerGamesWon ComputerGame[] @relation("ComputerGamesWon")
   computerGamesLost ComputerGame[] @relation("ComputerGamesLost")
+  guestGamesAsP1 GuestGames[] @relation("GuestP1")
+  guestGamesAsP2 GuestGames[] @relation("GuestP2")
+
 }
 
 model Game {
@@ -78,6 +81,9 @@ model Game {
   endedAt DateTime? 
   capturedPieces String[] @default([])
   status GameStatus @default(ACTIVE)
+  player1DrawOfferCount Int @default(3)
+  player2DrawOfferCount Int @default(3)
+
 }
 
 model ComputerGame{
@@ -99,6 +105,40 @@ model ComputerGame{
   capturedPieces String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+model GuestGames{
+  id Int @id @default(autoincrement())
+  player1GuestId String
+  player2GuestId String
+
+  player1UserId Int? 
+  player2UserId Int? 
+
+  player1Color String  // "w" | "b" - player2 gets the opposite
+
+  status GameStatus @default(ACTIVE)
+  draw Boolean @default(false)
+  winner String?
+  loser String? // Player1 or Player2
+
+  player1TimeLeft Int @default(600)
+  player2TimeLeft Int @default(600)
+
+  moves Json @default("[]")
+  capturedPieces String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  endedAt DateTime?
+
+  lastMoveBy String?
+  currentFen String
+  player1DrawOfferCount Int @default(3)
+  player2DrawOfferCount Int @default(3)
+  // Optional Relation if the guest converts into logged in users
+  player1 User? @relation("GuestP1",fields:[player1UserId],references:[id])
+  player2 User? @relation("GuestP2",fields:[player2UserId],references:[id])
+
 }
 
 

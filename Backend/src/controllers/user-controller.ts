@@ -9,6 +9,8 @@ const router = express.Router();
 import { nanoid } from 'nanoid';
 import { redis } from '../clients/redisClient';
 import { roomManager } from '../Classes/RoomManager';
+import { addGuestGamesToUserProfile } from '../utils/chessUtils';
+import { removePlayerFromQueue } from '../Services/MatchMaking';
 
 export enum ChessLevel {
   BEGINNER,
@@ -39,17 +41,24 @@ router.post('/register', async (req: Request, res: Response) => {
         .max(100, 'Password is too long '),
       chessLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'PRO']),
     });
+    const guestId = req.cookies.id;
 
     const validateData = schema.parse(req.body);
     const { name, email, password, chessLevel } = validateData;
     console.log(name, email, password, chessLevel);
+
+    // Remove player from matchmaking queue if they were searching as guest
+    if (guestId) {
+      await removePlayerFromQueue(guestId);
+    }
+
     const existingUser = await pc.user.findUnique({ where: { email: email } });
     if (existingUser) {
-      res.status(203).json({ message: 'User Already Exists', success: false });
+      res.status(400).json({ message: 'User Already Exists', success: false });
       return;
     }
     const hashedPass = await bcrypt.hash(password, 12);
-
+  
     const newUser = await pc.user.create({
       data: {
         name: name,
@@ -58,11 +67,22 @@ router.post('/register', async (req: Request, res: Response) => {
         chessLevel: chessLevel,
       },
     });
+    const guestGamesOfUser = await pc.guestGames.findMany({
+      where: {
+        OR: [{ player1GuestId: guestId }, { player2GuestId: guestId }],
+      },
+    });
+    if (guestGamesOfUser.length > 0) {
+
+      addGuestGamesToUserProfile(guestId, newUser.id);
+    }
+
     const token = jwt.sign(
       { id: newUser.id },
       process.env.SECRET_TOKEN as string,
       { expiresIn: '8h' }
     );
+
     res.clearCookie('guestId');
     res.cookie('token', token, {
       httpOnly: true,
@@ -70,20 +90,18 @@ router.post('/register', async (req: Request, res: Response) => {
       sameSite: 'lax',
       maxAge: 6 * 60 * 60 * 1000, // 6 hours in ms
     });
-    res
-      .status(200)
-      .json({
-        message: 'User Created',
-        success: true,
-        id: newUser.id,
-        username: newUser.name,
-        email: newUser.email,
-        chessLevel: chessLevel,
-        isGuest: false,
-      });
+    res.status(200).json({
+      message: 'User Created',
+      success: true,
+      id: newUser.id,
+      username: newUser.name,
+      email: newUser.email,
+      chessLevel: chessLevel,
+      isGuest: false,
+    });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      // ✅ Handle validation errors specifically
       res.status(400).json({
         message: 'Validation error',
         errors: error.errors,
@@ -98,35 +116,203 @@ router.post('/register', async (req: Request, res: Response) => {
     }
   }
 });
-router.get(
-  '/getProfile',
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    try {
-      //@ts-ignore
-      const id = req.userId;
-
-      const user = await pc.user.findUnique({
-        where: { id: Number(id) },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          chessLevel: true,
-        },
+//Will return games also which are computer and room-based!
+router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    //@ts-ignore
+    const id = req.userId;
+    //Checking if the redis has the profile cached
+    const userProfileInRedis = await redis.get(`user:${id}:profile`);
+    if (userProfileInRedis) {
+      // const userProfile = await redis.get(`user:{id}:profile`);
+      console.log(JSON.parse(userProfileInRedis));
+      res.status(200).json({
+        success: true,
+        userProfile: JSON.parse(userProfileInRedis),
+        isGuest: false,
       });
-
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-      res.status(200).json({ success: true, user: user, isGuest: false });
-    } catch (error) {
-      res.status(500).json({ error: error });
-      console.log(error);
+      return;
     }
+
+    const user = await pc.user.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        chessLevel: true,
+        computerGames: {
+          orderBy: { createdAt: 'desc' },
+        },
+        createdRooms: true,
+        joinedRooms: true,
+        gamesWon: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            loser: {
+              select: {
+                chessLevel: true,
+                name: true,
+              },
+            },
+            room: true,
+          },
+          omit: {
+            loserId: true,
+          },
+        },
+        gamesLost: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            loser: {
+              select: {
+                name: true,
+                chessLevel: true,
+              },
+            },
+          },
+          omit: {
+            loserId: false,
+          },
+        },
+        computerGamesWon: {
+          orderBy: { createdAt: 'desc' },
+        },
+        computerGamesLost: {
+          orderBy: { createdAt: 'desc' },
+        },
+        guestGamesAsP1: {
+          orderBy: { createdAt: 'desc' },
+        },
+        guestGamesAsP2: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Calculate guest games stats
+    const allGuestGames = [...user.guestGamesAsP1, ...user.guestGamesAsP2];
+    const guestGamesWon = allGuestGames.filter((g) => {
+      const isP1 = g.player1UserId === user.id;
+      const playerColor = isP1
+        ? g.player1Color
+        : g.player1Color === 'w'
+          ? 'b'
+          : 'w';
+      return g.winner === playerColor && g.status === 'FINISHED';
+    });
+    const guestGamesLost = allGuestGames.filter((g) => {
+      const isP1 = g.player1UserId === user.id;
+      const playerColor = isP1
+        ? g.player1Color
+        : g.player1Color === 'w'
+          ? 'b'
+          : 'w';
+      return g.loser === playerColor && g.status === 'FINISHED';
+    });
+    const guestGamesDrawn = allGuestGames.filter(
+      (g) => g.draw && g.status === 'FINISHED'
+    );
+
+    // Calculate stats
+    const stats = {
+      computer: {
+        total: user.computerGames.length,
+        won: user.computerGamesWon.length,
+        lost: user.computerGamesLost.length,
+        drawn: user.computerGames.filter((g) => g.draw).length,
+      },
+      room: {
+        total: user.gamesWon.length + user.gamesLost.length,
+        won: user.gamesWon.length,
+        lost: user.gamesLost.length,
+        drawn:
+          user.gamesWon.filter((g) => g.draw).length +
+          user.gamesLost.filter((g) => g.draw).length,
+      },
+      guest: {
+        total: allGuestGames.filter((g) => g.status === 'FINISHED').length,
+        won: guestGamesWon.length,
+        lost: guestGamesLost.length,
+        drawn: guestGamesDrawn.length,
+      },
+    };
+
+    // const updatedGames
+    const wonGamesTime = user.gamesWon.reduce((total, games) => {
+      const started = new Date(games.createdAt).getTime();
+      const ended = new Date(games.updatedAt).getTime();
+
+      const totalLength = ended - started;
+      return total + totalLength;
+    }, 0);
+    const lostGameTimePlayed = user.gamesLost.reduce((total, games) => {
+      const start = new Date(games.createdAt).getTime();
+      const end = new Date(games.updatedAt).getTime();
+
+      const totalLength = end - start;
+      return total + totalLength;
+    }, 0);
+    const computerGameTime = user.computerGames.reduce((total, games) => {
+      const started = new Date(games.createdAt).getTime();
+      const ended = new Date(games.updatedAt).getTime();
+      const totalLength = ended - started;
+      return total + totalLength;
+    }, 0);
+    const guestGameTime = allGuestGames.reduce((total, games) => {
+      const started = new Date(games.createdAt).getTime();
+      const ended = games.endedAt
+        ? new Date(games.endedAt).getTime()
+        : new Date(games.updatedAt).getTime();
+      const totalLength = ended - started;
+      return total + totalLength;
+    }, 0);
+    const totalTimePlayedMs =
+      lostGameTimePlayed + wonGamesTime + computerGameTime + guestGameTime;
+    // console.log(totalTimePlayedMs);
+    const totalHours = Math.floor(totalTimePlayedMs / (1000 * 60 * 60));
+    const totalMinutes = Math.floor((totalTimePlayedMs % 3600000) / 60000);
+    const totalTimePlayed = `${totalHours}h ${totalMinutes}m`;
+    // console.log(totalTimePlayed);
+
+    const userProfile = {
+      user: {
+        id: user.id,
+        name: user.name,
+        chessLevel: user.chessLevel,
+        email: user.email,
+      },
+      stats,
+      totalTimePlayed: totalTimePlayed,
+      recentGames: {
+        computerGamesWon: user.computerGamesWon,
+        computerGamesLost: user.computerGamesLost,
+        computerGamesInProgress: user.computerGames.filter(
+          (games) => games.status === 'ACTIVE'
+        ),
+        roomGamesWon: user.gamesWon,
+        roomGamesLost: user.gamesLost,
+        guestGamesWon,
+        guestGamesLost,
+        guestGamesDrawn,
+      },
+    };
+    await redis.setEx(`user:${id}:profile`, 600, JSON.stringify(userProfile));
+    res.status(200).json({
+      success: true,
+      userProfile,
+      isGuest: false,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error });
+    console.log(error);
   }
-);
+});
 
 router.post('/login', async (req: Request, res: Response) => {
   try {
@@ -135,6 +321,12 @@ router.post('/login', async (req: Request, res: Response) => {
       password: z.string().min(3, 'Password is required'),
     });
     const { email, password } = schema.parse(req.body);
+
+    // Remove player from matchmaking queue if they were searching as guest
+    const guestId = req.cookies.id;
+    if (guestId) {
+      await removePlayerFromQueue(guestId);
+    }
     const user = await pc.user.findUnique({ where: { email } });
     if (!user) {
       res.status(401).json({ message: 'User Does not exist', success: false });
@@ -168,17 +360,15 @@ router.post('/login', async (req: Request, res: Response) => {
       sameSite: 'lax',
       maxAge: 6 * 60 * 60 * 1000, // 6 hours in ms
     });
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: 'Login Successful',
-        id: user.id,
-        username: user.name,
-        email: user.email,
-        chessLevel: user.chessLevel,
-        isGuest: false,
-      });
+    res.status(200).json({
+      success: true,
+      message: 'Login Successful',
+      id: user.id,
+      username: user.name,
+      email: user.email,
+      chessLevel: user.chessLevel,
+      isGuest: false,
+    });
     return;
   } catch (error) {
     res.status(500).json({ error: error });
@@ -186,37 +376,41 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/edit', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { email, password, chessLevel, name } = req.body;
+router.post(
+  '/profile/update',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { email, password, chessLevel, name } = req.body;
 
-    const updateData: any = {};
-    if (name) updateData.name = name;
-    if (email) updateData.email = email;
-    if (chessLevel) updateData.chessLevel = chessLevel;
-    if (password) updateData.password = await bcrypt.hash(password, 12);
-    //@ts-ignore
-    const userId = req.userId;
-    const updatedUser = await pc.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        chessLevel: true,
-      },
-    });
-
-    res.status(200).json({
-      message: 'User updated successfully',
-      user: updatedUser,
-    });
-  } catch (error) {
-    res.status(500).json({ error: error });
-    console.log(error);
+      const updateData: any = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (chessLevel) updateData.chessLevel = chessLevel;
+      if (password) updateData.password = await bcrypt.hash(password, 12);
+      //@ts-ignore
+      const userId = req.userId;
+      const updatedUser = await pc.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          chessLevel: true,
+        },
+      });
+      await redis.del(`user:${userId}:profile`);
+      res.status(200).json({
+        message: 'User updated successfully',
+        user: updatedUser,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error });
+      console.log(error);
+    }
   }
-});
+);
 
 router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -392,12 +586,10 @@ router.post(
       });
 
       if (!room) {
-        res
-          .status(404)
-          .json({
-            message: 'Room does not exist or roomId is incorrect',
-            success: false,
-          });
+        res.status(404).json({
+          message: 'Room does not exist or roomId is incorrect',
+          success: false,
+        });
         return;
       }
 
@@ -437,12 +629,10 @@ router.post(
         return;
       }
       if (room.joinedBy) {
-        res
-          .status(404)
-          .json({
-            message: 'Room is already full and match is started',
-            success: false,
-          });
+        res.status(404).json({
+          message: 'Room is already full and match is started',
+          success: false,
+        });
         return;
       }
 
@@ -551,12 +741,10 @@ router.patch('/room/:roomId/status', async (req: Request, res: Response) => {
     const { roomId } = req.body;
     const room = await pc.room.findFirst({ where: { code: roomId } });
     if (!room) {
-      res
-        .status(404)
-        .json({
-          message: 'Room Code Incorrect! Room Does Not Exist',
-          success: false,
-        });
+      res.status(404).json({
+        message: 'Room Code Incorrect! Room Does Not Exist',
+        success: false,
+      });
       return;
     }
     await pc.room.update({

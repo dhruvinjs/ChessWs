@@ -1,10 +1,10 @@
-import { useState, useCallback, memo } from 'react';
-import { ArrowLeft, Play, Handshake, Flag } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '../Button';
-import { ConfirmDialog } from '../ConfirmDialog';
-import { useGameStore } from '../../stores/useGameStore';
-import { GameMessages } from '../../types/chess';
+import { useState, useCallback, memo } from "react";
+import { ArrowLeft, Play, Handshake, Flag, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "../Button";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { useGameStore } from "../../stores/useGameStore";
+import { GameMessages } from "../../types/chess";
 
 const GameControlsComponent = () => {
   const navigate = useNavigate();
@@ -13,6 +13,7 @@ const GameControlsComponent = () => {
   const initGameRequest = useGameStore((state) => state.initGameRequest);
   const resign = useGameStore((state) => state.resign);
   const offerDraw = useGameStore((state) => state.offerDraw);
+  const cancelSearch = useGameStore((state) => state.cancelSearch);
   const gameStatus = useGameStore((state) => state.gameStatus);
   const gameStarted = useGameStore((state) => state.gameStarted);
   const drawOfferSent = useGameStore((state) => state.drawOfferSent);
@@ -29,17 +30,21 @@ const GameControlsComponent = () => {
   const handleGoHome = useCallback(() => {
     if (isGameActive) {
       setShowHomeConfirm(true);
+    } else if (isWaitingForGame) {
+      // Cancel search before going home
+      cancelSearch();
+      navigate("/");
     } else {
-      navigate('/');
+      navigate("/");
     }
-  }, [isGameActive, navigate]);
+  }, [isGameActive, isWaitingForGame, cancelSearch, navigate]);
 
   const confirmGoHome = useCallback(() => {
     setShowHomeConfirm(false);
     if (isGameActive) {
       resign();
     }
-    setTimeout(() => navigate('/'), 300);
+    setTimeout(() => navigate("/"), 300);
   }, [navigate, resign, isGameActive]);
 
   const handleOfferDraw = useCallback(() => {
@@ -56,6 +61,10 @@ const GameControlsComponent = () => {
     initGameRequest();
   }, [initGameRequest]);
 
+  const handleCancelSearch = useCallback(() => {
+    cancelSearch();
+  }, [cancelSearch]);
+
   const handleResign = useCallback(() => {
     if (!isGameActive) return;
     setShowResignConfirm(true);
@@ -68,16 +77,16 @@ const GameControlsComponent = () => {
 
   const getDrawButtonText = () => {
     if (drawOfferSent) {
-      return 'Offer Sent';
+      return "Offer Sent";
     }
     if (isGameActive) {
-      return `Draw (${drawOfferCount}/3)`;
+      return `Draw (${drawOfferCount} left)`;
     }
-    return 'Draw';
+    return "Draw";
   };
 
   const isDrawDisabled =
-    !isGameActive || drawOfferSent || isGameOver || drawOfferCount >= 3;
+    !isGameActive || drawOfferSent || isGameOver || drawOfferCount <= 0;
 
   return (
     <>
@@ -90,16 +99,25 @@ const GameControlsComponent = () => {
           icon={<ArrowLeft className="w-4 h-4" />}
         />
 
-        {/* Play button - centered CTA */}
-        <Button
-          variant="primary"
-          size="md"
-          onClick={handlePlayGame}
-          text={isWaitingForGame ? 'Searching For Opponent...' : 'Play Game'}
-          icon={<Play className="w-6 h-4" />}
-          loading={isWaitingForGame}
-          disabled={isGameActive || isWaitingForGame}
-        />
+        {/* Play/Cancel button - centered CTA */}
+        {isWaitingForGame ? (
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleCancelSearch}
+            text="Cancel Search"
+            icon={<X className="w-4 h-4" />}
+          />
+        ) : (
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handlePlayGame}
+            text="Play Game"
+            icon={<Play className="w-6 h-4" />}
+            disabled={isGameActive}
+          />
+        )}
 
         {/* Secondary game actions - positioned on right */}
         <div className="flex items-center gap-3 sm:gap-4">

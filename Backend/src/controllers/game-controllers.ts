@@ -3,14 +3,12 @@ import express, { Request, Response } from 'express';
 import { getGamesCount } from '../Services/GameServices';
 import { authMiddleware } from '../middleware';
 import pc from '../clients/prismaClient';
-import { dmmfToRuntimeDataModel } from '@prisma/client/runtime/library';
 import { Chess } from 'chess.js';
 import { ComputerDifficulty } from '@prisma/client';
 import { redis } from '../clients/redisClient';
 import { ComputerGameMessages } from '../utils/messages';
 import {
   getComputerGameState,
-  handleComputerGameDraw,
   handlePlayerQuit,
 } from '../Services/ComputerGameServices';
 const gameRouter = express.Router();

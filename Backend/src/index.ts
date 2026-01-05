@@ -40,29 +40,12 @@ const userRoutes = router;
 app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/game', gameRouter);
 
-// Simple cookie parser for WebSocket upgrade
-function getCookieValue(
-  cookieString: string,
-  cookieName: string
-): string | null {
-  if (!cookieString) return null;
-
-  const cookies = cookieString.split(';');
-  for (const cookie of cookies) {
-    const [name, ...valueParts] = cookie.split('=');
-    if (name.trim() === cookieName) {
-      return valueParts.join('=').trim();
-    }
-  }
-  return null;
-}
-
 server.on('upgrade', (req, socket, head) => {
   try {
     const cookieHeader = req.headers['cookie'];
 
     // console.log("=== WebSocket Upgrade Request ===");
-    // console.log("Cookie Header:", cookieHeader);
+    console.log('Cookie Header:', cookieHeader);
 
     if (!cookieHeader) {
       // console.log("❌ No cookie header found");
@@ -73,11 +56,17 @@ server.on('upgrade', (req, socket, head) => {
 
     // Extract token from cookies
     const cookies = cookie.parse(cookieHeader);
+    if (cookies.id) {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+      return;
+    }
     const token = cookies.token;
     // console.log("Extracted Token:", token ? "Found" : "Not Found");
 
     if (!token) {
-      // console.log("❌ No token cookie found");
+      console.log('❌ No token cookie found');
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -89,9 +78,7 @@ server.on('upgrade', (req, socket, head) => {
       decodedToken = jwt.verify(token, process.env.SECRET_TOKEN!) as {
         id: number;
       };
-      // console.log("✅ Token verified for user:", decodedToken.id);
     } catch (jwtError) {
-      // console.log("❌ JWT verification failed:", jwtError);
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -105,10 +92,9 @@ server.on('upgrade', (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       //@ts-ignore
       ws.userId = decodedToken.id;
-      wss.emit('connection', ws, req);
+      wss.emit('connection', ws, req); // connection event means that successfull upgrade from the http to WebSocket is done
     });
   } catch (error) {
-    // console.error("❌ WebSocket upgrade error:", error);
     socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
     socket.destroy();
   }

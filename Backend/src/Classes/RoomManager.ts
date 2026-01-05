@@ -9,10 +9,10 @@ import {
   handleRoomLeave,
   handleRoomMove,
   handleRoomReconnection,
-  validatePayload,
   handleRoomDrawOffer,
   handleRoomDrawAcceptance,
   handleRoomDrawRejection,
+  validateRoomGamePayload,
 } from '../Services/RoomGameServices';
 import provideValidMoves from '../utils/chessUtils';
 
@@ -33,7 +33,7 @@ interface RestoredGameState {
 class RoomManager {
   public roomSocketManager: Map<number, WebSocket> = new Map();
   public globalRoomClock: NodeJS.Timeout | null = null;
-  public readonly MOVES_BEFORE_SAVE = 10;
+  // public readonly MOVES_BEFORE_SAVE = 10;
   private readonly TIME_BUFFER_ON_CRASH = 10;
 
   async addRoomUser(userId: number, userSocket: WebSocket) {
@@ -455,7 +455,7 @@ class RoomManager {
       const msg = JSON.parse(message);
       const { type, payload } = msg;
 
-      const validationError = validatePayload(type, payload);
+      const validationError = validateRoomGamePayload(type, payload);
       if (validationError) {
         userSocket.send(
           JSON.stringify({
@@ -880,21 +880,15 @@ class RoomManager {
         }
       }
 
-      // Restore captured pieces
-      const capturedPiecesArray = (
-        Array.isArray(gameFromDB.capturedPieces)
-          ? gameFromDB.capturedPieces
-          : []
-      ) as string[];
-      if (capturedPiecesArray.length > 0) {
+      await redis.sAdd('room-active-games', gameId.toString());
+      if (gameFromDB.capturedPieces.length > 0) {
         await redis.del(`room-game:${gameId}:capturedPieces`);
-        for (const piece of capturedPiecesArray) {
-          await redis.rPush(`room-game:${gameId}:capturedPieces`, piece);
+        //Use for of loop basically for async await becuase in
+        //forEach the promises are not awaited which can crash the code
+        for (const pieces of gameFromDB.capturedPieces) {
+          await redis.rPush(`room-game:${gameId}:capturedPieces`, pieces);
         }
       }
-
-      await redis.sAdd('room-active-games', gameId.toString());
-
       return {
         user1: gameFromDB.room.createdById,
         user2: gameFromDB.room.joinedById!,
@@ -905,7 +899,7 @@ class RoomManager {
         moveCount: movesArray.length,
         status: RoomMessages.ROOM_GAME_ACTIVE,
         chat: chatArray,
-        capturedPieces: gameFromDB.capturedPieces || [],
+        capturedPieces: gameFromDB.capturedPieces,
         roomCode: gameFromDB.room.code,
       };
     } catch (error) {

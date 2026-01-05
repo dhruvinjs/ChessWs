@@ -1,10 +1,21 @@
 import { redis } from '../clients/redisClient';
-
-const MATCHMAKING_KEY = process.env.MATCHMAKING_KEY || 'matchmaking:queue';
+import { GUEST_MATCHMAKING_KEY } from '../utils/chessUtils';
 
 export async function insertPlayerInQueue(playerId: string) {
   try {
-    const inserted = await redis.sAdd(MATCHMAKING_KEY, playerId);
+    const timeStamp = Date.now();
+    const is_player_in_queue = await redis.zScore(
+      GUEST_MATCHMAKING_KEY,
+      playerId
+    );
+    if (is_player_in_queue) {
+      console.log(`PlayerId:${playerId} already in queue`);
+      return null;
+    }
+    const inserted = await redis.zAdd(GUEST_MATCHMAKING_KEY, {
+      value: playerId,
+      score: timeStamp,
+    });
     if (inserted) {
       console.log(`added ${playerId} in queue`);
       return true;
@@ -19,33 +30,37 @@ export async function insertPlayerInQueue(playerId: string) {
 }
 
 export async function matchingPlayer(currentPlayerId: string) {
-  const queue = await redis.sMembers(MATCHMAKING_KEY);
-  //Find basically returns the first id not matching to currentPlayerId
-  const waitingPlayerId = queue.find((id) => id != currentPlayerId);
-  if (!waitingPlayerId) {
+  // Get the first player in queue (longest waiting)
+  const result = await redis.zRange(GUEST_MATCHMAKING_KEY, 0, 0);
+
+  if (!result || result.length === 0) {
     console.log('No opponent found in queue');
     return null;
   }
-  const transaction = redis.multi();
-  transaction.sRem(MATCHMAKING_KEY, currentPlayerId);
-  transaction.sRem(MATCHMAKING_KEY, waitingPlayerId);
 
-  const results = await transaction.exec();
-  if (results && results[0] && results[1]) {
-    console.log(`Match found: ${currentPlayerId} vs ${waitingPlayerId}`);
-    return { waitingPlayerId };
-  } else {
-    console.log('Failed to remove players from queue atomically');
+  const opponentId = result[0];
+
+  // Check if the opponent is the same as current player
+  if (opponentId === currentPlayerId) {
+    console.log('No opponent found (only current player in queue)');
     return null;
   }
+
+  await redis.zRem(GUEST_MATCHMAKING_KEY, opponentId);
+  await redis.zRem(GUEST_MATCHMAKING_KEY, currentPlayerId);
+  // Clear notification flags since they're now matched (using sorted set)
+  await redis.zRem('guest:notified:players', opponentId);
+  await redis.zRem('guest:notified:players', currentPlayerId);
+  console.log(`Match found: ${currentPlayerId} vs ${opponentId}`);
+  return { opponentId };
 }
 
 export async function removePlayerFromQueue(
   playerId: string
 ): Promise<boolean> {
   try {
-    const removed = await redis.sRem(MATCHMAKING_KEY, playerId);
-
+    const removed = await redis.zRem(GUEST_MATCHMAKING_KEY, playerId);
+    await redis.zRem('guest:notified:players', playerId);
     if (removed) {
       console.log(`Player ${playerId} removed from matchmaking queue`);
       return true;
@@ -60,7 +75,7 @@ export async function removePlayerFromQueue(
 }
 export async function clearQueue() {
   try {
-    await redis.del(MATCHMAKING_KEY);
+    await redis.del(GUEST_MATCHMAKING_KEY);
     return true;
   } catch (error) {
     console.error('Error in removing queue:', error);

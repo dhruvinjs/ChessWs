@@ -5,7 +5,7 @@ import { Move } from './GameServices';
 import { roomManager } from '../Classes/RoomManager';
 import { WebSocket } from 'ws';
 import { ErrorMessages, GameMessages, RoomMessages } from '../utils/messages';
-import provideValidMoves from '../utils/chessUtils';
+import provideValidMoves, { MOVE_BEFORE_SAFE } from '../utils/chessUtils';
 
 export async function getRoomGameState(gameId: number) {
   const gameExists = (await redis.hGetAll(`room-game:${gameId}`)) as Record<
@@ -117,7 +117,7 @@ export async function handleRoomMove(
       'moveCount',
       1
     );
-    if (updatedMoveCnt % roomManager.MOVES_BEFORE_SAVE === 0) {
+    if (updatedMoveCnt % MOVE_BEFORE_SAFE === 0) {
       const updatedGameData = (await redis.hGetAll(
         `room-game:${gameId}`
       )) as Record<string, string>;
@@ -503,7 +503,10 @@ export async function handleRoomChat(
   }
 }
 
-export function validatePayload(type: string, payload: any): string | null {
+export function validateRoomGamePayload(
+  type: string,
+  payload: any
+): string | null {
   if (!payload) {
     return 'Missing Payload Object';
   }

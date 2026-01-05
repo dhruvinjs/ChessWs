@@ -5,9 +5,9 @@ interface Props {
   minLength?: number;
   maxLength?: number;
   required: boolean;
- inputRef?: React.RefObject<HTMLInputElement | null> ;
- value?:string;
- onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export function Input({
@@ -19,18 +19,18 @@ export function Input({
   required,
   inputRef,
   value,
-  onChange
+  onChange,
 }: Props) {
   return (
     <input
-      className={`p-3 outline-none w-3/4 text-white shadow-md rounded-xl ${className}`}
+      className={`p-3 outline-none w-3/4 text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 shadow-md rounded-xl placeholder:text-slate-400 dark:placeholder:text-slate-500 ${className}`}
       placeholder={placeholder}
       required={required}
       minLength={minLength}
       maxLength={maxLength}
       type={type}
       ref={inputRef}
-      value={value}
+      defaultValue={value}
       onChange={onChange}
     />
   );

@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { SocketManager } from '../lib/socketManager';
-import { GameMessages } from '../types/chess';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { SocketManager } from "../lib/socketManager";
+import { GameMessages } from "../types/chess";
 
 interface Move {
   from: string;
@@ -9,13 +9,13 @@ interface Move {
   promotion?: string | null;
 }
 
-type Color = 'w' | 'b' | null;
+type Color = "w" | "b" | null;
 
 interface GameState {
   guestId: string;
   color: Color;
   moves: Move[];
-  winner: Color | 'draw' | null;
+  winner: Color | "draw" | null;
   loser: Color | null;
   gameId: string | null;
   oppConnected: boolean;
@@ -41,7 +41,7 @@ interface GameState {
   opponentId: number | null;
   opponentName: string | null;
   roomGameId: number | null;
-  roomStatus: 'WAITING' | 'FULL' | 'CANCELLED' | 'ACTIVE' | 'FINISHED' | null;
+  roomStatus: "WAITING" | "FULL" | "CANCELLED" | "ACTIVE" | "FINISHED" | null;
   chatMsg: Array<{
     sender: number;
     message: string;
@@ -56,12 +56,13 @@ interface GameState {
   setFen: (fen: string) => void;
   setOppStatus: (status: boolean) => void;
   updateTimers: (white: number, black: number) => void;
-  endGame: (winner: Color | 'draw', loser: Color | null) => void;
+  endGame: (winner: Color | "draw", loser: Color | null) => void;
   resetGame: () => void;
   setSelectedSquare: (square: string | null) => void;
   setDrawOfferCount: (count: number) => void;
   setDrawOfferSent: (sent: boolean) => void;
   setDrawOfferReceived: (received: boolean) => void;
+  cancelSearch: () => void;
 
   // Room actions
   setRoomInfo: (roomInfo: {
@@ -95,7 +96,7 @@ interface GameState {
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
-      guestId: '',
+      guestId: "",
       color: null,
       moves: [],
       winner: null,
@@ -104,7 +105,7 @@ export const useGameStore = create<GameState>()(
       oppConnected: true,
       gameStatus: GameMessages.INIT_GAME,
       gameStarted: false,
-      fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
       validMoves: [],
       whiteTimer: 600,
       blackTimer: 600,
@@ -116,10 +117,10 @@ export const useGameStore = create<GameState>()(
       // ✅ Initial draw state
       drawOfferReceived: false,
       drawOfferSent: false,
-      drawOfferCount: 0,
+      drawOfferCount: 3,
 
       // ✅ Initial room state
-      roomId: '',
+      roomId: "",
       isRoomCreator: false,
       opponentId: null,
       opponentName: null,
@@ -138,7 +139,7 @@ export const useGameStore = create<GameState>()(
           );
           set({ guestId });
           const socketManager = SocketManager.getInstance();
-          socketManager.init('guest', guestId);
+          socketManager.init("guest", guestId);
         } else {
           console.log(
             `⏭️ Zustand: Guest ID unchanged, skipping WebSocket init`
@@ -158,7 +159,7 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 0,
+          drawOfferCount: 3,
         }),
 
       processServerMove: (payload) => {
@@ -190,7 +191,7 @@ export const useGameStore = create<GameState>()(
           oppConnected: true,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: payload.count ?? 0,
+          drawOfferCount: payload.count ?? 3,
           // Preserve room state during reconnection
           isRoomCreator: state.isRoomCreator,
           roomId: state.roomId,
@@ -217,7 +218,7 @@ export const useGameStore = create<GameState>()(
 
       resetGame: () =>
         set({
-          guestId: '',
+          guestId: "",
           color: null,
           moves: [],
           winner: null,
@@ -226,7 +227,7 @@ export const useGameStore = create<GameState>()(
           oppConnected: true,
           gameStarted: false,
           gameStatus: GameMessages.INIT_GAME,
-          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
           validMoves: [],
           whiteTimer: 600,
           blackTimer: 600,
@@ -234,13 +235,20 @@ export const useGameStore = create<GameState>()(
           capturedPieces: [],
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 0,
+          drawOfferCount: 3,
         }),
 
       setSelectedSquare: (square) => set({ selectedSquare: square }),
-      setDrawOfferCount: (count) => set({ drawOfferCount: count ?? 0 }),
+      setDrawOfferCount: (count) => set({ drawOfferCount: count ?? 3 }),
       setDrawOfferSent: (sent) => set({ drawOfferSent: sent }),
       setDrawOfferReceived: (received) => set({ drawOfferReceived: received }),
+
+      cancelSearch: () => {
+        SocketManager.getInstance().send({
+          type: GameMessages.CANCEL_SEARCH,
+          payload: {},
+        });
+      },
 
       move: (move) => {
         const { gameId, roomGameId } = get();
@@ -259,7 +267,7 @@ export const useGameStore = create<GameState>()(
             payload: { ...move, gameId },
           });
         } else {
-          console.error('No gameId or roomGameId available for move');
+          console.error("No gameId or roomGameId available for move");
         }
       },
 
@@ -279,7 +287,7 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 0,
+          drawOfferCount: 3,
         });
       },
 
@@ -292,7 +300,7 @@ export const useGameStore = create<GameState>()(
         });
         set({
           gameStatus: GameMessages.GAME_OVER,
-          winner: color === 'w' ? 'b' : 'w',
+          winner: color === "w" ? "b" : "w",
           loser: color,
         });
       },
@@ -332,7 +340,7 @@ export const useGameStore = create<GameState>()(
         set({
           drawOfferReceived: false,
           gameStatus: GameMessages.GAME_OVER,
-          winner: 'draw',
+          winner: "draw",
           loser: null,
         });
       },
@@ -361,11 +369,11 @@ export const useGameStore = create<GameState>()(
           opponentId: roomInfo.opponentId,
           opponentName: roomInfo.opponentName,
           roomStatus: roomInfo.status as
-            | 'WAITING'
-            | 'FULL'
-            | 'CANCELLED'
-            | 'ACTIVE'
-            | 'FINISHED',
+            | "WAITING"
+            | "FULL"
+            | "CANCELLED"
+            | "ACTIVE"
+            | "FINISHED",
           roomGameId: roomInfo.gameId ? Number(roomInfo.gameId) : null,
         });
         // console.log("✅ Room state updated - isCreator:", roomInfo.isCreator);
@@ -397,13 +405,13 @@ export const useGameStore = create<GameState>()(
         }
 
         try {
-          const { roomApis } = await import('../api/api');
+          const { roomApis } = await import("../api/api");
           await roomApis.cancelRoom(roomId);
           // console.log(`✅ Room ${roomId} cancelled successfully`);
 
           // Reset room state
           set({
-            roomId: '',
+            roomId: "",
             isRoomCreator: false,
             opponentId: null,
             opponentName: null,
@@ -411,7 +419,7 @@ export const useGameStore = create<GameState>()(
             roomStatus: null,
           });
         } catch (error) {
-          console.error('❌ Failed to cancel room:', error);
+          console.error("❌ Failed to cancel room:", error);
           throw error;
         }
       },
@@ -420,7 +428,7 @@ export const useGameStore = create<GameState>()(
       startRoomGame: () => {
         const { roomId } = get();
         if (!roomId) {
-          console.error('No room ID available');
+          console.error("No room ID available");
           return;
         }
 
@@ -442,20 +450,20 @@ export const useGameStore = create<GameState>()(
         }
 
         // ALWAYS call the cancel API - NO WebSocket messages
-        console.log('🔄 Calling cancel API for room:', roomId);
+        console.log("🔄 Calling cancel API for room:", roomId);
         try {
-          const { roomApis } = await import('../api/api');
+          const { roomApis } = await import("../api/api");
           await roomApis.cancelRoom(roomId);
           // console.log(`✅ Room ${roomId} cancelled successfully via API`);
         } catch (error) {
-          console.error('❌ Failed to cancel room:', error);
+          console.error("❌ Failed to cancel room:", error);
           throw error; // Re-throw so caller knows it failed
         }
 
         // Reset room state ONLY after successful API call
         // console.log("🧹 Resetting room state");
         set({
-          roomId: '',
+          roomId: "",
           isRoomCreator: false,
           opponentId: null,
           opponentName: null,
@@ -467,11 +475,11 @@ export const useGameStore = create<GameState>()(
 
       // ✅ Exit room after game is over - NO API CALL
       exitRoom: () => {
-        console.log('👋 exitRoom called - just resetting state (no API call)');
+        console.log("👋 exitRoom called - just resetting state (no API call)");
 
         // Just reset the room state without calling cancel API
         set({
-          roomId: '',
+          roomId: "",
           isRoomCreator: false,
           opponentId: null,
           opponentName: null,
@@ -486,7 +494,7 @@ export const useGameStore = create<GameState>()(
           selectedSquare: null,
           winner: null,
           loser: null,
-          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
           whiteTimer: 600,
           blackTimer: 600,
         });
@@ -508,7 +516,7 @@ export const useGameStore = create<GameState>()(
       },
     }),
     {
-      name: 'chess-game-storage', // localStorage key
+      name: "chess-game-storage", // localStorage key
       partialize: (state) => ({
         // Only persist room-related state
         roomId: state.roomId,

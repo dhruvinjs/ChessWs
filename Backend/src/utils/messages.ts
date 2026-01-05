@@ -8,6 +8,7 @@ export const GameMessages = {
   ACCEPT_DRAW: 'accept_draw',
   REJECT_DRAW: 'reject_draw',
   REQUEST_VALID_MOVES: 'request_valid_moves',
+  CANCEL_SEARCH: 'cancel_search',
 
   // Server -> Client
   ASSIGN_ID: 'assign_id',
@@ -32,6 +33,12 @@ export const GameMessages = {
   PLAYER_UNAVAILABLE: 'player_unavailable',
   NO_ACTIVE_GAMES: 'no_active_games',
   DRAW_LIMIT_REACHED: 'draw_limit_reached',
+  NO_ACTIVE_USERS: 'no_active_users',
+  QUEUE_EXPIRED: 'queue_expired',
+  GAME_DRAW: 'game_draw',
+  DRAW_COOLDOWN: 'draw_cooldown',
+  ALREADY_IN_QUEUE: 'already_in_queue',
+  SEARCH_CANCELLED: 'search_cancelled',
 } as const;
 export const ComputerGameMessages = {
   //No Draw offers are there either you win or lose
