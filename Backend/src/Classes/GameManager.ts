@@ -292,14 +292,6 @@ export class GameManager {
         existingGameFromDb.player1Color === 'w' ? whiteTimer : blackTimer;
       const player2TimeLeft =
         existingGameFromDb.player1Color === 'w' ? blackTimer : whiteTimer;
-      const final_player1DrawCount =
-        existingGameFromDb.player1Color === 'w'
-          ? game.whitePlayerDrawOfferCount
-          : game.blackPlayerDrawOfferCount;
-      const final_player2DrawCount =
-        existingGameFromDb.player1Color === 'b'
-          ? game.whitePlayerDrawOfferCount
-          : game.blackPlayerDrawOfferCount;
 
       await redis.sRem('active-games', gameId);
       await redis.expire(`guest-game:${gameId}`, 600);
@@ -318,8 +310,6 @@ export class GameManager {
           draw: false,
           player1TimeLeft: player1TimerLeft,
           player2TimeLeft: player2TimeLeft,
-          player1DrawOfferCount: Number(final_player1DrawCount),
-          player2DrawOfferCount: Number(final_player2DrawCount),
         },
       });
       const winnerSocket = this.socketMap.get(winnerId);
@@ -391,14 +381,6 @@ export class GameManager {
       restoredGameFromDb.player1Color === 'w'
         ? restoredGameFromDb.player2GuestId
         : restoredGameFromDb.player1GuestId;
-    const whitePlayerDrawOfferCount =
-      restoredGameFromDb.player1Color === 'w'
-        ? restoredGameFromDb.player1DrawOfferCount
-        : restoredGameFromDb.player2DrawOfferCount;
-    const blackPlayerDrawOfferCount =
-      restoredGameFromDb.player1Color === 'b'
-        ? restoredGameFromDb.player1DrawOfferCount
-        : restoredGameFromDb.player2DrawOfferCount;
 
     const movesArray = (
       Array.isArray(restoredGameFromDb.moves) ? restoredGameFromDb.moves : []
@@ -414,8 +396,6 @@ export class GameManager {
       status: GameMessages.GAME_ACTIVE,
       fen: restoredGameFromDb.currentFen,
       movesCount: movesCount,
-      whitePlayerDrawCount: whitePlayerDrawOfferCount,
-      blackPlayerDrawCount: blackPlayerDrawOfferCount,
     });
     if (movesArray.length > 0) {
       await redis.del(`guest-games:${gameId}:moves`);
@@ -432,16 +412,6 @@ export class GameManager {
         await redis.rPush(`guest-game:${gameId}:capturedPieces`, pieces);
       }
     }
-
-    // Restore draw offer counts - both Redis and DB use same logic (remaining offers, starts at 3)
-    await redis.set(
-      `drawOffers:${gameId}:${restoredGameFromDb.player1GuestId}`,
-      restoredGameFromDb.player1DrawOfferCount.toString()
-    );
-    await redis.set(
-      `drawOffers:${gameId}:${restoredGameFromDb.player2GuestId}`,
-      restoredGameFromDb.player2DrawOfferCount.toString()
-    );
 
     return {
       whitePlayerId: whitePlayerId,
@@ -547,11 +517,9 @@ export class GameManager {
             currentFen: chess.fen(),
             player1GuestId: matchedPlayerId,
             player2GuestId: id,
-            player1Color: 'w',
-            player1TimeLeft: 30,
+            player1Color: isPlayerWhite ? 'w' : 'b',
+            player1TimeLeft: 600,
             player2TimeLeft: 600,
-            player1DrawOfferCount: 3,
-            player2DrawOfferCount: 3,
             status: 'ACTIVE',
           },
         });
@@ -561,11 +529,9 @@ export class GameManager {
           .hSet(`guest-game:${guestGameDB.id}`, {
             whitePlayerId: whitePlayerId,
             blackPlayerId: blackPlayerId,
-            whitePlayerDrawOfferCount: 3,
-            blackPlayerDrawOfferCount: 3,
             status: GameMessages.GAME_ACTIVE,
             fen: chess.fen(),
-            whiteTimer: 30,
+            whiteTimer: 600,
             blackTimer: 600,
           })
           .setEx(`user:${matchedPlayerId}:game`, 1800, String(guestGameDB.id))

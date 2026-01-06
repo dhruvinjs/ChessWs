@@ -1,6 +1,7 @@
-
-import { memo, useMemo } from "react";
+import { memo, useMemo, useEffect, useState, useCallback } from "react";
 import { useGameStore } from "../../stores/useGameStore";
+import { Handshake, X, Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface MovePairProps {
   moveNumber: number;
@@ -11,10 +12,10 @@ interface MovePairProps {
 const MovePair = memo(({ moveNumber, whiteMove, blackMove }: MovePairProps) => (
   <div className="grid grid-cols-[45px_1fr_1fr] sm:grid-cols-[50px_1fr_1fr] gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200 group">
     {/* Move Number */}
-    <span className="text-sm sm:text-base font-bold text-slate-600 dark:text-slate-400 text-right self-center">
+    <span className="text-sm sm:text-base font-bold text-slate-600 dark:text-slate-400 text-center self-center">
       {moveNumber}.
     </span>
-    
+
     {/* White's Move */}
     <div className="flex items-center justify-center bg-slate-100 dark:bg-slate-800 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-center group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors">
       {whiteMove ? (
@@ -30,7 +31,7 @@ const MovePair = memo(({ moveNumber, whiteMove, blackMove }: MovePairProps) => (
         <span className="text-sm text-slate-300 dark:text-slate-600">—</span>
       )}
     </div>
-    
+
     {/* Black's Move */}
     <div className="flex items-center justify-center bg-slate-100 dark:bg-slate-800 px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg text-center group-hover:bg-slate-200 dark:group-hover:bg-slate-700 transition-colors">
       {blackMove ? (
@@ -67,23 +68,141 @@ const PieceSVG = memo(({ piece }: { piece: string }) => {
 });
 PieceSVG.displayName = "PieceSVG";
 
+// Draw Offer Banner Component
+const DrawOfferBanner = memo(() => {
+  const drawOfferReceived = useGameStore((state) => state.drawOfferReceived);
+  const [timeLeft, setTimeLeft] = useState(30);
+
+  const acceptDraw = useCallback(() => {
+    const { acceptDraw } = useGameStore.getState();
+    acceptDraw();
+  }, []);
+
+  const rejectDraw = useCallback(() => {
+    const { rejectDraw } = useGameStore.getState();
+    rejectDraw();
+  }, []);
+
+  useEffect(() => {
+    if (!drawOfferReceived) return;
+
+    setTimeLeft(30);
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          rejectDraw();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [drawOfferReceived, rejectDraw]);
+
+  if (!drawOfferReceived) return null;
+
+  const progress = (timeLeft / 30) * 100;
+
+  return (
+    <AnimatePresence>
+      {drawOfferReceived && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mb-4 overflow-hidden"
+        >
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-300 dark:border-amber-600 rounded-xl p-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                  <Handshake className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="font-bold text-sm text-slate-900 dark:text-white">
+                  Draw Offer
+                </span>
+              </div>
+              <button
+                onClick={rejectDraw}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Message */}
+            <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mb-3">
+              Your opponent offers a draw
+            </p>
+
+            {/* Timer Progress */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-2">
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-500" />
+                  <span>{timeLeft}s</span>
+                </div>
+              </div>
+              <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <motion.div
+                  className={`h-full bg-amber-500 ${
+                    timeLeft <= 10 ? "animate-pulse" : ""
+                  }`}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={rejectDraw}
+                className="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1"
+              >
+                <X className="w-3 h-3" />
+                Decline
+              </button>
+              <button
+                onClick={acceptDraw}
+                className="flex-1 px-3 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 shadow-md"
+              >
+                <Handshake className="w-3 h-3" />
+                Accept
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+});
+DrawOfferBanner.displayName = "DrawOfferBanner";
+
 // Captured Pieces Component
 const CapturedPieces = memo(() => {
   const capturedPieces = useGameStore((state) => state.capturedPieces);
-  
+
   // Group pieces by type and count them
   const groupPieces = (pieces: string[]) => {
     const grouped = pieces.reduce((acc, piece) => {
       acc[piece] = (acc[piece] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-    
+
     return Object.entries(grouped).map(([piece, count]) => ({ piece, count }));
   };
 
   // Separate captured pieces by color
-  const capturedByWhite = groupPieces(capturedPieces.filter(piece => piece.startsWith("b"))); // Black pieces captured by white
-  const capturedByBlack = groupPieces(capturedPieces.filter(piece => piece.startsWith("w"))); // White pieces captured by black
+  const capturedByWhite = groupPieces(
+    capturedPieces.filter((piece) => piece.startsWith("b"))
+  ); // Black pieces captured by white
+  const capturedByBlack = groupPieces(
+    capturedPieces.filter((piece) => piece.startsWith("w"))
+  ); // White pieces captured by black
 
   if (capturedPieces.length === 0) return null;
 
@@ -96,12 +215,17 @@ const CapturedPieces = memo(() => {
         {/* White's Captured Pieces */}
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <span className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-300">W</span>
+            <span className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-300">
+              W
+            </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {capturedByWhite.length > 0 ? (
               capturedByWhite.map(({ piece, count }, index) => (
-                <div key={`white-${index}`} className="relative flex items-center gap-1 bg-white dark:bg-slate-700 p-2 rounded-lg shadow-md border border-indigo-200 dark:border-indigo-700 hover:shadow-lg transition-shadow">
+                <div
+                  key={`white-${index}`}
+                  className="relative flex items-center gap-1 bg-white dark:bg-slate-700 p-2 rounded-lg shadow-md border border-indigo-200 dark:border-indigo-700 hover:shadow-lg transition-shadow"
+                >
                   <PieceSVG piece={piece} />
                   {count > 1 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-800">
@@ -113,7 +237,9 @@ const CapturedPieces = memo(() => {
                 </div>
               ))
             ) : (
-              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">None captured</span>
+              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">
+                None captured
+              </span>
             )}
           </div>
         </div>
@@ -121,12 +247,17 @@ const CapturedPieces = memo(() => {
         {/* Black's Captured Pieces */}
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <span className="text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-300">B</span>
+            <span className="text-xs sm:text-sm font-bold text-amber-700 dark:text-amber-300">
+              B
+            </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {capturedByBlack.length > 0 ? (
               capturedByBlack.map(({ piece, count }, index) => (
-                <div key={`black-${index}`} className="relative flex items-center gap-1 bg-white dark:bg-slate-700 p-2 rounded-lg shadow-md border border-amber-200 dark:border-amber-700 hover:shadow-lg transition-shadow">
+                <div
+                  key={`black-${index}`}
+                  className="relative flex items-center gap-1 bg-white dark:bg-slate-700 p-2 rounded-lg shadow-md border border-amber-200 dark:border-amber-700 hover:shadow-lg transition-shadow"
+                >
                   <PieceSVG piece={piece} />
                   {count > 1 && (
                     <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-800">
@@ -138,7 +269,9 @@ const CapturedPieces = memo(() => {
                 </div>
               ))
             ) : (
-              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">None captured</span>
+              <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 italic">
+                None captured
+              </span>
             )}
           </div>
         </div>
@@ -156,36 +289,42 @@ const MoveHistoryComponent = () => {
   // Group moves into pairs (White + Black)
   const movePairs = useMemo(() => {
     const pairs: MovePairProps[] = [];
-    
+
     for (let i = 0; i < moves.length; i += 2) {
       const moveNumber = Math.floor(i / 2) + 1;
       const whiteMove = moves[i];
       const blackMove = moves[i + 1];
-      
+
       pairs.push({
         moveNumber,
-        whiteMove: whiteMove ? {
-          from: whiteMove.from,
-          to: whiteMove.to,
-          promotion: whiteMove.promotion
-        } : undefined,
-        blackMove: blackMove ? {
-          from: blackMove.from,
-          to: blackMove.to,
-          promotion: blackMove.promotion
-        } : undefined
+        whiteMove: whiteMove
+          ? {
+              from: whiteMove.from,
+              to: whiteMove.to,
+              promotion: whiteMove.promotion,
+            }
+          : undefined,
+        blackMove: blackMove
+          ? {
+              from: blackMove.from,
+              to: blackMove.to,
+              promotion: blackMove.promotion,
+            }
+          : undefined,
       });
     }
-    
+
     return pairs;
   }, [moves]);
 
   return (
     <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-xl flex flex-col w-full h-full">
-      <h3 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-3">
-        <span className="inline-block w-2 h-6 sm:h-7 bg-indigo-500 rounded"></span>
+      <h3 className="w-full flex items-center justify-center gap-3 text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 dark:text-white mb-3 sm:mb-4">
         Moves
       </h3>
+
+      {/* Draw Offer Banner */}
+      <DrawOfferBanner />
 
       {/* Captured Pieces Section */}
       <CapturedPieces />
@@ -193,8 +332,8 @@ const MoveHistoryComponent = () => {
       {/* Column Headers */}
       {moves.length > 0 && (
         <div className="grid grid-cols-[45px_1fr_1fr] sm:grid-cols-[50px_1fr_1fr] gap-2 sm:gap-3 px-3 sm:px-4 pb-3 mb-3 border-b border-slate-200 dark:border-slate-700">
-          <span className="text-xs sm:text-sm uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 text-right">
-            Move
+          <span className="text-xs sm:text-sm uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 text-center">
+            #
           </span>
           <span className="text-xs sm:text-sm uppercase tracking-wider font-bold text-indigo-600 dark:text-indigo-400 text-center">
             White

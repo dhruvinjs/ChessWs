@@ -562,14 +562,6 @@ export async function playerLeft(
           ? Number(game.blackTimer)
           : Number(game.whiteTimer);
 
-      // Fetch draw counts from Redis
-      const player1DrawCount = await redis.get(
-        `drawOffers:${gameId}:${existingGame.player1GuestId}`
-      );
-      const player2DrawCount = await redis.get(
-        `drawOffers:${gameId}:${existingGame.player2GuestId}`
-      );
-
       await pc.guestGames.update({
         where: { id: Number(gameId) },
         data: {
@@ -583,10 +575,6 @@ export async function playerLeft(
           capturedPieces,
           draw: false,
           endedAt: new Date(),
-          player1DrawOfferCount:
-            player1DrawCount !== null ? Number(player1DrawCount) : 3,
-          player2DrawOfferCount:
-            player2DrawCount !== null ? Number(player2DrawCount) : 3,
         },
       });
     }
@@ -678,14 +666,6 @@ export async function handleGuestGameDraw(
           ? Number(gameData.blackTimer)
           : Number(gameData.whiteTimer);
 
-      // Fetch draw counts from Redis
-      const player1DrawCount = await redis.get(
-        `drawOffers:${gameId}:${existingGame.player1GuestId}`
-      );
-      const player2DrawCount = await redis.get(
-        `drawOffers:${gameId}:${existingGame.player2GuestId}`
-      );
-
       await pc.guestGames.update({
         where: { id: Number(gameId) },
         data: {
@@ -697,10 +677,6 @@ export async function handleGuestGameDraw(
           capturedPieces,
           draw: true,
           endedAt: new Date(),
-          player1DrawOfferCount:
-            player1DrawCount !== null ? Number(player1DrawCount) : 3,
-          player2DrawOfferCount:
-            player2DrawCount !== null ? Number(player2DrawCount) : 3,
         },
       });
     }
@@ -750,48 +726,6 @@ export async function offerDraw(
 
   // Decrement remaining offers
   const remainingOffers = await redis.decr(offerCountKey);
-
-  // Also update the Redis hash fields for consistency with saveGuestGameProgress
-  const isWhitePlayer = game.whitePlayerId === playerId;
-  if (isWhitePlayer) {
-    await redis.hSet(
-      `guest-game:${gameId}`,
-      'whitePlayerDrawOfferCount',
-      String(remainingOffers)
-    );
-  } else {
-    await redis.hSet(
-      `guest-game:${gameId}`,
-      'blackPlayerDrawOfferCount',
-      String(remainingOffers)
-    );
-  }
-
-  const dbGame = await pc.guestGames.findUnique({
-    where: { id: Number(gameId) },
-    select: {
-      player1GuestId: true,
-      player2GuestId: true,
-    },
-  });
-
-  if (dbGame) {
-    if (dbGame.player1GuestId === playerId) {
-      await pc.guestGames.update({
-        where: { id: Number(gameId) },
-        data: {
-          player1DrawOfferCount: { decrement: 1 },
-        },
-      });
-    } else {
-      await pc.guestGames.update({
-        where: { id: Number(gameId) },
-        data: {
-          player2DrawOfferCount: { decrement: 1 },
-        },
-      });
-    }
-  }
 
   // Send confirmation to sender
   offerSenderSocket.send(
@@ -918,15 +852,6 @@ export async function saveGuestGameProgress(
       existingGameFromDb.player1Color === 'w'
         ? Number(gameState.blackTimer)
         : Number(gameState.whiteTimer);
-    //Draw count - handle undefined values
-    const player1DrawOfferCount =
-      existingGameFromDb.player1Color === 'w'
-        ? gameState.whitePlayerDrawOfferCount
-        : gameState.blackPlayerDrawOfferCount;
-    const player2DrawOfferCount =
-      existingGameFromDb.player1Color === 'w'
-        ? gameState.blackPlayerDrawOfferCount
-        : gameState.whitePlayerDrawOfferCount;
 
     await pc.guestGames.update({
       where: {
@@ -939,14 +864,6 @@ export async function saveGuestGameProgress(
         player1TimeLeft: player1TimeLeft,
         player2TimeLeft: player2TimeLeft,
         lastMoveBy: lastMoveBy,
-        player1DrawOfferCount:
-          player1DrawOfferCount !== undefined
-            ? Number(player1DrawOfferCount)
-            : undefined,
-        player2DrawOfferCount:
-          player2DrawOfferCount !== undefined
-            ? Number(player2DrawOfferCount)
-            : undefined,
       },
     });
 

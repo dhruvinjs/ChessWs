@@ -11,6 +11,39 @@ interface Move {
 
 type Color = "w" | "b" | null;
 
+interface InitGamePayload {
+  color: Color;
+  fen: string;
+  validMoves: Move[];
+  whiteTimer: number;
+  blackTimer: number;
+  gameId: string;
+  opponentName?: string | null;
+}
+
+interface ProcessServerMovePayload {
+  fen: string;
+  move: Move;
+  validMoves: Move[];
+  whiteTimer: number;
+  blackTimer: number;
+  capturedPiece?: string;
+}
+
+interface ReconnectPayload {
+  fen: string;
+  color: Color;
+  gameId: string;
+  whiteTimer: number;
+  blackTimer: number;
+  validMoves: Move[];
+  moves: Move[];
+  count?: number;
+  capturedPieces?: string[];
+  opponentId?: number | null;
+  opponentName?: string | null;
+}
+
 interface GameState {
   guestId: string;
   color: Color;
@@ -50,9 +83,9 @@ interface GameState {
 
   // Actions
   initGuestConnection: (guestId: string) => void;
-  initGame: (payload: any) => void;
-  processServerMove: (payload: any) => void;
-  reconnect: (payload: any) => void;
+  initGame: (payload: InitGamePayload) => void;
+  processServerMove: (payload: ProcessServerMovePayload) => void;
+  reconnect: (payload: ReconnectPayload) => void;
   setFen: (fen: string) => void;
   setOppStatus: (status: boolean) => void;
   updateTimers: (white: number, black: number) => void;
@@ -192,11 +225,12 @@ export const useGameStore = create<GameState>()(
           drawOfferReceived: false,
           drawOfferSent: false,
           drawOfferCount: payload.count ?? 3,
-          // Preserve room state during reconnection
+          // Preserve room state during reconnection, but update opponent info from payload
           isRoomCreator: state.isRoomCreator,
           roomId: state.roomId,
           roomStatus: state.roomStatus,
-          opponentName: state.opponentName,
+          opponentName: payload.opponentName ?? state.opponentName,
+          opponentId: payload.opponentId ?? state.opponentId,
           roomGameId: state.roomGameId,
         }));
       },
@@ -251,7 +285,16 @@ export const useGameStore = create<GameState>()(
       },
 
       move: (move) => {
-        const { gameId, roomGameId } = get();
+        const { gameId, roomGameId, drawOfferReceived } = get();
+
+        // Auto-reject draw offer if one is pending when player makes a move
+        if (drawOfferReceived) {
+          set({ drawOfferReceived: false });
+          SocketManager.getInstance().send({
+            type: GameMessages.REJECT_DRAW,
+            payload: { gameId: gameId || roomGameId },
+          });
+        }
 
         // Check if it's a room game or regular game
         if (roomGameId) {

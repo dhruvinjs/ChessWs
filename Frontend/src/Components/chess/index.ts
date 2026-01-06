@@ -9,3 +9,4 @@ export { Piece } from './Piece';
 export { showMessage } from '../ToastMessages';
 export { GameControls } from './GameControls';
 export { DrawOfferDialog } from './DrawOfferDialog';
+export { PlayerInfo } from './PlayerInfo';

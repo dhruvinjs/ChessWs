@@ -43,6 +43,8 @@ export interface SquareProps {
   isLastMove: boolean;
   isValidMove: boolean;
   onClick: () => void;
+  rankLabel?: string | null;
+  fileLabel?: string | null;
 }
 
 export const GameMessages = {

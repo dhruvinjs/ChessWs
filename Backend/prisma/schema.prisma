@@ -81,8 +81,6 @@ model Game {
   endedAt DateTime? 
   capturedPieces String[] @default([])
   status GameStatus @default(ACTIVE)
-  player1DrawOfferCount Int @default(3)
-  player2DrawOfferCount Int @default(3)
 
 }
 
