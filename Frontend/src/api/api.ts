@@ -60,6 +60,9 @@ export interface RoomGame {
   draw: boolean;
   winner?: { id: number; name: string; chessLevel?: string };
   loser?: { id: number; name: string; chessLevel?: string };
+  opponentName?: string;
+  opponentChessLevel?: string;
+  isCreator?: boolean;
 }
 
 export interface GuestGame {
@@ -93,6 +96,7 @@ export interface UserProfile {
     computerGamesInProgress: ComputerGame[];
     roomGamesWon: RoomGame[];
     roomGamesLost: RoomGame[];
+    roomGamesDrawn: RoomGame[];
     guestGamesWon: GuestGame[];
     guestGamesLost: GuestGame[];
     guestGamesDrawn: GuestGame[];

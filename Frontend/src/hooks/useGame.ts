@@ -1,18 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
-import { gamesApi } from '../api/axios';
+import { useQuery } from "@tanstack/react-query";
+import { gamesApi } from "../api/axios";
 
-async function fetchGuestGamesTotal(): Promise<number> {
-  const response = await gamesApi.get('/guest-games/total');
-  if (response.data.success) {
-    return response.data.count;
-  }
-  return 0;
+interface Stats {
+  guestGamesCount: number;
+  roomsCount: number;
 }
 
-export function useGuestGamesTotalQuery() {
+async function fetchStats(): Promise<Stats> {
+  const response = await gamesApi.get("/stats-total");
+  if (response.data.success) {
+    return response.data.stats;
+  }
+  return { guestGamesCount: 0, roomsCount: 0 };
+}
+
+export function useStatsQuery() {
   return useQuery({
-    queryKey: ['guestGamesTotal'],
-    queryFn: fetchGuestGamesTotal,
+    queryKey: ["stats"],
+    queryFn: fetchStats,
     staleTime: 1000 * 60 * 5, // cache for 5 minutes
   });
 }

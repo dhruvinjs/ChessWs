@@ -1,19 +1,17 @@
-import { useState } from 'react';
-import { Button } from '../Components';
-import { motion } from 'framer-motion';
-import { FloatingPieces } from '../Components/FloatingPieces';
-import { roomApis } from '../api/api';
-import axios from 'axios';
-import { showMessage } from '../Components/ToastMessages';
-import { useNavigate } from 'react-router-dom';
-import { useGameStore } from '../stores/useGameStore';
-import { SocketManager } from '../lib/socketManager';
-import { useUserQuery } from '../hooks/useUserQuery';
-import { ConfirmDialog } from '../Components/ConfirmDialog';
+import { useState } from "react";
+import { Button } from "../Components";
+import { motion } from "framer-motion";
+import { FloatingPieces } from "../Components/FloatingPieces";
+import { roomApis } from "../api/api";
+import axios from "axios";
+import { showMessage } from "../Components/ToastMessages";
+import { useNavigate } from "react-router-dom";
+import { useGameStore } from "../stores/useGameStore";
+import { ConfirmDialog } from "../Components/ConfirmDialog";
 
 export function Room() {
-  const [roomCode, setRoomCode] = useState('');
-  const [mode, setMode] = useState<'join' | 'host'>('join');
+  const [roomCode, setRoomCode] = useState("");
+  const [mode, setMode] = useState<"join" | "host">("join");
   const [isLoading, setIsLoading] = useState(false);
   const [showExistingRoomDialog, setShowExistingRoomDialog] = useState(false);
   const [existingRoomId, setExistingRoomId] = useState<string | null>(null);
@@ -21,21 +19,21 @@ export function Room() {
 
   const navigate = useNavigate();
   const setRoomInfo = useGameStore((state) => state.setRoomInfo);
-  const { data: user } = useUserQuery();
+  // const { data: user } = useUserQuery();
 
   const handleJoinRoom = async () => {
     const trimmedRoomCode = roomCode.trim();
     if (!trimmedRoomCode) {
-      showMessage('Validation Error', 'Please enter a room code', {
-        type: 'error',
+      showMessage("Validation Error", "Please enter a room code", {
+        type: "error",
       });
       return;
     }
     if (trimmedRoomCode.length !== 8) {
       showMessage(
-        'Validation Error',
-        'Room code must be exactly 8 characters',
-        { type: 'error' }
+        "Validation Error",
+        "Room code must be exactly 8 characters",
+        { type: "error" }
       );
       return;
     }
@@ -45,27 +43,24 @@ export function Room() {
       if (response.success) {
         const roomInfo = response.room;
         setRoomInfo(roomInfo);
-        if (user?.id) {
-          const socketManager = SocketManager.getInstance();
-          socketManager.init('room', user.id);
-        }
-        showMessage('Room Joined!', response.message, { type: 'success' });
-        setRoomCode('');
-        setTimeout(() => navigate(`/room/${trimmedRoomCode}`), 1000);
+        showMessage("Room Joined!", response.message, { type: "success" });
+        setRoomCode("");
+        // Navigate to room page - WebSocket will connect there
+        navigate(`/room/${trimmedRoomCode}`);
       } else {
-        showMessage('Join Failed', response.message, { type: 'error' });
+        showMessage("Join Failed", response.message, { type: "error" });
       }
     } catch (error: unknown) {
-      let errorMessage = 'Failed to join room';
+      let errorMessage = "Failed to join room";
       if (axios.isAxiosError(error)) {
         errorMessage = error.response?.data?.message || error.message;
-        if (error.response?.status === 404) errorMessage = 'Room not found.';
+        if (error.response?.status === 404) errorMessage = "Room not found.";
         if (error.response?.status === 400)
           errorMessage = error.response.data.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      showMessage('Error', errorMessage, { type: 'error' });
+      showMessage("Error", errorMessage, { type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -80,21 +75,18 @@ export function Room() {
         const roomInfo = response.room;
         setRoomCode(createdRoomId);
         setRoomInfo(roomInfo);
-        if (user?.id) {
-          const socketManager = SocketManager.getInstance();
-          socketManager.init('room', user.id);
-        }
         showMessage(
-          'Room Created!',
+          "Room Created!",
           `Room ${createdRoomId} created successfully!`,
-          { type: 'success' }
+          { type: "success" }
         );
-        setTimeout(() => navigate(`/room/${createdRoomId}`), 1500);
+        // Navigate to room page - WebSocket will connect there
+        navigate(`/room/${createdRoomId}`);
       } else {
         showMessage(
-          'Creation Failed',
-          response.message ?? 'Something went wrong',
-          { type: 'error' }
+          "Creation Failed",
+          response.message ?? "Something went wrong",
+          { type: "error" }
         );
       }
     } catch (error: unknown) {
@@ -107,9 +99,9 @@ export function Room() {
         setShowExistingRoomDialog(true);
       } else {
         const errorMessage = axios.isAxiosError(error)
-          ? error.response?.data?.message || 'Failed to create room'
-          : 'Failed to create room';
-        showMessage('Error', errorMessage, { type: 'error' });
+          ? error.response?.data?.message || "Failed to create room"
+          : "Failed to create room";
+        showMessage("Error", errorMessage, { type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -118,8 +110,8 @@ export function Room() {
 
   const handleRejoinExistingRoom = () => {
     if (existingRoomId) {
-      showMessage('Rejoining Room', `Redirecting to ${existingRoomId}`, {
-        type: 'info',
+      showMessage("Rejoining Room", `Redirecting to ${existingRoomId}`, {
+        type: "info",
       });
       setShowExistingRoomDialog(false);
       navigate(`/room/${existingRoomId}`);
@@ -133,13 +125,13 @@ export function Room() {
       const response = await roomApis.cancelRoom(existingRoomId);
       if (response.success) {
         showMessage(
-          'Room Cancelled',
+          "Room Cancelled",
           `Room ${existingRoomId} has been cancelled.`,
-          { type: 'success' }
+          { type: "success" }
         );
 
         useGameStore.setState({
-          roomId: '',
+          roomId: "",
           isRoomCreator: false,
           opponentId: null,
           opponentName: null,
@@ -149,17 +141,17 @@ export function Room() {
 
         setShowExistingRoomDialog(false);
         setExistingRoomId(null);
-        showMessage('Ready', 'You can now create a new room.', {
-          type: 'info',
+        showMessage("Ready", "You can now create a new room.", {
+          type: "info",
         });
       } else {
-        showMessage('Error', response.message, { type: 'error' });
+        showMessage("Error", response.message, { type: "error" });
       }
     } catch (error: unknown) {
       const errorMessage = axios.isAxiosError(error)
-        ? error.response?.data?.message || 'Failed to cancel room'
-        : 'Failed to cancel room';
-      showMessage('Error', errorMessage, { type: 'error' });
+        ? error.response?.data?.message || "Failed to cancel room"
+        : "Failed to cancel room";
+      showMessage("Error", errorMessage, { type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -187,22 +179,22 @@ export function Room() {
           <div className="flex gap-3 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
             <Button
               size="sm"
-              variant={mode === 'join' ? 'outline' : 'secondary'}
+              variant={mode === "join" ? "outline" : "secondary"}
               text="Join Room"
               className="flex-1"
-              onClick={() => setMode('join')}
+              onClick={() => setMode("join")}
             />
             <Button
               size="sm"
-              variant={mode === 'host' ? 'outline' : 'secondary'}
+              variant={mode === "host" ? "outline" : "secondary"}
               text="Host Room"
               className="flex-1"
-              onClick={() => setMode('host')}
+              onClick={() => setMode("host")}
             />
           </div>
 
           <div className="space-y-5">
-            {mode === 'join' ? (
+            {mode === "join" ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -214,18 +206,18 @@ export function Room() {
                     onChange={(e) =>
                       setRoomCode(
                         e.target.value
-                          .replace(/[^a-zA-Z0-9_-]/g, '')
+                          .replace(/[^a-zA-Z0-9_-]/g, "")
                           .slice(0, 8)
                       )
                     }
-                    className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider"
+                    className="w-full text-white p-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-lg font-mono tracking-wider"
                     placeholder="Enter 8-character room code"
                   />
                 </div>
                 <Button
                   size="lg"
                   variant="primary"
-                  text={isLoading ? 'Joining...' : 'Join Room'}
+                  text={isLoading ? "Joining..." : "Join Room"}
                   className="w-full"
                   onClick={handleJoinRoom}
                   disabled={isLoading}
@@ -240,7 +232,7 @@ export function Room() {
                     variant="outline"
                     text="Create Your Own Room"
                     className="w-full"
-                    onClick={() => setMode('host')}
+                    onClick={() => setMode("host")}
                   />
                 </div>
               </>
@@ -251,7 +243,7 @@ export function Room() {
                     Your Room Code
                   </label>
                   <div className="w-full p-4 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700 rounded-xl text-center text-lg font-mono tracking-wider text-amber-800 dark:text-amber-200">
-                    {roomCode || 'Click to generate'}
+                    {roomCode || "Click to generate"}
                   </div>
                 </div>
 
@@ -260,10 +252,10 @@ export function Room() {
                   variant="primary"
                   text={
                     isLoading
-                      ? 'Loading...'
+                      ? "Loading..."
                       : roomCode
-                      ? 'Join Your Room'
-                      : 'Host New Room'
+                      ? "Join Your Room"
+                      : "Host New Room"
                   }
                   className="w-full"
                   onClick={
@@ -284,8 +276,8 @@ export function Room() {
                         className="flex-1"
                         onClick={() => {
                           navigator.clipboard.writeText(roomCode);
-                          showMessage('Copied', 'Room code copied!', {
-                            type: 'success',
+                          showMessage("Copied", "Room code copied!", {
+                            type: "success",
                           });
                         }}
                       />

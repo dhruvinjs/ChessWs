@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; 
-import toast from "react-hot-toast"; 
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { Button } from "../Button";
 import { Card } from "../Card";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { computerGameApi } from "../../api/api"; 
+import { computerGameApi } from "../../api/api";
 
 // Unicode representations for piece icons
 const PIECE_WHITE = "♔";
@@ -22,16 +23,30 @@ interface PendingSetup {
 }
 
 const difficultyLevels: DifficultyLevel[] = [
-  { value: "EASY", label: "Pawn (Easy)", description: "Good for beginners, plays simple moves." },
-  { value: "MEDIUM", label: "Knight (Medium)", description: "Balanced challenge, uses basic tactics." },
-  { value: "HARD", label: "Queen (Hard)", description: "For experienced players, strategic and aggressive." }
+  {
+    value: "EASY",
+    label: "Pawn (Easy)",
+    description: "Good for beginners, plays simple moves.",
+  },
+  {
+    value: "MEDIUM",
+    label: "Knight (Medium)",
+    description: "Balanced challenge, uses basic tactics.",
+  },
+  {
+    value: "HARD",
+    label: "Queen (Hard)",
+    description: "For experienced players, strategic and aggressive.",
+  },
 ];
 
 export const ComputerGameSetup: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Local setup state
-  const [selectedDifficulty, setSelectedDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<
+    "EASY" | "MEDIUM" | "HARD"
+  >("MEDIUM");
   const [selectedColor, setSelectedColor] = useState<"w" | "b">("w");
 
   // Game Management State
@@ -47,8 +62,7 @@ export const ComputerGameSetup: React.FC = () => {
     setShowExistingDialog(false);
     setExistingGameId(null);
     setPendingSetup(null);
-    toast.success("Returning to your active game!");
-    
+
     // 🎯 FIX: Navigate to the game page - WebSocket will restore the game
     navigate("/computer/game");
   };
@@ -67,9 +81,9 @@ export const ComputerGameSetup: React.FC = () => {
       // A. Quit the existing game
       await computerGameApi.cancelComputerGame(existingGameId);
       console.log("✅ Existing game cancelled");
-      
+
       // B. Small delay for cleanup
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // C. Create new game
       const response = await computerGameApi.createComputerGame(
@@ -99,7 +113,7 @@ export const ComputerGameSetup: React.FC = () => {
 
   const handleStartGame = async () => {
     if (isCreating) return;
-    
+
     setIsCreating(true);
     const difficulty = selectedDifficulty;
     const playerColor = selectedColor;
@@ -120,7 +134,7 @@ export const ComputerGameSetup: React.FC = () => {
         // Scenario A: New game created successfully
         toast.success("Game created!");
         console.log("✅ Navigating to /computer/game");
-        
+
         // Navigate to game page - WebSocket will load the game data
         navigate("/computer/game");
         setPendingSetup(null);
@@ -138,7 +152,9 @@ export const ComputerGameSetup: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Failed to create game:", error);
-      toast.error(error.response?.data?.message || "Failed to connect or create game");
+      toast.error(
+        error.response?.data?.message || "Failed to connect or create game"
+      );
       setPendingSetup(null);
     } finally {
       // Only stop creating state if dialog is not showing
@@ -181,9 +197,10 @@ export const ComputerGameSetup: React.FC = () => {
             <label
               key={level.value}
               className={`flex items-center p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer shadow-sm 
-                ${selectedDifficulty === level.value
-                  ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 ring-4 ring-amber-500/20 dark:ring-amber-500/10"
-                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                ${
+                  selectedDifficulty === level.value
+                    ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20 ring-4 ring-amber-500/20 dark:ring-amber-500/10"
+                    : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 }
               `}
             >
@@ -192,7 +209,11 @@ export const ComputerGameSetup: React.FC = () => {
                 name="difficulty"
                 value={level.value}
                 checked={selectedDifficulty === level.value}
-                onChange={(e) => setSelectedDifficulty(e.target.value as "EASY" | "MEDIUM" | "HARD")}
+                onChange={(e) =>
+                  setSelectedDifficulty(
+                    e.target.value as "EASY" | "MEDIUM" | "HARD"
+                  )
+                }
                 className="mr-4 h-5 w-5 text-amber-600 border-gray-300 focus:ring-amber-500 dark:bg-gray-700 dark:border-gray-600"
               />
               <div className="flex-1">
@@ -214,13 +235,13 @@ export const ComputerGameSetup: React.FC = () => {
           Choose Your Color
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          
           {/* White Color Card */}
           <label
             className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg 
-              ${selectedColor === "w"
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-4 ring-blue-500/20 dark:ring-blue-500/10"
-                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              ${
+                selectedColor === "w"
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-4 ring-blue-500/20 dark:ring-blue-500/10"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
               }
             `}
           >
@@ -232,7 +253,13 @@ export const ComputerGameSetup: React.FC = () => {
               onChange={(e) => setSelectedColor(e.target.value as "w" | "b")}
               className="sr-only"
             />
-            <div className={`text-5xl mb-3 ${selectedColor === "w" ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'}`}>
+            <div
+              className={`text-5xl mb-3 ${
+                selectedColor === "w"
+                  ? "text-blue-600"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
               {PIECE_WHITE}
             </div>
             <div className="font-extrabold text-lg text-gray-900 dark:text-white">
@@ -246,9 +273,10 @@ export const ComputerGameSetup: React.FC = () => {
           {/* Black Color Card */}
           <label
             className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg
-              ${selectedColor === "b"
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-4 ring-blue-500/20 dark:ring-blue-500/10"
-                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              ${
+                selectedColor === "b"
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-4 ring-blue-500/20 dark:ring-blue-500/10"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
               }
             `}
           >
@@ -260,7 +288,13 @@ export const ComputerGameSetup: React.FC = () => {
               onChange={(e) => setSelectedColor(e.target.value as "w" | "b")}
               className="sr-only"
             />
-            <div className={`text-5xl mb-3 ${selectedColor === "b" ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'}`}>
+            <div
+              className={`text-5xl mb-3 ${
+                selectedColor === "b"
+                  ? "text-blue-600"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
               {PIECE_BLACK}
             </div>
             <div className="font-extrabold text-lg text-gray-900 dark:text-white">
@@ -277,7 +311,11 @@ export const ComputerGameSetup: React.FC = () => {
       <Button
         variant="primary"
         size="lg"
-        text={isCreating ? "Creating Game..." : `🎮 Start as ${selectedColor === 'w' ? 'White' : 'Black'}`}
+        text={
+          isCreating
+            ? "Creating Game..."
+            : `🎮 Start as ${selectedColor === "w" ? "White" : "Black"}`
+        }
         onClick={handleStartGame}
         disabled={isCreating}
         className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-xl hover:shadow-2xl transform hover:scale-[1.01] transition-all duration-300 font-extrabold text-lg tracking-wide disabled:from-gray-400 disabled:to-gray-500 disabled:shadow-none disabled:transform-none"

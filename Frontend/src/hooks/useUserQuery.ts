@@ -35,11 +35,11 @@ export function useUserQuery() {
       }
     },
     retry: false,
-    staleTime: Infinity,
+    staleTime: 30 * 1000, // 30 seconds - reduced to get fresh data on reconnection
     gcTime: Infinity, // Keep in cache forever
-    refetchOnWindowFocus: false,
-    refetchOnMount: false, // ⚠️ Changed from true to false
-    refetchOnReconnect: false,
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: true, // Refetch on component mount
+    refetchOnReconnect: true, // Refetch on network reconnection
     // Ensure query never fails - always return data
     throwOnError: false,
   });

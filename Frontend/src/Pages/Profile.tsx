@@ -33,8 +33,8 @@ export function Profile() {
   } = useQuery<ProfileResponse>({
     queryKey: ["profile"],
     queryFn: () => authApis.getProfile(),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: 30 * 1000, // 30 seconds - reduced to get fresh data
+    refetchOnWindowFocus: true, // Refetch when window gains focus
     retry: 1,
   });
 
@@ -233,8 +233,8 @@ export function Profile() {
     if (gameFilter === "all" || gameFilter === "room") {
       userProfile.recentGames.roomGamesWon?.forEach((game) => {
         games.push({
-          opponent: game.loser?.name || "Unknown",
-          opponentLevel: game.loser?.chessLevel,
+          opponent: game.opponentName || "Unknown",
+          opponentLevel: game.opponentChessLevel,
           result: game.draw ? "Draw" : "Win",
           type: "Room",
           time: formatTimeAgo(new Date(game.createdAt)),
@@ -245,9 +245,21 @@ export function Profile() {
       // Add room games lost
       userProfile.recentGames.roomGamesLost?.forEach((game) => {
         games.push({
-          opponent: game.loser?.name || "Unknown",
-          opponentLevel: game.loser?.chessLevel,
-          result: game.draw ? "Draw" : "Loss",
+          opponent: game.opponentName || "Unknown",
+          opponentLevel: game.opponentChessLevel,
+          result: "Loss",
+          type: "Room",
+          time: formatTimeAgo(new Date(game.createdAt)),
+          createdAt: new Date(game.createdAt),
+        });
+      });
+
+      // Add room games drawn
+      userProfile.recentGames.roomGamesDrawn?.forEach((game) => {
+        games.push({
+          opponent: game.opponentName || "Unknown",
+          opponentLevel: game.opponentChessLevel,
+          result: "Draw",
           type: "Room",
           time: formatTimeAgo(new Date(game.createdAt)),
           createdAt: new Date(game.createdAt),

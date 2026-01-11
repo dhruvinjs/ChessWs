@@ -1,12 +1,14 @@
 import { ChatInterface } from "../Components/room/ChatInterface";
 import { RoomHeader, ChessBoard, MoveHistory } from "../Components";
+import { PlayerInfo } from "../Components/chess";
 import { ConfirmDialog } from "../Components/ConfirmDialog";
 import { GameMessages } from "../types/chess";
 import { useGameStore } from "../stores/useGameStore";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, memo, useCallback, useState, useRef } from "react";
-import { SocketManager } from "../lib/socketManager";
+import { roomSocketManager } from "../lib/RoomSocketManager";
 import { useUserQuery } from "../hooks/useUserQuery";
+import { ArrowLeft } from "lucide-react";
 
 // Memoized Game Controls Component
 const GameControls = memo(
@@ -45,22 +47,6 @@ const GameControls = memo(
 );
 GameControls.displayName = "GameControls";
 
-// Memoized Board Header Component
-const BoardHeader = memo(() => (
-  <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-xl w-full">
-    <div className="flex items-center justify-between">
-      <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-        <span className="inline-block w-1.5 h-5 bg-indigo-500 rounded"></span>
-        Game Board
-      </h2>
-      <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 px-3 py-1 rounded-full text-sm font-medium">
-        Your Turn
-      </div>
-    </div>
-  </div>
-));
-BoardHeader.displayName = "BoardHeader";
-
 function RoomChessPageComponent() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
@@ -80,6 +66,7 @@ function RoomChessPageComponent() {
   const blackTimer = useGameStore((state) => state.blackTimer);
   const gameStatus = useGameStore((state) => state.gameStatus);
   const drawOfferSent = useGameStore((state) => state.drawOfferSent);
+  const color = useGameStore((state) => state.color);
 
   // ✅ Memoize computed values
   const playerCount = useMemo(() => (opponentId ? 2 : 1), [opponentId]);
@@ -87,6 +74,13 @@ function RoomChessPageComponent() {
     () => gameStatus === GameMessages.GAME_ACTIVE,
     [gameStatus]
   );
+
+  // Format timer for display (MM:SS)
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // ✅ Memoize callback functions to prevent re-creation
   const handleStartGame = useCallback(() => {
@@ -154,15 +148,38 @@ function RoomChessPageComponent() {
       syncRoomId(roomId);
     }
 
-    // ✅ Initialize room WebSocket for authenticated users only
-    if (user?.id && typeof user.id === "number" && !socketInitialized.current) {
-      const socketManager = SocketManager.getInstance();
-      socketManager.init("room", user.id);
+    // ✅ Initialize room WebSocket (authenticated via JWT cookie)
+    if (!socketInitialized.current && !roomSocketManager.isConnected()) {
+      console.log(
+        `🔌 RoomChessPage: Connecting RoomSocketManager for room ${roomId}`
+      );
+      roomSocketManager
+        .connect()
+        .then(() => {
+          console.log(
+            `✅ RoomChessPage: RoomSocketManager connected successfully`
+          );
+          socketInitialized.current = true;
+        })
+        .catch((err) => {
+          console.error(
+            `❌ RoomChessPage: Failed to connect RoomSocketManager:`,
+            err
+          );
+        });
+    } else if (roomSocketManager.isConnected()) {
+      console.log(
+        `✅ RoomChessPage: WebSocket already connected, reusing connection`
+      );
       socketInitialized.current = true;
     }
 
-    // Cleanup on unmount
+    // NOTE: Don't disconnect on unmount - only disconnect when explicitly leaving
+    // The socket needs to stay connected for reconnection scenarios
     return () => {
+      console.log(
+        `🧹 RoomChessPage: Component unmounting (but keeping socket connected)`
+      );
       socketInitialized.current = false;
     };
   }, [roomId, roomCode, navigate, user?.id]);
@@ -170,6 +187,15 @@ function RoomChessPageComponent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 p-4">
       <div className="w-full max-w-7xl mx-auto flex flex-col gap-4">
+        {/* Back Button */}
+        <button
+          onClick={() => navigate("/home")}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600 text-slate-300 rounded-lg transition-colors duration-150 font-medium w-fit"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-sm">Back to Home</span>
+        </button>
+
         {/* Room Header */}
         <RoomHeader
           roomCode={roomCode || roomId || ""}
@@ -194,17 +220,47 @@ function RoomChessPageComponent() {
 
           {/* Game Board Section - Center */}
           <div className="lg:col-span-3 order-1 lg:order-2 flex flex-col items-center gap-4">
-            {/* Game Board Header */}
-            <BoardHeader />
-
-            {/* Chessboard */}
-            <div className="w-full aspect-square max-w-full">
+            {/* Chessboard with Player Info */}
+            <div className="w-full max-w-full">
               {gameStatus === GameMessages.SEARCHING ? (
-                <div className="flex items-center justify-center h-full text-center text-xl font-semibold text-slate-600 dark:text-slate-400 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
+                <div className="flex items-center justify-center h-full aspect-square text-center text-xl font-semibold text-slate-600 dark:text-slate-400 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
                   <p>Waiting for game to start...</p>
                 </div>
               ) : (
-                <ChessBoard />
+                <div className="w-full flex flex-col gap-0">
+                  {/* Opponent Info (Top) */}
+                  <div className="w-full">
+                    <PlayerInfo
+                      playerName={opponentName || "Opponent"}
+                      playerColor={color === "w" ? "black" : "white"}
+                      timeLeft={
+                        color === "w"
+                          ? formatTimer(blackTimer)
+                          : formatTimer(whiteTimer)
+                      }
+                      position="top"
+                    />
+                  </div>
+
+                  {/* Chess Board */}
+                  <div className="w-full aspect-square -mt-[1px]">
+                    <ChessBoard />
+                  </div>
+
+                  {/* Current Player Info (Bottom) */}
+                  <div className="w-full -mt-[1px]">
+                    <PlayerInfo
+                      playerName={user?.name || "You"}
+                      playerColor={color === "w" ? "white" : "black"}
+                      timeLeft={
+                        color === "w"
+                          ? formatTimer(whiteTimer)
+                          : formatTimer(blackTimer)
+                      }
+                      position="bottom"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 

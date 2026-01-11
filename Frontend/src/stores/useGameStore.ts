@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SocketManager } from "../lib/socketManager";
+import { roomSocketManager } from "../lib/RoomSocketManager";
 import { GameMessages } from "../types/chess";
 
 interface Move {
@@ -66,7 +67,7 @@ interface GameState {
   // ✅ Draw offer state
   drawOfferReceived: boolean;
   drawOfferSent: boolean;
-  drawOfferCount: number;
+  // drawOfferCount: number;
 
   //room-state
   roomId: string;
@@ -75,6 +76,7 @@ interface GameState {
   opponentName: string | null;
   roomGameId: number | null;
   roomStatus: "WAITING" | "FULL" | "CANCELLED" | "ACTIVE" | "FINISHED" | null;
+  currentUserId: number | null;
   chatMsg: Array<{
     sender: number;
     message: string;
@@ -92,7 +94,7 @@ interface GameState {
   endGame: (winner: Color | "draw", loser: Color | null) => void;
   resetGame: () => void;
   setSelectedSquare: (square: string | null) => void;
-  setDrawOfferCount: (count: number) => void;
+  // setDrawOfferCount: (count: number) => void;
   setDrawOfferSent: (sent: boolean) => void;
   setDrawOfferReceived: (received: boolean) => void;
   cancelSearch: () => void;
@@ -103,6 +105,7 @@ interface GameState {
     status: string;
     playerCount: number;
     isCreator: boolean;
+    currentUserId?: number;
     opponentId: number | null;
     opponentName: string | null;
     gameId: string | null;
@@ -150,7 +153,7 @@ export const useGameStore = create<GameState>()(
       // ✅ Initial draw state
       drawOfferReceived: false,
       drawOfferSent: false,
-      drawOfferCount: 3,
+      // drawOfferCount: 3,
 
       // ✅ Initial room state
       roomId: "",
@@ -159,6 +162,7 @@ export const useGameStore = create<GameState>()(
       opponentName: null,
       roomGameId: null,
       roomStatus: null,
+      currentUserId: null,
       chatMsg: [],
 
       // ✅ Initialize guest connection - stores guestId and initializes WebSocket
@@ -192,7 +196,6 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 3,
         }),
 
       processServerMove: (payload) => {
@@ -224,7 +227,6 @@ export const useGameStore = create<GameState>()(
           oppConnected: true,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: payload.count ?? 3,
           // Preserve room state during reconnection, but update opponent info from payload
           isRoomCreator: state.isRoomCreator,
           roomId: state.roomId,
@@ -269,11 +271,9 @@ export const useGameStore = create<GameState>()(
           capturedPieces: [],
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 3,
         }),
 
       setSelectedSquare: (square) => set({ selectedSquare: square }),
-      setDrawOfferCount: (count) => set({ drawOfferCount: count ?? 3 }),
       setDrawOfferSent: (sent) => set({ drawOfferSent: sent }),
       setDrawOfferReceived: (received) => set({ drawOfferReceived: received }),
 
@@ -299,10 +299,7 @@ export const useGameStore = create<GameState>()(
         // Check if it's a room game or regular game
         if (roomGameId) {
           // Room game move
-          SocketManager.getInstance().send({
-            type: GameMessages.ROOM_MOVE,
-            payload: { ...move, roomGameId },
-          });
+          roomSocketManager.makeMove(roomGameId, move);
         } else if (gameId) {
           // Regular game move
           SocketManager.getInstance().send({
@@ -330,7 +327,6 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
-          drawOfferCount: 3,
         });
       },
 
@@ -353,10 +349,14 @@ export const useGameStore = create<GameState>()(
         const { gameId, roomGameId } = get();
         if (!gameId && !roomGameId) return;
 
-        SocketManager.getInstance().send({
-          type: GameMessages.OFFER_DRAW,
-          payload: roomGameId ? { roomGameId } : {},
-        });
+        if (roomGameId) {
+          roomSocketManager.offerDraw(roomGameId);
+        } else {
+          SocketManager.getInstance().send({
+            type: GameMessages.OFFER_DRAW,
+            payload: {},
+          });
+        }
 
         set({ drawOfferSent: true });
 
@@ -375,10 +375,14 @@ export const useGameStore = create<GameState>()(
         const { gameId, roomGameId } = get();
         if (!gameId && !roomGameId) return;
 
-        SocketManager.getInstance().send({
-          type: GameMessages.ACCEPT_DRAW,
-          payload: roomGameId ? { roomGameId } : {},
-        });
+        if (roomGameId) {
+          roomSocketManager.acceptDraw(roomGameId);
+        } else {
+          SocketManager.getInstance().send({
+            type: GameMessages.ACCEPT_DRAW,
+            payload: {},
+          });
+        }
 
         set({
           drawOfferReceived: false,
@@ -392,10 +396,14 @@ export const useGameStore = create<GameState>()(
         const { gameId, roomGameId } = get();
         if (!gameId && !roomGameId) return;
 
-        SocketManager.getInstance().send({
-          type: GameMessages.REJECT_DRAW,
-          payload: roomGameId ? { roomGameId } : {},
-        });
+        if (roomGameId) {
+          roomSocketManager.rejectDraw(roomGameId);
+        } else {
+          SocketManager.getInstance().send({
+            type: GameMessages.REJECT_DRAW,
+            payload: {},
+          });
+        }
 
         set({
           drawOfferReceived: false,
@@ -418,6 +426,7 @@ export const useGameStore = create<GameState>()(
             | "ACTIVE"
             | "FINISHED",
           roomGameId: roomInfo.gameId ? Number(roomInfo.gameId) : null,
+          currentUserId: roomInfo.currentUserId || null,
         });
         // console.log("✅ Room state updated - isCreator:", roomInfo.isCreator);
       },
@@ -475,10 +484,7 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
-        SocketManager.getInstance().send({
-          type: GameMessages.INIT_ROOM_GAME,
-          payload: { roomId },
-        });
+        roomSocketManager.startGame(roomId);
       },
 
       // ✅ Leave room (before game starts) - ONLY CALLS CANCEL API
@@ -548,10 +554,7 @@ export const useGameStore = create<GameState>()(
         const { roomGameId } = get();
         if (!roomGameId) return;
 
-        SocketManager.getInstance().send({
-          type: GameMessages.ROOM_LEAVE_GAME,
-          payload: { roomGameId },
-        });
+        roomSocketManager.resignGame(roomGameId);
 
         set({
           gameStatus: GameMessages.GAME_OVER,
@@ -559,7 +562,7 @@ export const useGameStore = create<GameState>()(
       },
     }),
     {
-      name: "chess-game-storage", // localStorage key
+      name: "chess-game-storage",
       partialize: (state) => ({
         // Only persist room-related state
         roomId: state.roomId,

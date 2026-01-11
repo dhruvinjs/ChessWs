@@ -17,7 +17,6 @@ const GameControlsComponent = () => {
   const gameStatus = useGameStore((state) => state.gameStatus);
   const gameStarted = useGameStore((state) => state.gameStarted);
   const drawOfferSent = useGameStore((state) => state.drawOfferSent);
-  const drawOfferCount = useGameStore((state) => state.drawOfferCount);
 
   const isWaitingForGame = gameStatus === GameMessages.SEARCHING;
   const isGameActive = gameStatus === GameMessages.GAME_ACTIVE && gameStarted;
@@ -79,14 +78,10 @@ const GameControlsComponent = () => {
     if (drawOfferSent) {
       return "Offer Sent";
     }
-    if (isGameActive) {
-      return `Draw (${drawOfferCount} left)`;
-    }
     return "Draw";
   };
 
-  const isDrawDisabled =
-    !isGameActive || drawOfferSent || isGameOver || drawOfferCount <= 0;
+  const isDrawDisabled = !isGameActive || drawOfferSent || isGameOver;
 
   return (
     <>
@@ -157,9 +152,7 @@ const GameControlsComponent = () => {
         onClose={() => setShowDrawConfirm(false)}
         onConfirm={confirmDraw}
         title="Offer Draw?"
-        message={`Are you sure you want to offer a draw? You have ${
-          3 - drawOfferCount
-        } offers remaining.`}
+        message="Are you sure you want to offer a draw?"
         confirmText="Yes, Offer Draw"
         cancelText="Cancel"
       />

@@ -9,6 +9,7 @@ export class SocketManager {
   private static instance: SocketManager;
   private socket: WebSocket | null = null;
   private wsBaseUrl = import.meta.env.VITE_WS_URL;
+  private currentConnectionType: GameModes | null = null;
 
   private constructor() {}
 
@@ -35,7 +36,6 @@ export class SocketManager {
         initGame,
         setDrawOfferReceived,
         setDrawOfferSent,
-        setDrawOfferCount,
       } = useGameStore.getState();
 
       switch (type) {
@@ -85,13 +85,13 @@ export class SocketManager {
             selectedSquare: null,
           });
 
-          const newState = useGameStore.getState();
-          console.log("📤 State updated:", {
-            newFen: newState.fen,
-            newValidMovesCount: newState.validMoves.length,
-            turn: newState.fen.split(" ")[1],
-            myColor: newState.color,
-          });
+          // const newState = useGameStore.getState();
+          // console.log("📤 State updated:", {
+          //   newFen: newState.fen,
+          //   newValidMovesCount: newState.validMoves.length,
+          //   turn: newState.fen.split(" ")[1],
+          //   myColor: newState.color,
+          // });
           break;
         }
 
@@ -128,7 +128,6 @@ export class SocketManager {
 
         case GameMessages.OFFER_DRAW:
           setDrawOfferSent(true);
-          setDrawOfferCount(payload.remainingOffers);
           showMessage(
             "🤝 Draw Offer Sent",
             payload.message || "Waiting for opponent's response...",
@@ -138,11 +137,6 @@ export class SocketManager {
 
         case GameMessages.DRAW_OFFERED:
           setDrawOfferReceived(true);
-          showMessage(
-            "🤝 Draw Offered",
-            payload.message || "Your opponent offered a draw.",
-            { type: "info" }
-          );
           break;
 
         case GameMessages.DRAW_ACCEPTED:
@@ -157,11 +151,6 @@ export class SocketManager {
         case GameMessages.DRAW_REJECTED:
           setDrawOfferSent(false);
           setDrawOfferReceived(false);
-          showMessage(
-            "❌ Draw Rejected",
-            payload.message || "The opponent rejected the draw offer.",
-            { type: "error" }
-          );
           break;
 
         case GameMessages.GAME_DRAW:
@@ -198,7 +187,7 @@ export class SocketManager {
 
           if (isReconnection) {
             reconnect(payload);
-            console.log("🔄 Reconnected to game");
+            // console.log("🔄 Reconnected to game");
           } else {
             initGame(payload);
             showMessage(
@@ -228,7 +217,7 @@ export class SocketManager {
             capturedPieces,
           } = payload;
 
-          console.log("[RECONNECT] restoring game state", payload);
+          // console.log("[RECONNECT] restoring game state", payload);
           useGameStore.getState().reconnect({
             fen,
             color,
@@ -241,7 +230,7 @@ export class SocketManager {
             count,
             capturedPieces,
           });
-          console.log("🔄 Reconnected to game");
+          // .log("🔄 Reconnected to game");
           break;
         }
 
@@ -249,7 +238,7 @@ export class SocketManager {
         // GAME STATUS - Silent (UI State Only)
         // ========================================
         case GameMessages.GAME_ACTIVE:
-          console.log("✅ Game is active");
+          // .log("✅ Game is active");
           break;
 
         // ========================================
@@ -264,7 +253,7 @@ export class SocketManager {
 
         case GameMessages.STALEMATE:
           // Already handled by game end state
-          console.log("Stalemate detected");
+          // console.log("Stalemate detected");
           break;
 
         // ========================================
@@ -339,6 +328,15 @@ export class SocketManager {
               ? joinIsCreator
               : currentState.isRoomCreator;
 
+          console.log(`👥 USER_HAS_JOINED received:`, {
+            opponentId: joinedOpponentId,
+            opponentName,
+            roomCode,
+            roomStatus: joinRoomStatus,
+            isCreator: finalIsCreator,
+            currentRoomId: currentState.roomId,
+          });
+
           useGameStore.setState({
             opponentId: joinedOpponentId,
             opponentName: opponentName,
@@ -349,7 +347,9 @@ export class SocketManager {
           });
 
           console.log(
-            `✅ ${opponentName} joined room - isCreator=${finalIsCreator}`
+            `✅ ${opponentName} joined room - isCreator=${finalIsCreator}, roomStatus=${
+              joinRoomStatus || "FULL"
+            }`
           );
           // Room header will show this visually
           break;
@@ -568,9 +568,9 @@ export class SocketManager {
               // Ensure valid moves are set from reconnection
               validMoves: payload.validMoves || [],
             });
-            console.log(
-              `🔄 Room reconnection - syncing host status: isCreator=${payload.isCreator}`
-            );
+            // console.log(
+            //   `🔄 Room reconnection - syncing host status: isCreator=${payload.isCreator}`
+            // );
           }
 
           console.log("🔄 Reconnected to room game");
@@ -612,7 +612,7 @@ export class SocketManager {
             }
           }, 2000);
 
-          console.log("👋 Left room");
+          // console.log("👋 Left room");
           break;
 
         case GameMessages.ROOM_READY_TO_START: {
@@ -622,7 +622,7 @@ export class SocketManager {
             roomStatus: "FULL",
             isRoomCreator: currentStore.isRoomCreator,
           });
-          console.log(`✅ Room ready - both players present`);
+          // console.log(`✅ Room ready - both players present`);
           // UI will show "Start Game" button - no toast needed
           break;
         }
@@ -661,7 +661,7 @@ export class SocketManager {
 
         case GameMessages.ROOM_NOT_READY:
           // Room is waiting for opponent - no toast needed
-          console.log("⏳ Room not ready - waiting for players");
+          // console.log("⏳ Room not ready - waiting for players");
           break;
 
         case GameMessages.ROOM_GAME_ACTIVE_ERROR:
@@ -714,7 +714,7 @@ export class SocketManager {
               },
             ],
           });
-          console.log("💬 Chat message received from user:", sender);
+          // console.log("💬 Chat message received from user:", sender);
           break;
         }
 
@@ -724,7 +724,7 @@ export class SocketManager {
 
         case GameMessages.ALREADY_IN_QUEUE:
           // Player is already in queue - restore searching state (e.g., after page reload)
-          console.log("⏳ ALREADY_IN_QUEUE received - restoring search state");
+          // console.log("⏳ ALREADY_IN_QUEUE received - restoring search state");
           // Always restore searching state when player is in queue
           useGameStore.setState({
             gameStatus: GameMessages.SEARCHING,
@@ -748,7 +748,7 @@ export class SocketManager {
 
         case GameMessages.NO_ACTIVE_USERS:
           // No active users to match with
-          console.log("👥 No active users in queue");
+          // console.log("👥 No active users in queue");
           showMessage(
             "🔍 Still Searching",
             payload.message || "No opponents available yet. Please wait...",
@@ -758,13 +758,13 @@ export class SocketManager {
 
         case GameMessages.MATCH_NOT_FOUND:
           // No immediate match found, player added to queue
-          console.log("🔍 No match found, added to queue");
+          // console.log("🔍 No match found, added to queue");
           // Keep searching state - match will be found when another player joins
           break;
 
         case GameMessages.SEARCH_CANCELLED:
           // Search was cancelled by user
-          console.log("🛑 Search cancelled");
+          // console.log("🛑 Search cancelled");
           useGameStore.setState({
             gameStatus: undefined,
             gameStarted: false,
@@ -797,11 +797,23 @@ export class SocketManager {
 
   public init(type: GameModes, userId?: number | string): void {
     console.log(
-      `🔧 SocketManager.init called with type: ${type}, userId: ${userId}`
+      `🔧 SocketManager.init called with type: ${type}, userId: ${userId}, currentType: ${this.currentConnectionType}`
     );
 
-    // If already connected to the same type, don't reconnect
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+    // If trying to connect to a DIFFERENT type, close the existing connection first
+    if (this.currentConnectionType && this.currentConnectionType !== type) {
+      console.log(
+        `🔄 Switching from ${this.currentConnectionType} to ${type} - closing old connection`
+      );
+      this.closeSocket();
+    }
+
+    // If already connected to the SAME type, don't reconnect
+    if (
+      this.socket &&
+      this.socket.readyState === WebSocket.OPEN &&
+      this.currentConnectionType === type
+    ) {
       console.log(`✅ Already connected to ${type} WebSocket`);
       return;
     }
@@ -855,6 +867,7 @@ export class SocketManager {
     try {
       console.log(`🚀 Attempting to create WebSocket...`);
       this.socket = new WebSocket(wsUrl);
+      this.currentConnectionType = type;
 
       this.socket.onopen = () => {
         console.log(`✅ Successfully connected to ${type} WebSocket:`, wsUrl);
@@ -865,6 +878,7 @@ export class SocketManager {
           `🔌 ${type} WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`
         );
         this.socket = null;
+        this.currentConnectionType = null;
       };
 
       this.socket.onerror = (err) => {
@@ -876,6 +890,7 @@ export class SocketManager {
       console.log(`📡 WebSocket instance created, waiting for connection...`);
     } catch (error) {
       console.error(`❌ Failed to create WebSocket:`, error);
+      this.currentConnectionType = null;
     }
   }
 
@@ -891,6 +906,7 @@ export class SocketManager {
       this.socket.onerror = null;
       this.socket.close();
       this.socket = null;
+      this.currentConnectionType = null;
     }
   }
 

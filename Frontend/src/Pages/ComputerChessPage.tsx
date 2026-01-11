@@ -140,7 +140,6 @@ export const ComputerChessPage: React.FC = () => {
     }
     resetGame();
     setShowNewGameDialog(false);
-    toast.success('Starting new game setup');
     navigate('/computer');
   };
 

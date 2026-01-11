@@ -1,6 +1,6 @@
-import { useComputerGameStore } from '../stores/useComputerGameStore';
-import toast from 'react-hot-toast';
-import { ComputerGameMessages } from '../types/chess';
+import { useComputerGameStore } from "../stores/useComputerGameStore";
+import toast from "react-hot-toast";
+import { ComputerGameMessages } from "../types/chess";
 
 export interface ComputerMove {
   from: string;
@@ -11,8 +11,8 @@ export interface ComputerMove {
 export interface ComputerGamePayload {
   computerGameId?: number;
   fen?: string;
-  playerColor?: 'w' | 'b';
-  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+  playerColor?: "w" | "b";
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
   moves?: ComputerMove[];
   move?: ComputerMove;
   message?: string;
@@ -39,41 +39,41 @@ export class ComputerSocketManager {
       this.socket?.readyState === WebSocket.OPEN ||
       this.socket?.readyState === WebSocket.CONNECTING
     ) {
-      console.log('⚠️ Already connected or connecting, skipping');
+      // console.log('⚠️ Already connected or connecting, skipping');
       return Promise.resolve();
     }
 
-    store.setConnectionStatus('connecting');
+    store.setConnectionStatus("connecting");
 
     return new Promise((resolve, reject) => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host =
-        import.meta.env.VITE_WS_URL?.replace(/^wss?:\/\//, '') ||
-        'localhost:8080';
+        import.meta.env.VITE_WS_URL?.replace(/^wss?:\/\//, "") ||
+        "localhost:8080";
       const url = `${protocol}//${host}/computer`;
 
-      console.log(`[WebSocket] Connecting to: ${url}`);
+      // console.log(`[WebSocket] Connecting to: ${url}`);
       this.socket = new WebSocket(url);
 
       this.socket.onopen = () => {
-        console.log('✅ WebSocket connected successfully');
+        // console.log('✅ WebSocket connected successfully');
         this.reconnectAttempts = 0;
-        store.setConnectionStatus('connected');
+        store.setConnectionStatus("connected");
         resolve();
       };
 
       this.socket.onerror = (err) => {
-        console.error('❌ WebSocket error:', err);
-        store.setConnectionStatus('error');
-        toast.error('Failed to connect to game server');
+        // console.error('❌ WebSocket error:', err);
+        store.setConnectionStatus("error");
+        toast.error("Failed to connect to game server");
         reject(err);
       };
 
       this.socket.onclose = (event) => {
-        console.log(
-          `🔌 WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`
-        );
-        store.setConnectionStatus('disconnected');
+        // console.log(
+        //   `🔌 WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`
+        // );
+        store.setConnectionStatus("disconnected");
         store.setIsThinking(false);
         this.socket = null;
 
@@ -83,9 +83,9 @@ export class ComputerSocketManager {
           this.reconnectAttempts < this.maxReconnectAttempts
         ) {
           this.reconnectAttempts++;
-          console.log(
-            `🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
-          );
+          // console.log(
+          //   `🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+          // );
           setTimeout(() => this.connect(), 2000 * this.reconnectAttempts);
         }
       };
@@ -101,20 +101,20 @@ export class ComputerSocketManager {
     try {
       message = JSON.parse(event.data);
     } catch {
-      console.error('❌ Invalid message received:', event.data);
+      console.error("❌ Invalid message received:", event.data);
       return;
     }
 
     const { type, payload } = message;
-    console.log('📨 Received message:', { type, payload });
+    // console.log('📨 Received message:', { type, payload });
 
     switch (type) {
       case ComputerGameMessages.COMPUTER_GAME_ACTIVE:
-        console.log('🎮 Game active, setting data:', payload);
+        // console.log('🎮 Game active, setting data:', payload);
 
         if (!payload.computerGameId || !payload.fen) {
-          console.error('❌ Invalid game data received:', payload);
-          toast.error('Invalid game data received');
+          console.error("❌ Invalid game data received:", payload);
+          toast.error("Invalid game data received");
           return;
         }
 
@@ -123,24 +123,24 @@ export class ComputerSocketManager {
           fen: payload.fen,
           moves: payload.moves || [],
           capturedPieces: payload.capturedPieces || [],
-          playerColor: payload.playerColor || 'w',
-          difficulty: payload.difficulty || 'MEDIUM',
+          playerColor: payload.playerColor || "w",
+          difficulty: payload.difficulty || "MEDIUM",
           validMoves: payload.validMoves || [],
         });
-        store.setGameStatus('active');
+        store.setGameStatus("active");
         store.setIsThinking(false);
-        toast.success(payload.message || 'Game loaded!');
+        toast.success(payload.message || "Game loaded!");
         break;
 
       case ComputerGameMessages.PLAYER_MOVE:
         // 🎯 Backend sends: { fen, capturedPiece } (NO validMoves, NO move)
         if (!payload.fen) {
-          console.error('❌ Invalid PLAYER_MOVE payload:', payload);
+          console.error("❌ Invalid PLAYER_MOVE payload:", payload);
           return;
         }
 
-        console.log('✅ Player move validated by server');
-        console.log('📊 Updated FEN:', payload.fen);
+        // console.log('✅ Player move validated by server');
+        // console.log('📊 Updated FEN:', payload.fen);
 
         // Just update the FEN, don't touch validMoves (will come with COMPUTER_MOVE)
         store.updateGameState(payload.fen, store.gameData?.validMoves || []);
@@ -156,15 +156,15 @@ export class ComputerSocketManager {
       case ComputerGameMessages.COMPUTER_MOVE:
         // 🎯 Backend sends: { move, fen, capturedPiece, validMoves }
         if (!payload.fen || !payload.move) {
-          console.error('❌ Invalid COMPUTER_MOVE payload:', payload);
+          console.error("❌ Invalid COMPUTER_MOVE payload:", payload);
           return;
         }
 
-        console.log('🤖 Computer move:', payload.move);
-        console.log(
-          "📊 Valid moves for player's turn:",
-          payload.validMoves?.length
-        );
+        // console.log('🤖 Computer move:', payload.move);
+        // console.log(
+        // "📊 Valid moves for player's turn:",
+        // payload.validMoves?.length
+        // );
 
         // Update with computer's move + new validMoves for player's turn
         store.updateGameState(
@@ -180,77 +180,77 @@ export class ComputerSocketManager {
           store.addCapturedPiece(payload.capturedPiece);
         }
 
-        toast('Computer moved!', { icon: '🤖' });
+        toast("Computer moved!", { icon: "🤖" });
         break;
 
       case ComputerGameMessages.PLAYER_CHECK:
-        toast('You put the computer in check!', {
-          icon: '⚡',
+        toast("You put the computer in check!", {
+          icon: "⚡",
           style: {
-            background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
-            color: '#000',
-            fontWeight: '700',
+            background: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)",
+            color: "#000",
+            fontWeight: "700",
           },
         });
         break;
 
       case ComputerGameMessages.COMPUTER_CHECK:
-        toast.error('Computer put you in check!', {
-          icon: '🔥',
+        toast.error("Computer put you in check!", {
+          icon: "🔥",
           style: {
-            background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
-            color: '#fff',
-            fontWeight: '700',
+            background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)",
+            color: "#fff",
+            fontWeight: "700",
           },
         });
         break;
 
       case ComputerGameMessages.PLAYER_WON:
-        store.setGameStatus('finished');
-        store.setGameResult('win');
+        store.setGameStatus("finished");
+        store.setGameResult("win");
         store.setIsThinking(false);
-        toast.success(payload.message || 'You won!', {
-          icon: '🏆',
+        toast.success(payload.message || "You won!", {
+          icon: "🏆",
           style: {
             background:
-              'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 50%, #e17055 100%)',
-            fontWeight: '800',
+              "linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 50%, #e17055 100%)",
+            fontWeight: "800",
           },
         });
         break;
 
       case ComputerGameMessages.COMPUTER_WON:
-        store.setGameStatus('finished');
-        store.setGameResult('loss');
+        store.setGameStatus("finished");
+        store.setGameResult("loss");
         store.setIsThinking(false);
-        toast.error(payload.message || 'Computer won!', { icon: '💔' });
+        toast.error(payload.message || "Computer won!", { icon: "💔" });
         break;
 
       case ComputerGameMessages.COMPUTER_GAME_OVER:
-        store.setGameStatus('finished');
-        store.setGameResult('draw');
+        store.setGameStatus("finished");
+        store.setGameResult("draw");
         store.setIsThinking(false);
-        toast(payload.message || 'Game drawn', { icon: '🤝' });
+        toast(payload.message || "Game drawn", { icon: "🤝" });
         break;
 
       case ComputerGameMessages.NOT_YOUR_TURN:
-        toast.error(payload.message || 'Not your turn', { icon: '⏸️' });
+        toast.error(payload.message || "Not your turn", { icon: "⏸️" });
         break;
 
       case ComputerGameMessages.NO_ACTIVE_GAME:
-        console.log('ℹ️ No active game found - backend says no game exists');
-        store.setGameStatus('idle');
+        // console.log('ℹ️ No active game found - backend says no game exists');
+        store.setGameStatus("idle");
         store.setGameData(null);
         store.setIsThinking(false);
         break;
 
       default:
-        console.warn('⚠️ Unknown message type:', type);
+        console.warn("⚠️ Unknown message type:", type);
     }
   }
 
   public makeMove(gameId: number, move: ComputerMove) {
-    console.log('📤 Sending move:', { gameId, move });
+    // console.log('📤 Sending move:', { gameId, move });
     this.send({
       type: ComputerGameMessages.PLAYER_MOVE,
       payload: { computerGameId: gameId, move },
@@ -258,7 +258,7 @@ export class ComputerSocketManager {
   }
 
   public quitGame(gameId: number) {
-    console.log('👋 Quitting game:', gameId);
+    //   console.log('👋 Quitting game:', gameId);
     this.send({
       type: ComputerGameMessages.PLAYER_QUIT,
       payload: { computerGameId: gameId },
@@ -268,24 +268,24 @@ export class ComputerSocketManager {
   private send(msg: ComputerGameMessage) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       console.error(
-        '❌ Cannot send - socket not connected. State:',
+        "❌ Cannot send - socket not connected. State:",
         this.socket?.readyState
       );
-      toast.error('Connection lost');
+      toast.error("Connection lost");
       return;
     }
-    console.log('📤 Sending message:', msg.type, msg.payload);
+    // console.log('📤 Sending message:', msg.type, msg.payload);
     this.socket.send(JSON.stringify(msg));
   }
 
   public disconnect() {
-    console.log('🔌 Manually disconnecting WebSocket');
+    // console.log('🔌 Manually disconnecting WebSocket');
     const store = useComputerGameStore.getState();
-    store.setConnectionStatus('disconnected');
+    store.setConnectionStatus("disconnected");
     store.setIsThinking(false);
 
     if (this.socket) {
-      this.socket.close(1000, 'Client disconnect');
+      this.socket.close(1000, "Client disconnect");
       this.socket = null;
     }
   }
@@ -295,18 +295,18 @@ export class ComputerSocketManager {
   }
 
   public getConnectionState() {
-    if (!this.socket) return 'disconnected';
+    if (!this.socket) return "disconnected";
     switch (this.socket.readyState) {
       case WebSocket.CONNECTING:
-        return 'connecting';
+        return "connecting";
       case WebSocket.OPEN:
-        return 'connected';
+        return "connected";
       case WebSocket.CLOSING:
-        return 'closing';
+        return "closing";
       case WebSocket.CLOSED:
-        return 'disconnected';
+        return "disconnected";
       default:
-        return 'unknown';
+        return "unknown";
     }
   }
 }

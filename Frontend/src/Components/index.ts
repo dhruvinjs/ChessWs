@@ -9,7 +9,6 @@ export { Card } from "./Card";
 
 // Chess components
 export { ChessBoard } from "./chess/ChessBoard";
-export { GameHeader } from "./chess/GameHeader";
 export { GameStatus } from "./chess/GameStatus";
 export { MoveHistory } from "./chess/MoveHistory";
 export { Square } from "./chess/Square";

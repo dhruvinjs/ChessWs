@@ -1,4 +1,4 @@
-import { Cpu, Trophy, Users, Zap } from "lucide-react";
+import { Cpu, Users, Zap } from "lucide-react";
 import { FloatingPieces } from "../Components/FloatingPieces";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -75,22 +75,6 @@ export function Home() {
           </motion.div>
         ))}
       </div>
-
-      <motion.div
-        className="mt-16 text-slate-400 text-sm font-medium flex items-center space-x-4 z-10"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-      >
-        <span className="flex items-center">
-          <span className="w-2 h-2 bg-green-500 rounded-full mr-2" /> 12.4k
-          online
-        </span>
-        <span>|</span>
-        <span className="flex items-center">
-          <Trophy className="w-4 h-4 mr-1 text-amber-500" /> 1.2M matches
-        </span>
-      </motion.div>
     </section>
   );
 }

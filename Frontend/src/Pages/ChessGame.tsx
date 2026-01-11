@@ -103,7 +103,10 @@ export function ChessGame() {
   useEffect(() => {
     if (gameStatus === GameMessages.GAME_ACTIVE || gameId) {
       setGameInitiated(true);
-    } else if (gameStatus === GameMessages.GAME_OVER) {
+    } else if (
+      gameStatus === GameMessages.GAME_OVER ||
+      gameStatus === undefined
+    ) {
       setGameInitiated(false);
     }
   }, [gameStatus, gameId]);
@@ -132,7 +135,18 @@ export function ChessGame() {
           <div className="flex-1 flex flex-col items-center justify-center gap-3 md:gap-4 min-h-0 min-w-0">
             {/* Board Container with Player Info */}
             <div className="flex-shrink-0 w-full flex items-center justify-center">
-              <div className="w-full max-w-[min(85vw,80vh)] md:max-w-[min(75vw,75vh)] lg:max-w-[700px] flex flex-col gap-0">
+              <div className="w-full max-w-[min(85vw,80vh)] md:max-w-[min(85vw,85vh)] lg:max-w-[min(65vw,85vh)] xl:max-w-[850px] 2xl:max-w-[900px] flex flex-col gap-0">
+                {/* Back Button - Above board */}
+                <div className="w-full mb-2 md:mb-3">
+                  <button
+                    onClick={handleQuitClick}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 dark:bg-slate-700/90 dark:hover:bg-slate-600/90 text-white backdrop-blur-md border border-slate-600/50 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Back</span>
+                  </button>
+                </div>
+
                 {/* Opponent Info (Top) - Sticks to board */}
                 <div className="w-full">
                   <PlayerInfo
@@ -175,17 +189,8 @@ export function ChessGame() {
             {/* Moves Section - Below board on mobile only */}
             <div className="w-full max-w-[85vw] md:hidden flex-shrink-0">
               <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2.5 relative">
-                <div className="flex items-center justify-between mb-2 relative">
-                  <button
-                    onClick={handleQuitClick}
-                    className="flex items-center px-2 py-1 rounded bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300 transition-all"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
-                  <h3 className="absolute left-1/2 -translate-x-1/2 text-sm font-bold text-gray-300">
-                    Moves
-                  </h3>
-                  <div className="w-10"></div>
+                <div className="flex items-center justify-center mb-2">
+                  <h3 className="text-sm font-bold text-gray-300">Moves</h3>
                 </div>
 
                 {gameStatus === GameMessages.SEARCHING ? (
@@ -243,21 +248,11 @@ export function ChessGame() {
 
           {/* RIGHT SECTION - Full Moves Panel on Tablet and Desktop */}
           <div
-            className="hidden md:flex w-80 lg:w-96 flex-col min-h-0"
+            className="hidden md:flex w-64 lg:w-72 xl:w-80 flex-col min-h-0"
             style={{ maxHeight: "calc(100vh - 2rem)" }}
           >
-            {/* Moves Panel with Back Button */}
+            {/* Moves Panel */}
             <div className="flex-1 flex flex-col min-h-0 relative">
-              {/* Header with Back Button */}
-              <div className="absolute top-6 left-6 z-10">
-                <button
-                  onClick={handleQuitClick}
-                  className="flex items-center px-3 py-2 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300 transition-all shadow-md"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-              </div>
-
               {/* Start Game or Cancel Search Button Overlay */}
               {gameStatus === GameMessages.SEARCHING ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm rounded-2xl z-20">

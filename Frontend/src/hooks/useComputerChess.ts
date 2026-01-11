@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 export const useComputerChess = () => {
   // ✔ Top-level hooks MUST stay to keep hook order stable
   //@ts-ignore
-  const dummy = useComputerGameStore((s) => s.gameStatus); 
+  const dummy = useComputerGameStore((s) => s.gameStatus);
   // we don't actually use it here — it only stabilizes hook order
 
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -15,11 +15,8 @@ export const useComputerChess = () => {
   const handleSquareClick = useCallback(
     (squareName: string, pieceString: string | null) => {
       // ✔ Always get fresh Zustand snapshot inside handler
-      const {
-        gameData,
-        gameStatus,
-        isThinking,
-      } = useComputerGameStore.getState();
+      const { gameData, gameStatus, isThinking } =
+        useComputerGameStore.getState();
 
       const validMoves = gameData?.validMoves;
 
@@ -61,10 +58,21 @@ export const useComputerChess = () => {
         );
 
         if (move) {
+          // Check if this is a pawn promotion move
+          const isPawnPromotion =
+            (squareName[1] === "8" && playerColor === "w") ||
+            (squareName[1] === "1" && playerColor === "b");
+
+          // Get the piece at the selected square
+          const piece = chess.get(selectedSquare as any);
+          const isPawn = piece?.type === "p";
+
           computerSocketManager.makeMove(gameData.computerGameId, {
             from: selectedSquare,
             to: squareName,
-            ...(move.promotion && { promotion: move.promotion }),
+            // Auto-promote to queen if it's a pawn reaching the last rank
+            promotion:
+              isPawn && isPawnPromotion ? "q" : move.promotion || undefined,
           });
 
           setSelectedSquare(null);
