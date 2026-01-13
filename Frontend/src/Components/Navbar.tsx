@@ -123,7 +123,7 @@ export function Navbar({ variant }: NavbarProps) {
               >
                 <Crown className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600 dark:text-amber-400 drop-shadow-lg" />
                 <span className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-amber-700 via-orange-600 to-amber-700 dark:from-amber-400 dark:via-orange-400 dark:to-amber-400 bg-clip-text text-transparent whitespace-nowrap">
-                  ChessMasters
+                  ChessVerse
                 </span>
               </div>
             </div>

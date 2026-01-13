@@ -10,31 +10,31 @@ const AUTH_ONLY_ROUTES = ["/profile", "/home", "/room"];
 export function ProtectedLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: user, isLoading, isFetching } = useUserQuery();
+
+  // Optimization: Removed 'isFetching' from the UI condition.
+  // This prevents the LoadingScreen from flickering on every background refresh.
+  const { data: user, isLoading } = useUserQuery();
   const hasRedirected = useRef(false);
 
-  // 🚫 If no user at all, redirect to login
+  // 🚫 Handle redirection for unauthenticated users
   useEffect(() => {
-    // Don't redirect while still loading/fetching
-    if (isLoading || isFetching) return;
+    if (isLoading) return;
 
     if (!user && !hasRedirected.current) {
       hasRedirected.current = true;
       console.log("No user found, redirecting to login");
       navigate("/login", { replace: true });
     }
-  }, [user, navigate, isLoading, isFetching]);
+  }, [user, navigate, isLoading]);
 
-  // 🚫 If guest tries to access auth-only routes, show message and redirect
+  // 🚫 Handle redirection for guests trying to access restricted areas
   useEffect(() => {
-    // Don't run redirect logic while loading/fetching
-    if (isLoading || isFetching) return;
+    if (isLoading) return;
 
     if (user?.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname)) {
       if (!hasRedirected.current) {
         hasRedirected.current = true;
 
-        // Show toast message for different protected routes
         const messages: Record<string, { title: string; message: string }> = {
           "/room": {
             title: "Access Denied",
@@ -64,22 +64,23 @@ export function ProtectedLayout() {
         navigate("/", { replace: true });
       }
     } else {
-      // Reset redirect flag when user is authenticated or on allowed routes
+      // Reset flag if they move to a safe route or log in
       hasRedirected.current = false;
     }
-  }, [user, location.pathname, navigate, isLoading, isFetching]);
+  }, [user, location.pathname, navigate, isLoading]);
 
-  // ⏳ Show loading while checking auth OR while actively fetching
-  if (isLoading || isFetching) {
+  // ⏳ Performance fix: Only show LoadingScreen on initial mount (isLoading).
+  // Background updates will happen silently without blocking the UI.
+  if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // If no user or guest on protected route, show nothing to prevent flash
+  // Prevent UI flash if we are about to redirect
   if (!user || (user.isGuest && AUTH_ONLY_ROUTES.includes(location.pathname))) {
     return null;
   }
 
-  // Hide navbar on ALL game pages
+  // Determine if we should hide the Navbar (e.g., in active matches)
   const isGamePage =
     location.pathname === "/game" ||
     location.pathname === "/computer/game" ||

@@ -120,7 +120,7 @@ export const LoadingScreen = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          ChessWs
+          ChessVerse
         </motion.h2>
 
         <motion.div

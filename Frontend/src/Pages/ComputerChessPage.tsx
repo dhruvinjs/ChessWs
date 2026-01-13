@@ -1,15 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Chess } from 'chess.js';
-import { useComputerGameStore } from '../stores/useComputerGameStore';
-import { computerSocketManager } from '../lib/ComputerSocketManager';
-import { ComputerCapturedPieces } from '../Components/computerGame/ComputerCapturedPieces';
-import { ComputerMoveHistory } from '../Components/computerGame/ComputerMoveHistory';
-import { useUserQuery } from '../hooks/useUserQuery';
-import { ConfirmDialog } from '../Components/ConfirmDialog';
-import { useNavigate } from 'react-router-dom';
-import { ComputerChessBoard } from '../Components/computerGame/ComputerChessBoard';
-import { LoadingScreen } from '../Components/LoadingScreen'; // 🎯 NEW: Import LoadingScreen
-import toast from 'react-hot-toast';
+import React, { useEffect, useRef, useState } from "react";
+import { Chess } from "chess.js";
+import { useComputerGameStore } from "../stores/useComputerGameStore";
+import { computerSocketManager } from "../lib/ComputerSocketManager";
+import { ComputerCapturedPieces } from "../Components/computerGame/ComputerCapturedPieces";
+import { ComputerMoveHistory } from "../Components/computerGame/ComputerMoveHistory";
+import { useUserQuery } from "../hooks/useUserQuery";
+import { ConfirmDialog } from "../Components/ConfirmDialog";
+import { useNavigate } from "react-router-dom";
+import { ComputerChessBoard } from "../Components/computerGame/ComputerChessBoard";
+import { LoadingScreen } from "../Components/LoadingScreen"; // 🎯 NEW: Import LoadingScreen
+import toast from "react-hot-toast";
 
 export const ComputerChessPage: React.FC = () => {
   const gameData = useComputerGameStore((state) => state.gameData);
@@ -23,71 +23,108 @@ export const ComputerChessPage: React.FC = () => {
   const isThinking = useComputerGameStore((state) => state.isThinking);
   const resetGame = useComputerGameStore((state) => state.resetGame);
 
-  const { data: user } = useUserQuery();
+  const { data: user, isLoading: isUserLoading } = useUserQuery();
   const navigate = useNavigate();
 
-  const hasConnected = useRef(false);
+  const socketInitialized = useRef(false);
+  const hasRedirected = useRef(false);
   const [showQuitDialog, setShowQuitDialog] = useState(false);
   const [showBackDialog, setShowBackDialog] = useState(false);
   const [showNewGameDialog, setShowNewGameDialog] = useState(false); // 🎯 NEW: Dialog for New Game button
   const [isLoadingGame, setIsLoadingGame] = useState(true);
   const loadingTimeoutRef = useRef<number | null>(null);
 
+  // Initialize WebSocket connection (don't reset store on mount to preserve game data on reload)
   useEffect(() => {
-    if (!user?.id || connectionStatus !== 'disconnected') {
+    // Wait for user query to finish loading
+    if (isUserLoading) {
+      console.log("User query still loading...");
       return;
     }
 
-    if (hasConnected.current) {
-      console.log('Connection attempt already initiated, skipping re-trigger.');
+    // Check if we have valid user data (user can be guest with id: 0)
+    if (!user || user.id === undefined) {
+      console.log("No user data available", { user, isUserLoading });
       return;
     }
 
-    hasConnected.current = true;
-    setConnectionStatus('connecting');
+    console.log("User data loaded:", {
+      userId: user.id,
+      isGuest: user.isGuest,
+    });
 
-    console.log('Initiating WebSocket connection');
-    computerSocketManager
-      .connect()
-      .then(() => {
-        console.log('WebSocket connected successfully');
-        setConnectionStatus('connected');
+    // ✅ Initialize WebSocket if not already connected
+    if (!socketInitialized.current && !computerSocketManager.isConnected()) {
+      console.log(
+        "🔌 ComputerChessPage: Connecting WebSocket for user:",
+        user.id
+      );
+      socketInitialized.current = true;
+      setConnectionStatus("connecting");
 
-        loadingTimeoutRef.current = setTimeout(() => {
-          console.log('No game data received after 5s, showing setup screen');
+      computerSocketManager
+        .connect()
+        .then(() => {
+          console.log("✅ WebSocket connected successfully");
+          setConnectionStatus("connected");
+
+          // Wait 5 seconds for game data, then redirect to setup if no game
+          loadingTimeoutRef.current = setTimeout(() => {
+            console.log("No game data received after 5s, redirecting to setup");
+            const currentGameData = useComputerGameStore.getState().gameData;
+            if (!hasRedirected.current && !currentGameData) {
+              hasRedirected.current = true;
+              navigate("/computer", { replace: true });
+            }
+          }, 5000) as unknown as number;
+        })
+        .catch((error) => {
+          console.error("Connection failed:", error);
+          setConnectionStatus("error");
+          socketInitialized.current = false;
           setIsLoadingGame(false);
-        }, 5000);
-      })
-      .catch((error) => {
-        console.error('Connection failed:', error);
-        setConnectionStatus('error');
-        hasConnected.current = false;
+        });
+    } else if (computerSocketManager.isConnected()) {
+      console.log("✅ WebSocket already connected, reusing connection");
+      socketInitialized.current = true;
+      setConnectionStatus("connected");
+      // Check if we already have game data
+      if (gameData && gameStatus === "active") {
         setIsLoadingGame(false);
-      });
-  }, [user?.id, connectionStatus, setConnectionStatus]);
+      }
+    }
+
+    // NOTE: Don't disconnect on unmount - keep socket connected for reload scenarios
+    return () => {
+      console.log(
+        "🧹 ComputerChessPage: Component unmounting (keeping socket connected)"
+      );
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      socketInitialized.current = false;
+    };
+  }, [
+    user,
+    isUserLoading,
+    setConnectionStatus,
+    navigate,
+    gameData,
+    gameStatus,
+  ]);
 
   useEffect(() => {
-    if (gameData && gameStatus === 'active') {
-      console.log('✅ Game data received, stopping loading');
+    if (gameData && gameStatus === "active") {
+      console.log("✅ Game data received, stopping loading");
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
       }
       setIsLoadingGame(false);
+      hasRedirected.current = false; // Reset redirect flag when game is active
     }
   }, [gameData, gameStatus]);
-
-  useEffect(() => {
-    return () => {
-      console.log('ComputerChessPage unmounting - disconnecting WebSocket');
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-      computerSocketManager.disconnect();
-      hasConnected.current = false;
-      resetGame();
-    };
-  }, [resetGame]);
 
   // Event handlers
   const handleQuitClick = () => {
@@ -98,18 +135,19 @@ export const ComputerChessPage: React.FC = () => {
     if (gameData) {
       computerSocketManager.quitGame(gameData.computerGameId);
     }
-    resetGame();
+    computerSocketManager.disconnect(); // Disconnect when explicitly quitting
     setShowQuitDialog(false);
-    toast.success('Game quit successfully');
-    navigate('/computer');
+    toast.success("Game quit successfully");
+    navigate("/computer");
   };
 
   const handleBackClick = () => {
-    if (gameData && gameStatus === 'active') {
+    if (gameData && gameStatus === "active") {
       setShowBackDialog(true);
     } else {
       resetGame();
-      navigate('/home');
+      computerSocketManager.disconnect(); // Disconnect when leaving
+      navigate("/home");
     }
   };
 
@@ -118,42 +156,49 @@ export const ComputerChessPage: React.FC = () => {
       computerSocketManager.quitGame(gameData.computerGameId);
     }
     resetGame();
+    computerSocketManager.disconnect(); // Disconnect when leaving
+    resetGame();
     setShowBackDialog(false);
-    navigate('/home');
+    navigate("/home");
   };
 
   // 🎯 NEW: New Game button handlers
   const handleNewGameClick = () => {
-    if (gameStatus === 'active') {
+    if (gameStatus === "active") {
       // Show confirmation dialog if game is active
       setShowNewGameDialog(true);
     } else {
       // If game is finished, just reset and go to setup
       resetGame();
-      navigate('/computer');
+      navigate("/computer");
     }
   };
 
   const handleNewGameConfirm = () => {
     if (gameData) {
+      computerSocketManager.disconnect(); // Disconnect when starting new game
       computerSocketManager.quitGame(gameData.computerGameId);
     }
     resetGame();
     setShowNewGameDialog(false);
-    navigate('/computer');
+    navigate("/computer");
   };
 
   // Show loading spinner
+  if (isUserLoading) {
+    return <LoadingScreen />;
+  }
+
   if (
     isLoadingGame &&
-    connectionStatus !== 'error' &&
-    connectionStatus !== 'disconnected'
+    (connectionStatus === "connecting" || connectionStatus === "connected") &&
+    !gameData
   ) {
-    return <LoadingScreen />; // 🎯 Use LoadingScreen component
+    return <LoadingScreen />;
   }
 
   // Show error state
-  if (connectionStatus === 'error') {
+  if (connectionStatus === "error") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
@@ -179,7 +224,7 @@ export const ComputerChessPage: React.FC = () => {
             Unable to connect to game server
           </p>
           <button
-            onClick={() => navigate('/computer')}
+            onClick={() => navigate("/computer")}
             className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
           >
             Go Back
@@ -189,10 +234,16 @@ export const ComputerChessPage: React.FC = () => {
     );
   }
 
-  // Show setup if no game
-  if (!gameData || gameStatus === 'idle') {
-    navigate('/computer');
-    return null;
+  // If no game data and not loading, show a message
+  if (!gameData || gameStatus === "idle") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading game...</p>
+        </div>
+      </div>
+    );
   }
 
   // Main game UI
@@ -217,10 +268,10 @@ export const ComputerChessPage: React.FC = () => {
           ) : (
             <p
               className={`text-lg font-medium ${
-                isPlayerTurn ? 'text-green-600' : 'text-orange-600'
+                isPlayerTurn ? "text-green-600" : "text-orange-600"
               }`}
             >
-              {isPlayerTurn ? 'Your turn' : "Computer's turn"}
+              {isPlayerTurn ? "Your turn" : "Computer's turn"}
             </p>
           )}
         </div>
@@ -250,7 +301,7 @@ export const ComputerChessPage: React.FC = () => {
                   onClick={handleNewGameClick}
                   className="w-full py-2 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
                 >
-                  {gameStatus === 'active' ? 'New Game' : 'Play Again'}
+                  {gameStatus === "active" ? "New Game" : "Play Again"}
                 </button>
               </div>
             </div>
@@ -277,7 +328,7 @@ export const ComputerChessPage: React.FC = () => {
                     Your Color:
                   </span>
                   <span className="font-medium text-gray-800 dark:text-white">
-                    {gameData.playerColor === 'w' ? 'White' : 'Black'}
+                    {gameData.playerColor === "w" ? "White" : "Black"}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -11,7 +11,7 @@ export class SocketManager {
   private wsBaseUrl = import.meta.env.VITE_WS_URL;
   private currentConnectionType: GameModes | null = null;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): SocketManager {
     if (!SocketManager.instance) {
@@ -85,13 +85,6 @@ export class SocketManager {
             selectedSquare: null,
           });
 
-          // const newState = useGameStore.getState();
-          // console.log("📤 State updated:", {
-          //   newFen: newState.fen,
-          //   newValidMovesCount: newState.validMoves.length,
-          //   turn: newState.fen.split(" ")[1],
-          //   myColor: newState.color,
-          // });
           break;
         }
 
@@ -114,7 +107,7 @@ export class SocketManager {
             });
           } else {
             showMessage(
-              "� You Lost",
+              "� Game Over",
               payload.message || "Better luck next time",
               { type: "error" }
             );
@@ -347,8 +340,7 @@ export class SocketManager {
           });
 
           console.log(
-            `✅ ${opponentName} joined room - isCreator=${finalIsCreator}, roomStatus=${
-              joinRoomStatus || "FULL"
+            `✅ ${opponentName} joined room - isCreator=${finalIsCreator}, roomStatus=${joinRoomStatus || "FULL"
             }`
           );
           // Room header will show this visually

@@ -58,7 +58,7 @@ export function Footer() {
           }}
           transition={{ type: 'spring', stiffness: 300 }}
         >
-          ♟ Chess Masters
+          ♟ ChessVerse
         </motion.span>
 
         {/* Social Icons */}

@@ -56,7 +56,7 @@ export class ComputerSocketManager {
       this.socket = new WebSocket(url);
 
       this.socket.onopen = () => {
-        // console.log('✅ WebSocket connected successfully');
+        console.log("✅ WebSocket connected successfully");
         this.reconnectAttempts = 0;
         store.setConnectionStatus("connected");
         resolve();
@@ -139,10 +139,6 @@ export class ComputerSocketManager {
           return;
         }
 
-        // console.log('✅ Player move validated by server');
-        // console.log('📊 Updated FEN:', payload.fen);
-
-        // Just update the FEN, don't touch validMoves (will come with COMPUTER_MOVE)
         store.updateGameState(payload.fen, store.gameData?.validMoves || []);
 
         // Show "Computer is thinking..."
@@ -238,10 +234,11 @@ export class ComputerSocketManager {
         break;
 
       case ComputerGameMessages.NO_ACTIVE_GAME:
-        // console.log('ℹ️ No active game found - backend says no game exists');
+        console.log("ℹ️ No active game found - backend says no game exists");
         store.setGameStatus("idle");
         store.setGameData(null);
         store.setIsThinking(false);
+        // Don't show toast here as it's expected behavior
         break;
 
       default:
@@ -279,15 +276,23 @@ export class ComputerSocketManager {
   }
 
   public disconnect() {
-    // console.log('🔌 Manually disconnecting WebSocket');
+    console.log("🔌 Manually disconnecting WebSocket");
     const store = useComputerGameStore.getState();
-    store.setConnectionStatus("disconnected");
-    store.setIsThinking(false);
 
     if (this.socket) {
+      // Remove event listeners to prevent them from firing during manual disconnect
+      this.socket.onopen = null;
+      this.socket.onerror = null;
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+
       this.socket.close(1000, "Client disconnect");
       this.socket = null;
     }
+
+    store.setConnectionStatus("disconnected");
+    store.setIsThinking(false);
+    this.reconnectAttempts = 0;
   }
 
   public isConnected() {

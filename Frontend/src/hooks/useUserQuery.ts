@@ -9,21 +9,32 @@ export function useUserQuery() {
     queryFn: async () => {
       try {
         const response = await authApis.getProfile();
-        const user = response.userProfile;
-        return { ...user, isGuest: false };
+
+        // FIX: The backend returns 'user', not 'userProfile'
+        const userData = response.user;
+
+        if (!userData) {
+          throw new Error("User data not found in response");
+        }
+
+        // Ensure we spread the actual user object found in the JSON
+        return { ...userData, isGuest: false };
       } catch (error: unknown) {
-        // Always fallback to guest on any error
         const status = axios.isAxiosError(error)
           ? error.response?.status
           : undefined;
-        console.log("Auth failed, creating guest user:", status);
+
+        console.log("Auth failed, creating guest user. Status:", status);
+
         try {
           const guestResponse = await authApis.getOrCreateGuest();
+          // Backend might return { user: {...} } or just the user object
           const guest = guestResponse.user || guestResponse;
+
           return { ...guest, isGuest: true };
         } catch (guestError) {
-          // If even guest creation fails, return a minimal guest user
           console.error("Guest creation failed:", guestError);
+          // Ultimate fallback to prevent application crash
           return {
             id: 0,
             name: "Guest",
@@ -35,12 +46,11 @@ export function useUserQuery() {
       }
     },
     retry: false,
-    staleTime: 30 * 1000, // 30 seconds - reduced to get fresh data on reconnection
-    gcTime: Infinity, // Keep in cache forever
-    refetchOnWindowFocus: true, // Refetch when window gains focus
-    refetchOnMount: true, // Refetch on component mount
-    refetchOnReconnect: true, // Refetch on network reconnection
-    // Ensure query never fails - always return data
+    staleTime: 5 * 60 * 1000,
+    gcTime: Infinity,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
     throwOnError: false,
   });
 }

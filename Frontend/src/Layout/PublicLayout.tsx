@@ -1,4 +1,3 @@
-// layouts/PublicLayout.tsx
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,7 +12,7 @@ export function PublicLayout() {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Check if user should be redirected (only after loading is complete)
-  const publicPages = ['/', '/login', '/register', '/about'];
+  const publicPages = ['/', '/login', '/register'];
   const shouldRedirect =
     !isLoading &&
     !isFetching &&
@@ -22,19 +21,20 @@ export function PublicLayout() {
     publicPages.includes(location.pathname);
 
   // ✅ Redirect authenticated (non-guest) users away from all public pages
-  useEffect(() => {
+useEffect(() => {
     if (shouldRedirect && !isRedirecting) {
       setIsRedirecting(true);
 
-      // Redirect after showing the animated screen (no toast needed)
-      setTimeout(() => {
+      // 2. Reduce the timeout. 3 seconds is too long for a transition.
+      // 1 second (1000ms) is plenty to show the "Welcome Back" UI.
+      const timer = setTimeout(() => {
         navigate('/home', { replace: true });
         setIsRedirecting(false);
-      }, 3000); // Increased to 3 seconds for better showcase
-    }
-  }, [shouldRedirect, isRedirecting, navigate]);
+      }, 1000); 
 
-  // Show loading screen while checking authentication
+      return () => clearTimeout(timer); // Cleanup timer on unmount
+    }
+  }, [shouldRedirect, isRedirecting, navigate]);  // Show loading screen while checking authentication
   if (isLoading || isFetching) {
     return <LoadingScreen />;
   }

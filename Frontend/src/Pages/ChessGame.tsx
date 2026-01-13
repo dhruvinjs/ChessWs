@@ -6,7 +6,6 @@ import { useGameStore } from "../stores/useGameStore";
 import { useEffect, useState } from "react";
 import { useUserQuery } from "../hooks/useUserQuery";
 import { Flag, Handshake, ArrowLeft } from "lucide-react";
-import { Button } from "../Components/Button";
 import { useNavigate } from "react-router-dom";
 
 export function ChessGame() {
@@ -52,43 +51,31 @@ export function ChessGame() {
   };
 
   const handleQuitConfirm = () => {
-    resign(); // Resign from the game
+    resign();
     setShowQuitDialog(false);
     navigate("/home");
   };
 
-  // Handle game initialization when user clicks Start Game
   const handleStartGame = () => {
     if (!user?.id) return;
     const guestId = String(user.id);
-
-    // Initialize WebSocket connection
     initGuestConnection(guestId);
     setGameInitiated(true);
-
-    // Wait a brief moment for WebSocket to connect, then send INIT_GAME
     setTimeout(() => {
       const { initGameRequest } = useGameStore.getState();
       initGameRequest();
     }, 100);
   };
 
-  // Handle cancel search
   const handleCancelSearch = () => {
     cancelSearch();
     setGameInitiated(false);
   };
 
-  // Auto-reconnect WebSocket on mount (for page refresh/reconnection scenarios)
   useEffect(() => {
     if (!user?.id) return;
-
     const guestId = String(user.id);
-
-    // Always initialize WebSocket connection on mount
     initGuestConnection(guestId);
-
-    // If we have an existing game (gameId exists) or were searching, mark as initiated
     if (
       gameId ||
       gameStatus === GameMessages.SEARCHING ||
@@ -99,7 +86,6 @@ export function ChessGame() {
     }
   }, [user?.id, initGuestConnection, gameId, gameStatus, moves.length]);
 
-  // Update gameInitiated when game becomes active (after reconnection)
   useEffect(() => {
     if (gameStatus === GameMessages.GAME_ACTIVE || gameId) {
       setGameInitiated(true);
@@ -112,42 +98,42 @@ export function ChessGame() {
   }, [gameStatus, gameId]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
-      {/* Searching Overlay - Soft, non-intrusive */}
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
+      {/* Searching Overlay */}
       {gameStatus === GameMessages.SEARCHING && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-800/95 backdrop-blur-md border border-emerald-500/50 rounded-2xl px-6 py-4 shadow-2xl animate-pulse">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl px-5 py-3.5 shadow-lg">
           <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-3 border-emerald-500 border-t-transparent"></div>
-            <p className="text-lg font-semibold text-emerald-400">
-              Searching for an opponent...
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent"></div>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Finding opponent...
             </p>
           </div>
         </div>
       )}
 
       {/* Main Game Area */}
-      <div className="h-full flex items-center justify-center p-2 md:p-4">
+      <div className="h-full flex items-center justify-center p-4 md:p-6 lg:p-8">
         <div
-          className="w-full h-full max-h-[95vh] flex flex-col md:flex-row gap-3 md:gap-4"
-          style={{ maxWidth: "1600px" }}
+          className="w-full h-full max-h-[96vh] flex flex-col md:flex-row gap-5 md:gap-6 lg:gap-8"
+          style={{ maxWidth: "1800px" }}
         >
           {/* LEFT SECTION - Board + Player Info */}
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 md:gap-4 min-h-0 min-w-0">
-            {/* Board Container with Player Info */}
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 md:gap-5 min-h-0 min-w-0">
             <div className="flex-shrink-0 w-full flex items-center justify-center">
-              <div className="w-full max-w-[min(85vw,80vh)] md:max-w-[min(85vw,85vh)] lg:max-w-[min(65vw,85vh)] xl:max-w-[850px] 2xl:max-w-[900px] flex flex-col gap-0">
-                {/* Back Button - Above board */}
-                <div className="w-full mb-2 md:mb-3">
+              <div className="w-full max-w-[min(92vw,52vh)] md:max-w-[min(70vw,80vh)] lg:max-w-[min(60vw,85vh)] xl:max-w-[700px] 2xl:max-w-[750px] flex flex-col gap-0">
+                {/* Back Button */}
+                <div className="w-full mb-3 md:mb-4">
                   <button
                     onClick={handleQuitClick}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 dark:bg-slate-700/90 dark:hover:bg-slate-600/90 text-white backdrop-blur-md border border-slate-600/50 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                    className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/90 text-slate-700 dark:text-white backdrop-blur-md shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200"
+                    style={{ minWidth: "44px", minHeight: "44px" }}
                   >
                     <ArrowLeft className="h-4 w-4" />
-                    <span className="text-sm font-semibold">Back</span>
+                    <span className="text-sm font-medium">Back</span>
                   </button>
                 </div>
 
-                {/* Opponent Info (Top) - Sticks to board */}
+                {/* Opponent Info (Top) */}
                 <div className="w-full">
                   <PlayerInfo
                     playerName={
@@ -166,11 +152,13 @@ export function ChessGame() {
                 </div>
 
                 {/* Chess Board */}
-                <div className="w-full aspect-square -mt-[1px]">
-                  <ChessBoard />
+                <div className="w-full flex justify-center">
+                  <div className="w-full max-w-[650px] lg:max-w-[700px] xl:max-w-[750px] aspect-square">
+                    <ChessBoard />
+                  </div>
                 </div>
 
-                {/* Current Player Info (Bottom) - Sticks to board */}
+                {/* Current Player Info (Bottom) */}
                 <div className="w-full -mt-[1px]">
                   <PlayerInfo
                     playerName={user?.name || "You"}
@@ -186,133 +174,142 @@ export function ChessGame() {
               </div>
             </div>
 
-            {/* Moves Section - Below board on mobile only */}
-            <div className="w-full max-w-[85vw] md:hidden flex-shrink-0">
-              <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-2.5 relative">
-                <div className="flex items-center justify-center mb-2">
-                  <h3 className="text-sm font-bold text-gray-300">Moves</h3>
+            {/* Moves Section - Mobile Only */}
+            <div className="w-full max-w-[92vw] md:hidden flex-shrink-0">
+              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl p-4 shadow-lg">
+                <div className="flex items-center justify-center mb-4">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Move History
+                  </h3>
                 </div>
 
                 {gameStatus === GameMessages.SEARCHING ? (
-                  <div className="flex flex-col items-center justify-center py-4">
-                    <span className="text-3xl mb-3">♟</span>
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <span className="text-4xl mb-5">♟</span>
                     <button
                       onClick={handleCancelSearch}
-                      className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all text-sm"
+                      className="px-6 h-11 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+                      style={{ minWidth: "44px", minHeight: "44px" }}
                     >
                       Cancel Search
                     </button>
-                    <p className="text-xs text-gray-500 mt-2">Stop searching</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                      Stop searching
+                    </p>
                   </div>
                 ) : !gameInitiated ? (
-                  <div className="flex flex-col items-center justify-center py-4">
-                    <span className="text-3xl mb-3">♟</span>
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <span className="text-4xl mb-5">♟</span>
                     <button
                       onClick={handleStartGame}
                       disabled={isUserLoading}
-                      className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      className="px-6 h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ minWidth: "44px", minHeight: "44px" }}
                     >
                       Start Game
                     </button>
-                    <p className="text-xs text-gray-500 mt-2">Find opponent</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                      Find opponent
+                    </p>
                   </div>
                 ) : (
-                  <div className="max-h-32 mb-2">
+                  <div className="max-h-40 mb-4 overflow-y-auto">
                     <MoveHistory />
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-2 border-t border-slate-700/50">
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                {/* Action Buttons - Mobile */}
+                <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <button
                     onClick={() => setShowResignDialog(true)}
                     disabled={!isGameActive}
-                    text="Resign"
-                    icon={<Flag className="w-4 h-4" />}
-                    className="flex-1 !bg-red-600/20 hover:!bg-red-600/30 !text-red-400 !shadow-none"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 h-11 rounded-xl bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 font-medium shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ minWidth: "44px", minHeight: "44px" }}
+                  >
+                    <Flag className="w-4 h-4" />
+                    <span className="text-sm">Resign</span>
+                  </button>
+                  <button
                     onClick={() => offerDraw()}
                     disabled={!isGameActive || drawOfferSent}
-                    text={drawOfferSent ? "Sent" : "Draw"}
-                    icon={<Handshake className="w-4 h-4" />}
-                    className="flex-1 !bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-400 !shadow-none"
-                  />
+                    className="flex-1 flex items-center justify-center gap-2 px-4 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ minWidth: "44px", minHeight: "44px" }}
+                  >
+                    <Handshake className="w-4 h-4" />
+                    <span className="text-sm">{drawOfferSent ? "Sent" : "Draw"}</span>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* RIGHT SECTION - Full Moves Panel on Tablet and Desktop */}
+          {/* RIGHT SECTION - Desktop Moves Panel */}
           <div
-            className="hidden md:flex w-64 lg:w-72 xl:w-80 flex-col min-h-0"
-            style={{ maxHeight: "calc(100vh - 2rem)" }}
+            className="hidden md:flex w-80 lg:w-96 xl:w-[400px] flex-col min-h-0"
+            style={{ maxHeight: "calc(100vh - 3rem)" }}
           >
-            {/* Moves Panel */}
-            <div className="flex-1 flex flex-col min-h-0 relative">
-              {/* Start Game or Cancel Search Button Overlay */}
+            <div className="flex-1 flex flex-col min-h-0 relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-2xl p-5 shadow-lg">
+              {/* Overlay for Start/Cancel */}
               {gameStatus === GameMessages.SEARCHING ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm rounded-2xl z-20">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl z-20">
                   <div className="flex flex-col items-center text-center p-8">
-                    <span className="text-5xl mb-4">♟</span>
+                    <span className="text-5xl mb-6">♟</span>
                     <button
                       onClick={handleCancelSearch}
-                      className="px-8 py-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-lg font-semibold rounded-xl shadow-2xl hover:shadow-red-500/50 transform hover:scale-105 transition-all"
+                      className="px-8 h-12 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+                      style={{ minWidth: "44px", minHeight: "44px" }}
                     >
                       Cancel Search
                     </button>
-                    <p className="text-sm text-gray-400 mt-4">
-                      Stop searching for opponent
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
+                      Stop searching
                     </p>
                   </div>
                 </div>
               ) : (
                 !gameInitiated && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm rounded-2xl z-20">
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl z-20">
                     <div className="flex flex-col items-center text-center p-8">
-                      <span className="text-5xl mb-4">♟</span>
+                      <span className="text-5xl mb-6">♟</span>
                       <button
                         onClick={handleStartGame}
                         disabled={isUserLoading}
-                        className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-lg font-semibold rounded-xl shadow-2xl hover:shadow-emerald-500/50 transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-8 h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl shadow-sm hover:shadow-md active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ minWidth: "44px", minHeight: "44px" }}
                       >
                         Start Game
                       </button>
-                      <p className="text-sm text-gray-400 mt-4">
-                        Click to find an opponent
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
+                        Find opponent
                       </p>
                     </div>
                   </div>
                 )
               )}
 
-              {/* MoveHistory Component */}
               <MoveHistory />
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-3">
-              <Button
-                variant="secondary"
-                size="sm"
+            {/* Action Buttons - Desktop */}
+            <div className="flex gap-3 mt-4">
+              <button
                 onClick={() => setShowResignDialog(true)}
                 disabled={!isGameActive}
-                text="Resign"
-                icon={<Flag className="w-4 h-4" />}
-                className="flex-1 !bg-red-600/20 hover:!bg-red-600/30 !text-red-400 !shadow-none"
-              />
-              <Button
-                variant="secondary"
-                size="sm"
+                className="flex-1 flex items-center justify-center gap-2 px-4 h-12 rounded-xl bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 font-medium shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ minWidth: "44px", minHeight: "44px" }}
+              >
+                <Flag className="w-4 h-4" />
+                <span className="text-sm">Resign</span>
+              </button>
+              <button
                 onClick={() => offerDraw()}
                 disabled={!isGameActive || drawOfferSent}
-                text={drawOfferSent ? "Sent" : "Draw"}
-                icon={<Handshake className="w-4 h-4" />}
-                className="flex-1 !bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-400 !shadow-none"
-              />
+                className="flex-1 flex items-center justify-center gap-2 px-4 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-medium shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ minWidth: "44px", minHeight: "44px" }}
+              >
+                <Handshake className="w-4 h-4" />
+                <span className="text-sm">{drawOfferSent ? "Sent" : "Draw"}</span>
+              </button>
             </div>
           </div>
         </div>

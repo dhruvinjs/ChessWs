@@ -5,11 +5,6 @@ import { computerSocketManager } from "../lib/ComputerSocketManager";
 import toast from "react-hot-toast";
 
 export const useComputerChess = () => {
-  // ✔ Top-level hooks MUST stay to keep hook order stable
-  //@ts-ignore
-  const dummy = useComputerGameStore((s) => s.gameStatus);
-  // we don't actually use it here — it only stabilizes hook order
-
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
 
   const handleSquareClick = useCallback(
@@ -64,6 +59,7 @@ export const useComputerChess = () => {
             (squareName[1] === "1" && playerColor === "b");
 
           // Get the piece at the selected square
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const piece = chess.get(selectedSquare as any);
           const isPawn = piece?.type === "p";
 

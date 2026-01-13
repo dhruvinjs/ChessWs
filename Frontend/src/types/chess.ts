@@ -26,9 +26,9 @@ export type { Move, Square, Piece };
 
 // Move payload for socket communication
 export interface MovePayload {
-  from: Square;
-  to: Square;
-  promotion?: string;
+  from: string;
+  to: string;
+  promotion?: string | null;
 }
 
 // Enhanced Move with game context
@@ -148,3 +148,50 @@ export const PIECE_SYMBOLS: Record<string, string> = {
   bN: "♞",
   bP: "♟",
 };
+
+// export interface RoomMove {
+//   from: string;
+//   to: string;
+//   promotion?: string;
+// }
+
+export interface RoomGamePayload {
+  roomGameId?: number;
+  fen?: string;
+  color?: "w" | "b";
+  whiteTimer?: number;
+  blackTimer?: number;
+  opponentId?: number;
+  opponentName?: string;
+  roomCode?: string;
+  roomStatus?: string;
+  gameStatus?: string;
+  isCreator?: boolean;
+  moves?: MovePayload[];
+  move?: MovePayload;
+  message?: string;
+  capturedPiece?: string;
+  capturedPieces?: string[];
+  validMoves?: Array<{ from: string; to: string; promotion?: string | null }>;
+  winner?: "w" | "b" | "draw";
+  loser?: "w" | "b";
+  reason?: string;
+  result?: string;
+  sender?: number;
+  timestamp?: number;
+  count?: number;
+  remainingOffers?: number;
+  roomId?: string;
+  turn?: string;
+  currentUserId?: number;
+  chat?: Array<{
+    sender: number;
+    message: string;
+    timestamp: number;
+  }>;
+}
+
+export interface RoomGameMessage {
+  type: string;
+  payload: RoomGamePayload;
+}
