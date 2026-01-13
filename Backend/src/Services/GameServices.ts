@@ -2,7 +2,10 @@ import { WebSocket } from 'ws';
 import { GameMessages, ErrorMessages } from '../utils/messages';
 import { redis } from '../clients/redisClient';
 import { Chess, PieceSymbol } from 'chess.js';
-import provideValidMoves, { MOVE_BEFORE_SAFE } from '../utils/chessUtils';
+import provideValidMoves, {
+  MOVE_BEFORE_SAFE,
+  parseMoves,
+} from '../utils/chessUtils';
 import { gameManager } from '../Classes/GameManager';
 import pc from '../clients/prismaClient';
 
@@ -12,7 +15,7 @@ export async function getGameState(gameId: string) {
     string,
     string
   >;
-  console.log(existingGame);
+  // console.log(existingGame);
 
   if (!existingGame || Object.keys(existingGame).length === 0) {
     return null;
@@ -256,13 +259,15 @@ export async function handleGuestGameMove(
         existingGame.player1Color === 'w'
           ? Number(gameState.blackTimer)
           : Number(gameState.whiteTimer);
-      const raw_moves = await redis.lRange(`guest-game:${gameId}:moves`, 0, -1);
-      const final_moves = raw_moves.map((move) => JSON.parse(move));
+      // const raw_moves = await redis.lRange(`guest-game:${gameId}:moves`, 0, -1);
+      // const final_moves = raw_moves.map((move) => JSON.parse(move));
+      const final_moves = await parseMoves(`guest-game:${gameId}:moves`);
       const final_capturedPieces = await redis.lRange(
         `guest-game:${gameId}:capturedPieces`,
         0,
         -1
       );
+
       await pc.guestGames.update({
         where: { id: Number(gameId) },
         data: {
@@ -278,6 +283,7 @@ export async function handleGuestGameMove(
           capturedPieces: final_capturedPieces,
         },
       });
+      await redis.hIncrBy(`stats`, 'guestGamesCount', 1);
     }
 
     const winnerMessage = JSON.stringify({
@@ -381,8 +387,8 @@ export async function reconnectPlayer(
     socket.send(JSON.stringify(message));
     return;
   }
-  console.log(game.status);
-  console.log('GameEnded: ', game.gameEnded);
+  // console.log(game.status);
+  // console.log('GameEnded: ', game.gameEnded);
   if (game.gameEnded) {
     const message = {
       type: GameMessages.GAME_OVER,
@@ -422,7 +428,6 @@ export async function reconnectPlayer(
 
   console.log('sending the current moves to ', playerId);
   const validMoves = provideValidMoves(game.board.fen());
-  const drawCount = await redis.get(`drawOffers:${gameId}:${playerId}`);
 
   socket.send(
     JSON.stringify({
@@ -438,7 +443,6 @@ export async function reconnectPlayer(
         validMoves: validMoves || [],
         moves: game.moves,
         status: game.status,
-        count: drawCount !== null ? Number(drawCount) : 3,
         capturedPieces: game.capturedPieces,
       },
     })
@@ -462,29 +466,55 @@ export async function reconnectPlayer(
   );
 }
 
-export async function getGamesCount() {
-  const count = await redis.get('guest:games:total');
-  // console.log(count);
-  return count ? parseInt(count) : 0;
+export async function getStats() {
+  const statsFromRedis = (await redis.hGetAll(`stats`)) as Record<
+    string,
+    string
+  >;
+  if (statsFromRedis && Object.keys(statsFromRedis).length > 0) {
+    console.log('redis');
+    return {
+      guestGamesCount: Number(statsFromRedis.guestGamesCount),
+      roomsCount: Number(statsFromRedis.roomsCount),
+    };
+  }
+  const guestGamesCount = await pc.guestGames.count();
+  const roomsCount = await pc.room.count({
+    where: {
+      status: 'FINISHED',
+    },
+  });
+  const statsFromDb = {
+    guestGamesCount: guestGamesCount ?? 0,
+    roomsCount: roomsCount ?? 0,
+  };
+  // console.log(statsFromDb);
+  await redis.hSet(`stats`, {
+    guestGamesCount: guestGamesCount.toString(),
+    roomsCount: roomsCount.toString(),
+  });
+  return statsFromDb;
 }
 export async function playerLeft(
   playerId: string,
   gameId: string,
-  socket: WebSocket,
-  socketMap: Map<string, WebSocket>
+  socket?: WebSocket,
 ) {
   const game = await getGameState(gameId);
 
   if (!game) {
     console.log('Game Not found');
-    socket.send(
-      JSON.stringify({
-        type: GameMessages.GAME_NOT_FOUND,
-        payload: {
-          message: 'Cannot leave game due to game not found',
-        },
-      })
-    );
+    // Only send message if socket exists
+    if (socket) {
+      socket.send(
+        JSON.stringify({
+          type: GameMessages.GAME_NOT_FOUND,
+          payload: {
+            message: 'Cannot leave game due to game not found',
+          },
+        })
+      );
+    }
     return;
   }
 
@@ -497,31 +527,7 @@ export async function playerLeft(
   console.log('In player left method');
 
   const winnerColor = playerId === game.whitePlayerId ? 'b' : 'w';
-  const opponentId =
-    playerId === game.whitePlayerId ? game.blackPlayerId : game.whitePlayerId;
   const loserColor = winnerColor === 'b' ? 'w' : 'b';
-  const winnerSocket = socketMap.get(opponentId);
-  const loserSocket = socketMap.get(playerId);
-
-  const winnerMessage = {
-    type: GameMessages.GAME_OVER,
-    payload: {
-      result: 'win',
-      message: 'Player Left You Won!',
-      winner: winnerColor,
-      loser: loserColor,
-    },
-  };
-
-  const loserMessage = {
-    type: GameMessages.GAME_OVER,
-    payload: {
-      result: 'lose',
-      message: 'You Lost',
-      winner: winnerColor,
-      loser: loserColor,
-    },
-  };
 
   try {
     await redis
@@ -532,11 +538,9 @@ export async function playerLeft(
       .expire(`guest-game:${gameId}`, 600)
       .expire(`guest-game:${gameId}:moves`, 600)
       .sRem('active-games', gameId)
-      .del(`drawOffers:${gameId}:${playerId}`)
       .exec();
 
-    // Update DB with game result
-    const moves = await redis.lRange(`guest-game:${gameId}:moves`, 0, -1);
+    const moves = await parseMoves(`guest-game:${gameId}:moves`);
     const capturedPieces = await redis.lRange(
       `guest-game:${gameId}:capturedPieces`,
       0,
@@ -577,30 +581,26 @@ export async function playerLeft(
           endedAt: new Date(),
         },
       });
+      await redis.hIncrBy(`stats`, 'guestGamesCount', 1);
     }
 
     console.log(`✅ Game ${gameId} ended - Status set to GAME_OVER`);
+    // Only send message if socket exists (opponent might also be disconnected)
+    if (socket) {
+      socket.send(JSON.stringify({
+        type: GameMessages.GAME_OVER,
+        payload: {
+          result: 'win',
+          message: 'Player Left You Won!',
+          winner: winnerColor,
+          loser: loserColor,
+        },
+      }));
+    }
   } catch (error) {
     console.error('Error updating game status:', error);
   }
 
-  // Notify both players
-  winnerSocket?.send(JSON.stringify(winnerMessage));
-  loserSocket?.send(JSON.stringify(loserMessage));
-}
-
-export function calculateTime(lastMoveTime: number) {
-  const currentTime = Date.now();
-  const elapsed = currentTime - lastMoveTime;
-
-  const ten_min = 10 * 60 * 1000;
-  const remainingTime = Math.max(0, ten_min - elapsed);
-  const exceeded = elapsed > ten_min;
-
-  return {
-    exceeded,
-    remainingTime,
-  };
 }
 
 export interface Move {
@@ -640,7 +640,7 @@ export async function handleGuestGameDraw(
     await redis.expire(`guest-game:${gameId}:moves`, 600);
 
     // Get moves and captured pieces from Redis for DB update
-    const moves = await redis.lRange(`guest-game:${gameId}:moves`, 0, -1);
+    const moves = await parseMoves(`guest-game:${gameId}:moves`);
     const capturedPieces = await redis.lRange(
       `guest-game:${gameId}:capturedPieces`,
       0,
@@ -679,6 +679,7 @@ export async function handleGuestGameDraw(
           endedAt: new Date(),
         },
       });
+      await redis.hIncrBy(`stats`, 'guestGamesCount', 1);
     }
 
     console.log(`✅ Game ${gameId} ended in draw: ${reason}`);
@@ -704,36 +705,13 @@ export async function offerDraw(
     return;
   }
 
-  const offerCountKey = `drawOffers:${gameId}:${playerId}`;
-  // Initialize to 3 if key doesn't exist
-  const exists = await redis.exists(offerCountKey);
-  if (!exists) {
-    await redis.set(offerCountKey, '3');
-  }
-
-  const count = await redis.get(offerCountKey);
-
-  // Block if no offers remaining
-  if (Number(count) <= 0) {
-    offerSenderSocket.send(
-      JSON.stringify({
-        type: GameMessages.DRAW_LIMIT_REACHED,
-        payload: { message: "You've reached the maximum of 3 draw offers." },
-      })
-    );
-    return;
-  }
-
-  // Decrement remaining offers
-  const remainingOffers = await redis.decr(offerCountKey);
-
+  await redis.setEx(`draw-offer:${gameId}`, 30, 'true');
   // Send confirmation to sender
   offerSenderSocket.send(
     JSON.stringify({
       type: GameMessages.OFFER_DRAW,
       payload: {
         message: 'Draw offered to the opponent. Waiting for response!',
-        remainingOffers: remainingOffers,
       },
     })
   );
@@ -770,7 +748,7 @@ export async function acceptDraw(
 
   const whitePlayerSocket = socketMap.get(game.whitePlayerId);
   const blackPlayerSocket = socketMap.get(game.blackPlayerId);
-
+  await redis.del(`draw-offer:${gameId}`);
   await handleGuestGameDraw(
     whitePlayerSocket!,
     blackPlayerSocket,

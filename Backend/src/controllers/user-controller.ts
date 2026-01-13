@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
@@ -58,7 +58,7 @@ router.post('/register', async (req: Request, res: Response) => {
       return;
     }
     const hashedPass = await bcrypt.hash(password, 12);
-  
+
     const newUser = await pc.user.create({
       data: {
         name: name,
@@ -73,7 +73,6 @@ router.post('/register', async (req: Request, res: Response) => {
       },
     });
     if (guestGamesOfUser.length > 0) {
-
       addGuestGamesToUserProfile(guestId, newUser.id);
     }
 
@@ -144,36 +143,77 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
         computerGames: {
           orderBy: { createdAt: 'desc' },
         },
-        createdRooms: true,
-        joinedRooms: true,
-        gamesWon: {
-          orderBy: { createdAt: 'desc' },
+        createdRooms: {
+          where: {
+            game: {
+              isNot: null,
+            },
+          },
+
           include: {
-            loser: {
-              select: {
-                chessLevel: true,
-                name: true,
+            game: {
+              include: {
+                winner: {
+                  select: {
+                    id: true,
+                    name: true,
+                    chessLevel: true,
+                  },
+                },
+                loser: {
+                  select: {
+                    id: true,
+                    name: true,
+                    chessLevel: true,
+                  },
+                },
               },
             },
-            room: true,
+
+            joinedBy: {
+              select: {
+                id: true,
+                name: true,
+                chessLevel: true,
+              },
+            },
           },
-          omit: {
-            loserId: true,
-          },
+          orderBy: { createdAt: 'desc' },
         },
-        gamesLost: {
-          orderBy: { createdAt: 'desc' },
+        joinedRooms: {
+          where: {
+            game: {
+              isNot: null,
+            },
+          },
           include: {
-            loser: {
+            game: {
+              include: {
+                winner: {
+                  select: {
+                    id: true,
+                    name: true,
+                    chessLevel: true,
+                  },
+                },
+                loser: {
+                  select: {
+                    id: true,
+                    name: true,
+                    chessLevel: true,
+                  },
+                },
+              },
+            },
+            createdBy: {
               select: {
+                id: true,
                 name: true,
                 chessLevel: true,
               },
             },
           },
-          omit: {
-            loserId: false,
-          },
+          orderBy: { createdAt: 'desc' },
         },
         computerGamesWon: {
           orderBy: { createdAt: 'desc' },
@@ -194,7 +234,36 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'User not found' });
       return;
     }
+    // const room=user.created
+    // Calculate room games from createdRooms and joinedRooms
+    const allRoomGames = [
+      ...user.createdRooms.map((r) => ({
+        ...r.game,
+        roomId: r.id,
+        roomCode: r.code,
+        isCreator: true,
+        opponentId: r.joinedBy?.id,
+        opponentName: r.joinedBy?.name,
+        opponentChessLevel: r.joinedBy?.chessLevel,
+      })),
+      ...user.joinedRooms.map((r) => ({
+        ...r.game,
+        roomId: r.id,
+        roomCode: r.code,
+        isCreator: false,
+        opponentId: r.createdBy?.id,
+        opponentName: r.createdBy?.name,
+        opponentChessLevel: r.createdBy?.chessLevel,
+      })),
+    ].filter((g) => g && g.status === 'FINISHED');
 
+    const roomGamesWon = allRoomGames.filter(
+      (g) => !g.draw && g.winnerId === user.id
+    );
+    const roomGamesLost = allRoomGames.filter(
+      (g) => !g.draw && g.loserId === user.id
+    );
+    const roomGamesDrawn = allRoomGames.filter((g) => g.draw);
     // Calculate guest games stats
     const allGuestGames = [...user.guestGamesAsP1, ...user.guestGamesAsP2];
     const guestGamesWon = allGuestGames.filter((g) => {
@@ -218,7 +287,6 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     const guestGamesDrawn = allGuestGames.filter(
       (g) => g.draw && g.status === 'FINISHED'
     );
-
     // Calculate stats
     const stats = {
       computer: {
@@ -228,12 +296,10 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
         drawn: user.computerGames.filter((g) => g.draw).length,
       },
       room: {
-        total: user.gamesWon.length + user.gamesLost.length,
-        won: user.gamesWon.length,
-        lost: user.gamesLost.length,
-        drawn:
-          user.gamesWon.filter((g) => g.draw).length +
-          user.gamesLost.filter((g) => g.draw).length,
+        total: allRoomGames.length,
+        won: roomGamesWon.length,
+        lost: roomGamesLost.length,
+        drawn: roomGamesDrawn.length,
       },
       guest: {
         total: allGuestGames.filter((g) => g.status === 'FINISHED').length,
@@ -243,19 +309,14 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
       },
     };
 
-    // const updatedGames
-    const wonGamesTime = user.gamesWon.reduce((total, games) => {
-      const started = new Date(games.createdAt).getTime();
-      const ended = new Date(games.updatedAt).getTime();
+    // Calculate room game time
+    const roomGameTime = allRoomGames.reduce((total, games) => {
+      const started = new Date(games.createdAt!).getTime();
+      const ended = games.endedAt
+        ? new Date(games.endedAt).getTime()
+        : new Date(games.updatedAt!).getTime();
 
       const totalLength = ended - started;
-      return total + totalLength;
-    }, 0);
-    const lostGameTimePlayed = user.gamesLost.reduce((total, games) => {
-      const start = new Date(games.createdAt).getTime();
-      const end = new Date(games.updatedAt).getTime();
-
-      const totalLength = end - start;
       return total + totalLength;
     }, 0);
     const computerGameTime = user.computerGames.reduce((total, games) => {
@@ -272,8 +333,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
       const totalLength = ended - started;
       return total + totalLength;
     }, 0);
-    const totalTimePlayedMs =
-      lostGameTimePlayed + wonGamesTime + computerGameTime + guestGameTime;
+    const totalTimePlayedMs = roomGameTime + computerGameTime + guestGameTime;
     // console.log(totalTimePlayedMs);
     const totalHours = Math.floor(totalTimePlayedMs / (1000 * 60 * 60));
     const totalMinutes = Math.floor((totalTimePlayedMs % 3600000) / 60000);
@@ -295,14 +355,26 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
         computerGamesInProgress: user.computerGames.filter(
           (games) => games.status === 'ACTIVE'
         ),
-        roomGamesWon: user.gamesWon,
-        roomGamesLost: user.gamesLost,
+        roomGamesWon,
+        roomGamesLost,
+        roomGamesDrawn,
         guestGamesWon,
         guestGamesLost,
         guestGamesDrawn,
       },
+      // Send all games to user
+      allGames: {
+        roomGames: allRoomGames,
+        computerGames: user.computerGames,
+        guestGames: allGuestGames,
+      },
+      // Include rooms with opponent info
+      rooms: {
+        created: user.createdRooms,
+        joined: user.joinedRooms,
+      },
     };
-    await redis.setEx(`user:${id}:profile`, 600, JSON.stringify(userProfile));
+    await redis.setEx(`user:${id}:profile`, 30, JSON.stringify(userProfile)); // Reduced to 30 seconds for faster updates
     res.status(200).json({
       success: true,
       userProfile,
@@ -683,89 +755,148 @@ router.post(
     }
   }
 );
-// router.post("/room/leave", authMiddleware, async (req: Request, res: Response) => {
-//   try {
-//     // @ts-ignore
-//     const userId = req.userId;
-//     const { code } = req.body;
 
-//     const room = await pc.room.findUnique({
-//       where: { code },
-//       include: { game: true },
-//     });
+router.patch(
+  '/room/:roomId/status',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { roomId } = req.params
+      // @ts-ignore
+      const userId = req.userId;
 
-//     if (!room) {
-//       res.status(404).json({ message: "Room doesn't exist or code incorrect", success: false });
-//         return
-//     }
+      const room = await pc.room.findFirst({
+        where: { code: String(roomId) },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          joinedBy: { select: { id: true, name: true } },
+        },
+      });
 
-//     if (userId !== room.createdById && userId !== room.joinedById) {
-//        res.status(403).json({ message: "You are not part of this room", success: false });
-//        return
-//     }
+      if (!room) {
+        res.status(404).json({
+          message: 'Room Code Incorrect! Room Does Not Exist',
+          success: false,
+        });
+        return;
+      }
 
-//     let updatedRoom;
+      const isCreator = room.createdById === userId;
+      const isJoiner = room.joinedById === userId;
 
-//     if (room.status === "WAITING") {
-//       updatedRoom = await pc.room.update({
-//         where: { id: room.id },
-//         data: { status: "CANCELLED" },
-//       });
+      if (!isCreator && !isJoiner) {
+        res.status(403).json({
+          message: 'You are not part of this room',
+          success: false,
+        });
+        return;
+      }
 
-//        res.status(200).json({
-//         message: "Room cancelled successfully.",
-//         success: true,
-//         room: updatedRoom,
-//       });
-//       return
-//     }
+      // CREATOR cancelling the room
+      if (isCreator) {
+        console.log(`🔴 Creator ${userId} cancelling room ${roomId}`);
 
-//     // 3️⃣ Already finished — no changes
-//      res.status(200).json({
-//       message: "Room is already finished or cancelled.",
-//       success: true,
-//       room,
-//     });
-//     return
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({
-//       message: "Internal Server Error",
-//       success: false,
-//     });
-//   }
-// });
+        await pc.room.update({
+          where: { id: room.id },
+          data: {
+            status: 'CANCELLED',
+            joinedById: null,
+          },
+        });
 
-router.patch('/room/:roomId/status', async (req: Request, res: Response) => {
-  try {
-    const { roomId } = req.body;
-    const room = await pc.room.findFirst({ where: { code: roomId } });
-    if (!room) {
-      res.status(404).json({
-        message: 'Room Code Incorrect! Room Does Not Exist',
+        // Notify joiner if they exist
+        if (room.joinedById) {
+          const joinerSocket = roomManager.roomSocketManager.get(
+            room.joinedById
+          );
+          if (joinerSocket) {
+            joinerSocket.send(
+              JSON.stringify({
+                type: 'room_opponent_left',
+                payload: {
+                  message: 'Room creator cancelled the room',
+                  reason: 'creator_cancelled',
+                  roomStatus: 'CANCELLED',
+                },
+              })
+            );
+          }
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'Room cancelled successfully',
+          roomStatus: 'CANCELLED',
+        });
+        return;
+      }
+
+      // JOINER leaving the room - should go back to WAITING, not CANCELLED
+      if (isJoiner && room.status === 'FULL') {
+        console.log(
+          `🟡 Joiner ${userId} leaving room ${roomId} - back to WAITING`
+        );
+
+        await pc.room.update({
+          where: { id: room.id },
+          data: {
+            status: 'WAITING',
+            joinedById: null,
+          },
+        });
+
+        // Clear lobby chat
+        await redis.del(`room:${roomId}:lobby-chat`);
+
+        // Notify creator
+        const creatorSocket = roomManager.roomSocketManager.get(
+          room.createdById
+        );
+        console.log(`  - Creator socket exists: ${!!creatorSocket}`);
+        console.log(`  - Creator socket state: ${creatorSocket?.readyState}`);
+
+        if (creatorSocket) {
+          const notification = {
+            type: 'room_opponent_left',
+            payload: {
+              message: 'Opponent left. Waiting for new player...',
+              reason: 'opponent_left',
+              roomStatus: 'WAITING',
+            },
+          };
+          console.log(
+            `📤 Sending notification to creator ${room.createdById}:`,
+            JSON.stringify(notification)
+          );
+          creatorSocket.send(JSON.stringify(notification));
+          console.log(`✅ Notification sent successfully`);
+        } else {
+          console.log(`⚠️ Creator socket not available`);
+        }
+
+        res.status(200).json({
+          success: true,
+          message: 'You left the room',
+          roomStatus: 'WAITING',
+        });
+        return;
+      }
+
+      // If room is already WAITING and joiner tries to leave (shouldn't happen)
+      res.status(400).json({
+        message: 'Invalid room state',
         success: false,
       });
       return;
+    } catch (error) {
+      console.error('Error in room status update:', error);
+      res.status(500).json({
+        message: 'Internal Server Error',
+        success: false,
+      });
     }
-    await pc.room.update({
-      where: { id: room.id },
-      data: {
-        status: 'CANCELLED',
-        joinedById: null,
-      },
-    });
-    res
-      .status(200)
-      .json({ success: true, message: 'Room Is cancelled successfully' });
-    return;
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: 'Internal Server Error',
-      success: false,
-    });
   }
-});
+);
 
 // router.patch()
 

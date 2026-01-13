@@ -3,6 +3,8 @@
 import { Chess } from 'chess.js';
 import pc from '../clients/prismaClient';
 import { redis } from '../clients/redisClient';
+import WebSocket from 'ws';
+import { InputJsonValue } from '@prisma/client/runtime/client';
 export const MOVE_BEFORE_SAFE = 5;
 export const GUEST_MATCHMAKING_KEY =
   process.env.GUEST_MATCHING_KEY || 'guest:game:queue';
@@ -25,7 +27,14 @@ export function delay(ms: number) {
   });
 }
 
-export function sendMessage(socket: WebSocket, message: JSON) {
+export function sendMessage(socket: WebSocket | undefined, message: string) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.log(`⚠️ Opponent socket not available`);
+    return;
+  }
+  socket.send(message);
+}
+export function sendError(socket: WebSocket, message: JSON) {
   socket.send(JSON.stringify(message));
 }
 export async function addGuestGamesToUserProfile(
@@ -55,18 +64,38 @@ export async function addGuestGamesToUserProfile(
   }
 }
 
-// export async function checkQueueForExisingPlayer(playerId:string) {
-//   try {
+export interface MovePayload {
+  from: string;
+  to: string;
+  promotion?: string | null;
+}
 
-//       //zscore actually checks the exact playerId in priority queue which is implemented using the sorted sets
-//       const is_player_in_queue = await redis.zScore(GUEST_MATCHMAKING_KEY,playerId)
-//       if(!is_player_in_queue){
-//         console.log("Player not in queue")
-//         return true;
-//       }
+export interface ChatPayload {
+  sender: number;
+  message: string;
+  timestamp: number;
+}
 
-//     } catch (error) {
-//     console.log("Error IN Check Queue For Existing Player: ".error);
-//     return null
-//   }
-// }
+export async function parseChat(redisKey: string): Promise<InputJsonValue[]> {
+  const chatRaw = await redis.lRange(redisKey, 0, -1);
+  if (!chatRaw || chatRaw.length === 0) return []; // returning empty array if no chat is there
+  return chatRaw.map((c: string) => {
+    try {
+      return JSON.parse(c);
+    } catch {
+      return { sender: 0, message: String(c), timestamp: Date.now() };
+    }
+  });
+}
+
+export async function parseMoves(redisKey: string): Promise<InputJsonValue[]> {
+  const movesRaw = await redis.lRange(redisKey, 0, -1);
+  if (!movesRaw || movesRaw.length === 0) return [];
+  return movesRaw.map((m: string) => {
+    try {
+      return JSON.parse(m);
+    } catch {
+      return { from: '', to: '', promotion: null };
+    }
+  });
+}

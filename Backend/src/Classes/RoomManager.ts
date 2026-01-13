@@ -14,7 +14,7 @@ import {
   handleRoomDrawRejection,
   validateRoomGamePayload,
 } from '../Services/RoomGameServices';
-import provideValidMoves from '../utils/chessUtils';
+import provideValidMoves, { parseChat, sendMessage } from '../utils/chessUtils';
 
 interface RestoredGameState {
   user1: number;
@@ -55,8 +55,17 @@ class RoomManager {
     try {
       const gameIdFromRedis = await redis.get(`user:${userId}:room-game`);
       if (gameIdFromRedis) {
-        const gameExists = await redis.exists(`room-game:${gameIdFromRedis}`);
-        if (gameExists) {
+        const gameData = await redis.hGetAll(`room-game:${gameIdFromRedis}`);
+
+        // Only reconnect if game exists AND is not finished
+        if (
+          gameData &&
+          Object.keys(gameData).length > 0 &&
+          gameData.status !== RoomMessages.ROOM_GAME_OVER
+        ) {
+          console.log(
+            `♻️ Reconnecting user ${userId} to active game ${gameIdFromRedis}`
+          );
           await handleRoomReconnection(
             userId,
             userSocket,
@@ -64,6 +73,10 @@ class RoomManager {
             this.roomSocketManager
           );
           return;
+        } else {
+          // Clean up stale Redis key if game is finished
+          console.log(`🧹 Cleaning up stale game reference for user ${userId}`);
+          await redis.del(`user:${userId}:room-game`);
         }
       }
 
@@ -71,7 +84,7 @@ class RoomManager {
       const room = await pc.room.findFirst({
         where: {
           OR: [{ createdById: userId }, { joinedById: userId }],
-          status: { in: ['FULL', 'ACTIVE'] },
+          status: { in: ['WAITING', 'FULL', 'ACTIVE'] },
           NOT: { status: { in: ['FINISHED', 'CANCELLED'] } },
         },
         include: {
@@ -118,46 +131,87 @@ class RoomManager {
         return;
       }
 
-      if (room.status === 'FULL') {
-        const opponentId =
-          userId === room.createdById ? room.joinedById : room.createdById;
+      // Handle WAITING room (only creator, no joiner yet)
+      if (room.status === 'WAITING') {
         const isCreator = userId === room.createdById;
 
-        // Get opponent info for proper state sync
-        const opponent = await pc.user.findUnique({
-          where: { id: opponentId! },
-          select: { name: true },
-        });
+        if (!isCreator) {
+          console.log(
+            `⚠️ User ${userId} tried to reconnect to WAITING room but is not creator`
+          );
+          return;
+        }
 
-        const opponentSocket = this.roomSocketManager.get(opponentId!);
-
-        // Send single consolidated message with all necessary room state
         console.log(
-          `🔄 User ${userId} reconnecting to FULL room (isCreator: ${isCreator})`
+          `🔄 Creator ${userId} reconnecting to WAITING room (roomCode: ${room.code})`
         );
+
         userSocket.send(
           JSON.stringify({
             type: GameMessages.USER_HAS_JOINED,
             payload: {
-              message: isCreator
-                ? 'Welcome back! Opponent is ready.'
-                : 'Rejoined room successfully!',
+              message: 'Welcome back! Waiting for opponent to join.',
+              opponentId: null,
+              opponentName: null,
+              roomCode: room.code,
+              roomStatus: 'WAITING',
+              isCreator: true,
+              currentUserId: userId,
+              playerCount: 1,
+            },
+          })
+        );
+        return;
+      }
+
+      // Handle FULL room (both players joined, game not started yet)
+      if (room.status === 'FULL') {
+        const isCreator = userId === room.createdById;
+        const opponentId = isCreator ? room.joinedById : room.createdById;
+
+        // Get both user info for complete room state
+        const [currentUser, opponent] = await Promise.all([
+          pc.user.findUnique({
+            where: { id: userId },
+            select: { name: true, chessLevel: true },
+          }),
+          pc.user.findUnique({
+            where: { id: opponentId! },
+            select: { name: true, chessLevel: true },
+          }),
+        ]);
+
+        const opponentSocket = this.roomSocketManager.get(opponentId!);
+
+        const lobbyChat = await parseChat(`room:${room.code}:lobby-chat`);
+
+        userSocket.send(
+          JSON.stringify({
+            type: GameMessages.USER_HAS_JOINED,
+            payload: {
               opponentId: opponentId,
               opponentName: opponent?.name || null,
               roomCode: room.code,
               roomStatus: 'FULL',
               isCreator: isCreator,
+              currentUserId: userId,
+              playerCount: 2,
+              chat: lobbyChat,
             },
           })
         );
 
-        // Notify opponent that this user has reconnected
-        opponentSocket?.send(
-          JSON.stringify({
-            type: RoomMessages.OPP_ROOM_RECONNECTED,
-            payload: { message: 'Opponent has rejoined. Game can start now!' },
-          })
-        );
+        // Notify opponent that this user has reconnected (if they're online)
+        if (opponentSocket) {
+          opponentSocket.send(
+            JSON.stringify({
+              type: RoomMessages.OPP_ROOM_RECONNECTED,
+              payload: {
+                message: `${currentUser?.name || 'Opponent'} has rejoined. Game can start now!`,
+              },
+            })
+          );
+        }
       }
     } catch (error) {
       console.error('Error checking for active or full game:', error);
@@ -173,11 +227,6 @@ class RoomManager {
 
       const createdBySocket = this.roomSocketManager.get(createdById);
 
-      console.log(
-        `🔔 Notifying creator ${createdById} about opponent ${opponentId} joining`
-      );
-      console.log(`Creator socket connected: ${!!createdBySocket}`);
-
       if (createdBySocket) {
         createdBySocket.send(
           JSON.stringify({
@@ -188,9 +237,6 @@ class RoomManager {
               opponentName: opponent?.name || null,
             },
           })
-        );
-        console.log(
-          `✅ USER_HAS_JOINED message sent to creator ${createdById}`
         );
       } else {
         console.log(
@@ -310,6 +356,7 @@ class RoomManager {
     blackTimer: number
   ) {
     try {
+      let dbSaveSuccess = false;
       const winnerId =
         whiteTimer <= 0 ? Number(game.user2) : Number(game.user1);
       const loserId = whiteTimer <= 0 ? Number(game.user1) : Number(game.user2);
@@ -321,12 +368,14 @@ class RoomManager {
       const moves = game.moves ? JSON.parse(game.moves) : [];
       const roomCode = game.roomCode;
 
+      // Get chat messages from Redis using the util function
+      const chatArr = await parseChat(`room-game:${gameId}:chat`);
+
       if (!roomCode) {
         console.error(
           `[handleRoomTimeExpired] Room code not found in Redis for game ${gameId}`
         );
 
-        // Still notify clients even if room code not found
         const errorMessage = JSON.stringify({
           type: RoomMessages.ROOM_GAME_OVER,
           payload: {
@@ -339,49 +388,95 @@ class RoomManager {
 
         winnerSocket?.send(errorMessage);
         loserSocket?.send(errorMessage);
+        throw new Error(`Room Code missing of game: ${gameId}`);
+      }
+      try {
+        await pc.$transaction([
+          pc.game.update({
+            where: { id: Number(gameId) },
+            data: {
+              winnerId,
+              loserId,
+              draw: false,
+              moves,
+              chat: chatArr,
+              currentFen: game.fen,
+              whiteTimeLeft: whiteTimer,
+              blackTimeLeft: blackTimer,
+              lastMoveAt: new Date(),
+              lastMoveBy: whiteTimer <= 0 ? 'w' : 'b',
+              endedAt: new Date(),
+              status: 'FINISHED',
+            },
+          }),
 
-        // Clean up Redis anyway
-        await redis.del(`user:${winnerId}:room-game`);
-        await redis.del(`user:${loserId}:room-game`);
-        await redis.del(`room-game:${gameId}`);
-        await redis.sRem('room-active-games', gameId);
+          pc.room.update({
+            where: { code: roomCode },
+            data: { status: 'FINISHED' },
+          }),
+        ]);
+        dbSaveSuccess = true;
+        console.log(
+          `⏱️ Game ${gameId} ended by time - Chat messages saved: ${chatArr.length}`
+        );
+      } catch (dbError) {
+        console.error(`[DB Error] Failed to save game ${gameId}:`, dbError);
 
+        winnerSocket?.send(
+          JSON.stringify({
+            type: RoomMessages.ROOM_GAME_OVER,
+            payload: {
+              result: 'error',
+              message: 'Game ended but failed to save. Please refresh.',
+            },
+          })
+        );
+        loserSocket?.send(
+          JSON.stringify({
+            type: RoomMessages.ROOM_GAME_OVER,
+            payload: {
+              result: 'error',
+              message: 'Game ended but failed to save. Please refresh.',
+            },
+          })
+        );
         return;
       }
 
-      // Use roomCode directly - much simpler!
-      await pc.$transaction([
-        pc.game.update({
-          where: { id: Number(gameId) },
-          data: {
-            winnerId,
-            loserId,
-            draw: false,
-            moves,
-            currentFen: game.fen,
-            whiteTimeLeft: whiteTimer,
-            blackTimeLeft: blackTimer,
-            lastMoveAt: new Date(),
-            lastMoveBy: whiteTimer <= 0 ? 'w' : 'b',
-            endedAt: new Date(),
-            status: 'FINISHED',
-          },
-        }),
+      if (dbSaveSuccess) {
+        try {
+          // ✅ Use redis.multi() for atomic deletion
+          const result = await redis
+            .multi()
+            .hIncrBy(`stats`, 'roomGamesCount', 1)
+            .hSet(`room-game:${gameId}`, {
+              status: RoomMessages.ROOM_GAME_OVER,
+              winner: winnerId.toString(),
+            })
+            .del(`user:${winnerId}:room-game`)
+            .del(`user:${loserId}:room-game`)
+            .del(`room-game:${gameId}`)
+            .del(`room-game:${gameId}:moves`)
+            .del(`room-game:${gameId}:chat`)
+            .del(`room-game:${gameId}:capturedPieces`)
+            .sRem('room-active-games', gameId)
+            .exec();
 
-        pc.room.update({
-          where: { code: roomCode },
-          data: { status: 'FINISHED' },
-        }),
-      ]);
-
-      await redis.del(`user:${winnerId}:room-game`);
-      await redis.del(`user:${loserId}:room-game`);
-      await redis.hSet(`room-game:${gameId}`, {
-        status: RoomMessages.ROOM_GAME_OVER,
-        winner: winnerId.toString(),
-      });
-      await redis.sRem('room-active-games', gameId);
-
+          if (result && result.every((r) => r !== null)) {
+            console.log(`✅ Game ${gameId} fully cleaned from Redis`);
+          } else {
+            console.warn(
+              `⚠️ Some Redis operations failed for game ${gameId}, but DB is safe`
+            );
+          }
+        } catch (redisError) {
+          // Redis cleanup failed, but DB already saved ✅
+          console.error(
+            `[Redis Error] Failed to clean game ${gameId}:`,
+            redisError
+          );
+        }
+      }
       const winnerMessage = JSON.stringify({
         type: RoomMessages.ROOM_GAME_OVER,
         payload: {
@@ -414,13 +509,11 @@ class RoomManager {
         error
       );
 
-      // Get user IDs from game data
       const user1Id = Number(game.user1);
       const user2Id = Number(game.user2);
       const socket1 = this.roomSocketManager.get(user1Id);
       const socket2 = this.roomSocketManager.get(user2Id);
 
-      // Notify both players of the error
       const errorMessage = JSON.stringify({
         type: RoomMessages.ROOM_GAME_OVER,
         payload: {
@@ -434,19 +527,6 @@ class RoomManager {
 
       socket1?.send(errorMessage);
       socket2?.send(errorMessage);
-
-      // Try to clean up Redis even if DB transaction failed
-      try {
-        await redis.del(`user:${user1Id}:room-game`);
-        await redis.del(`user:${user2Id}:room-game`);
-        await redis.del(`room-game:${gameId}`);
-        await redis.sRem('room-active-games', gameId);
-      } catch (redisError) {
-        console.error(
-          '[handleRoomTimeExpired] Redis cleanup failed:',
-          redisError
-        );
-      }
     }
   }
 
@@ -521,7 +601,6 @@ class RoomManager {
         const newGame = await pc.$transaction(async (tx) => {
           const game = await tx.game.create({
             data: {
-              moves: [],
               currentFen: chess.fen(),
               roomId: room.id,
               blackTimeLeft: 600,
@@ -543,6 +622,25 @@ class RoomManager {
 
         const gameId = newGame.id;
         const moves = provideValidMoves(chess.fen());
+
+        // Store lobby chat messages to Redis if any exist
+        // Check Redis for any pre-game lobby chat
+        const lobbyChatKey = `room:${roomCode}:lobby-chat`;
+        const lobbyChatExists = await redis.exists(lobbyChatKey);
+        if (lobbyChatExists) {
+          const lobbyChat = await redis.lRange(lobbyChatKey, 0, -1);
+          if (lobbyChat.length > 0) {
+            // Transfer lobby chat to game chat
+            for (const chat of lobbyChat) {
+              await redis.rPush(`room-game:${gameId}:chat`, chat);
+            }
+            console.log(
+              `📝 Transferred ${lobbyChat.length} lobby chat messages to game ${gameId}`
+            );
+          }
+          // Clean up lobby chat after transfer
+          await redis.del(lobbyChatKey);
+        }
 
         await redis
           .multi()
@@ -664,7 +762,18 @@ class RoomManager {
           const opponentSocket = this.roomSocketManager.get(opponentId);
           const timestamp = Date.now();
 
-          // Send to opponent
+          // Store lobby chat in Redis for transfer to game later
+          const chatPayload = {
+            sender: userId,
+            message: message,
+            timestamp: timestamp,
+          };
+          await redis.rPush(
+            `room:${roomId}:lobby-chat`,
+            JSON.stringify(chatPayload)
+          );
+          await redis.expire(`room:${roomId}:lobby-chat`, 86400);
+
           opponentSocket?.send(
             JSON.stringify({
               type: RoomMessages.ROOM_CHAT,
@@ -915,27 +1024,19 @@ class RoomManager {
       const userRoom = await pc.room.findFirst({
         where: {
           OR: [{ createdById: userId }, { joinedById: userId }],
-          status: {
-            in: ['ACTIVE', 'FULL'],
-          },
-          NOT: {
-            status: { in: ['FINISHED', 'CANCELLED'] },
-          },
+          status: { in: ['ACTIVE', 'FULL', 'WAITING'] },
         },
-        include: {
-          game: {
-            select: {
-              id: true,
-              winnerId: true,
-              loserId: true,
-              draw: true,
-            },
-          },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          createdById: true,
+          joinedById: true,
         },
       });
 
       if (!userRoom) {
-        console.log('⚠️ No active or waiting room found for user:', userId);
+        console.log(`⚠️ No active room found for user ${userId}`);
         return;
       }
 
@@ -944,44 +1045,158 @@ class RoomManager {
           ? userRoom.joinedById
           : userRoom.createdById;
 
-      if (!opponentId) {
-        console.log(`Opponent not found for disconnected user ${userId}`);
-        return;
-      }
+      const isCreator = userId === userRoom.createdById;
 
-      const opponentSocket = this.roomSocketManager.get(opponentId);
-
+      // ===== Handle each status =====
       if (userRoom.status === 'ACTIVE') {
-        opponentSocket?.send(
-          JSON.stringify({
-            type: RoomMessages.ROOM_OPP_DISCONNECTED,
-            payload: {
-              message:
-                'Opponent disconnected during game. Waiting for reconnection...',
-            },
-          })
-        );
-
-        console.log(
-          `User ${userId} disconnected mid-game from room ${userRoom.code}`
+        await this.handleActiveGameDisconnection(
+          userId,
+          userRoom.code,
+          opponentId
         );
       } else if (userRoom.status === 'FULL') {
-        opponentSocket?.send(
-          JSON.stringify({
-            type: RoomMessages.ROOM_OPP_DISCONNECTED,
-            payload: {
-              message: 'Opponent left the lobby before game start.',
-            },
-          })
+        await this.handleFullRoomDisconnection(
+          userRoom.code,
+          opponentId,
+          isCreator
         );
-
-        console.log(
-          `User ${userId} disconnected from lobby of room ${userRoom.code}`
+      } else if (userRoom.status === 'WAITING') {
+        await this.handleWaitingRoomDisconnection(
+          userRoom.code,
+          opponentId,
+          isCreator
         );
       }
     } catch (error) {
-      console.error('❌ Error handling room disconnection:', error);
+      console.error(
+        `❌ Error handling disconnection for user ${userId}:`,
+        error
+      );
     }
+  }
+
+  private async handleActiveGameDisconnection(
+    userId: number,
+    userCode: string,
+    opponentId: number | null
+  ) {
+    console.log(`User ${userId} disconnected mid-game from room ${userCode}`);
+
+    if (!opponentId) return;
+
+    const opponentSocket = this.roomSocketManager.get(opponentId);
+    opponentSocket?.send(
+      JSON.stringify({
+        type: RoomMessages.ROOM_OPP_DISCONNECTED,
+        payload: {
+          message:
+            'Opponent disconnected during game. Waiting for reconnection...',
+        },
+      })
+    );
+  }
+
+  private async handleFullRoomDisconnection(
+    roomCode: string,
+    opponentId: number | null,
+    isCreator: boolean
+  ) {
+    if (!opponentId) return;
+
+    const opponentSocket = this.roomSocketManager.get(opponentId);
+
+    if (isCreator) {
+      await this.cancelRoom(roomCode, opponentSocket);
+    } else {
+      await this.revertRoomToWaiting(roomCode, opponentSocket);
+    }
+  }
+
+  private async handleWaitingRoomDisconnection(
+    roomCode: string,
+    opponentId: number | null,
+    isCreator: boolean
+  ) {
+    if (isCreator) {
+      // Creator can disconnect from WAITING without issue
+      console.log(`Creator disconnected from WAITING room ${roomCode}`);
+      return;
+    }
+
+    if (!opponentId) return;
+
+    await pc.room.update({
+      where: { code: roomCode },
+      data: { joinedById: null, status: 'WAITING' },
+    });
+
+    const opponentSocket = this.roomSocketManager.get(opponentId);
+    sendMessage(
+      opponentSocket,
+      JSON.parse(
+        JSON.stringify({
+          type: RoomMessages.ROOM_OPPONENT_LEFT,
+          payload: {
+            message: 'Opponent disconnected. Waiting for new player...',
+            roomStatus: 'WAITING',
+          },
+        })
+      )
+    );
+  }
+
+  private async cancelRoom(
+    roomCode: string,
+    opponentSocket: WebSocket | undefined
+  ) {
+    console.log(`🔴 Room ${roomCode} cancelled due to creator disconnect`);
+
+    await pc.room.update({
+      where: { code: roomCode },
+      data: { joinedById: null, status: 'CANCELLED' },
+    });
+
+    await redis.del(`room:${roomCode}:lobby-chat`);
+
+    sendMessage(
+      opponentSocket,
+      JSON.parse(
+        JSON.stringify({
+          type: RoomMessages.ROOM_OPPONENT_LEFT,
+          payload: {
+            message: 'Room creator disconnected. Room cancelled.',
+            roomStatus: 'CANCELLED',
+          },
+        })
+      )
+    );
+  }
+
+  private async revertRoomToWaiting(
+    roomCode: string,
+    opponentSocket: WebSocket | undefined
+  ) {
+    console.log(`Room ${roomCode} reverted to WAITING`);
+
+    await pc.room.update({
+      where: { code: roomCode },
+      data: { joinedById: null, status: 'WAITING' },
+    });
+
+    await redis.del(`room:${roomCode}:lobby-chat`);
+
+    sendMessage(
+      opponentSocket,
+      JSON.parse(
+        JSON.stringify({
+          type: RoomMessages.ROOM_OPPONENT_LEFT,
+          payload: {
+            message: 'Opponent disconnected. Waiting for new player...',
+            roomStatus: 'WAITING',
+          },
+        })
+      )
+    );
   }
 }
 

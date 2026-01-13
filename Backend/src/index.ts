@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({
-  path: './env',
+  path: './.env',
 });
 import cookieParser from 'cookie-parser';
 import { WebSocketServer } from 'ws';
@@ -56,13 +56,34 @@ server.on('upgrade', (req, socket, head) => {
 
     // Extract token from cookies
     const cookies = cookie.parse(cookieHeader);
+    const token = cookies.token;
+    if (token) {
+      if (token) {
+        jwt.verify(token, process.env.SECRET_TOKEN!, (err, decoded) => {
+          if (err) {
+            console.log('❌ Token verification failed');
+            socket.destroy();
+            return;
+          }
+
+          // @ts-ignore
+          req.userId = (decoded as any).id;
+
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            // @ts-ignore
+            ws.userId = (decoded as any).id;
+            wss.emit('connection', ws, req);
+          });
+        });
+        return; // Exit after handling the token
+      }
+    }
     if (cookies.id) {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });
       return;
     }
-    const token = cookies.token;
     // console.log("Extracted Token:", token ? "Found" : "Not Found");
 
     if (!token) {
@@ -73,16 +94,6 @@ server.on('upgrade', (req, socket, head) => {
     }
 
     // Verify JWT
-    let decodedToken;
-    try {
-      decodedToken = jwt.verify(token, process.env.SECRET_TOKEN!) as {
-        id: number;
-      };
-    } catch (jwtError) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
 
     // Attach userId to request
     //@ts-ignore

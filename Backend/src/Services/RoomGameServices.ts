@@ -5,7 +5,12 @@ import { Move } from './GameServices';
 import { roomManager } from '../Classes/RoomManager';
 import { WebSocket } from 'ws';
 import { ErrorMessages, GameMessages, RoomMessages } from '../utils/messages';
-import provideValidMoves, { MOVE_BEFORE_SAFE } from '../utils/chessUtils';
+import provideValidMoves, {
+  MOVE_BEFORE_SAFE,
+  parseChat,
+  parseMoves,
+  sendMessage,
+} from '../utils/chessUtils';
 
 export async function getRoomGameState(gameId: number) {
   const gameExists = (await redis.hGetAll(`room-game:${gameId}`)) as Record<
@@ -98,6 +103,7 @@ export async function handleRoomMove(
     const boardMove = chess.move({
       to: move.to,
       from: move.from,
+      promotion: move.promotion || 'q',
     });
 
     await redis.rPush(`room-game:${gameId}:moves`, JSON.stringify(move));
@@ -186,40 +192,14 @@ export async function handleRoomMove(
     const loserId =
       winnerColor === 'b' ? existingGame.user2 : existingGame.user1;
 
-    const finalGameData = (await redis.hGetAll(
-      `room-game:${gameId}`
-    )) as Record<string, string>;
-    await saveGameProgress(
-      gameId,
-      finalGameData,
-      chess.fen(),
-      movingPlayerColor
-    );
+    // 1. Get all final data from Redis before deleting
+    const [final_moves, final_chat, final_CapturedPieces] = await Promise.all([
+      parseMoves(`room-game:${gameId}:moves`),
+      parseChat(`room-game:${gameId}:chat`),
+      redis.lRange(`room-game:${gameId}:capturedPieces`, 0, -1),
+    ]);
 
-    const winnerSocket = socketManager.get(winnerId);
-    const loserSocket = socketManager.get(loserId);
-    await redis.hSet(`room-game:${gameId}`, {
-      status: RoomMessages.ROOM_GAME_OVER,
-      winner: winnerColor,
-    });
-    await redis.expire(`room-game:${gameId}`, 86400);
-    await redis.sRem(`room-active-games`, gameId.toString());
-
-    // Get final game data including captured pieces
-    const finalMovesRaw = await redis.lRange(
-      `room-game:${gameId}:moves`,
-      0,
-      -1
-    );
-    const finalMoves = finalMovesRaw.map((m) => JSON.parse(m));
-    const finalChatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
-    const finalChat = finalChatRaw.map((c) => JSON.parse(c));
-    const finalCapturedPieces = await redis.lRange(
-      `room-game:${gameId}:capturedPieces`,
-      0,
-      -1
-    );
-
+    // 2. Save to Database (Transaction)
     await pc.$transaction([
       pc.game.update({
         where: { id: gameId },
@@ -227,52 +207,73 @@ export async function handleRoomMove(
           winnerId,
           loserId,
           draw: false,
-          endedAt: new Date(Date.now()),
-          moves: finalMoves,
-          chat: finalChat,
-          capturedPieces: finalCapturedPieces,
+          endedAt: new Date(),
+          moves: final_moves,
+          chat: final_chat,
+          capturedPieces: final_CapturedPieces,
           currentFen: chess.fen(),
           status: 'FINISHED',
         },
       }),
       pc.room.update({
         where: { code: existingGame.roomCode },
-        data: {
-          status: 'FINISHED',
-        },
+        data: { status: 'FINISHED' },
       }),
     ]);
+    await redis
+      .multi()
+      .hIncrBy(`stats`, 'roomGamesCount', 1)
+      .hSet(`room-game:${gameId}`, {
+        status: RoomMessages.ROOM_GAME_OVER,
+        winner: winnerId.toString(),
+      })
+      .del(`user:${winnerId}:room-game`)
+      .del(`user:${loserId}:room-game`)
+      .del(`room-game:${gameId}`)
+      .del(`room-game:${gameId}:moves`)
+      .del(`room-game:${gameId}:chat`)
+      .del(`room-game:${gameId}:capturedPieces`)
+      .sRem('room-active-games', gameId.toString())
+      .exec();
 
-    const winnerMessage = JSON.stringify({
-      type: RoomMessages.ROOM_GAME_OVER,
-      payload: {
-        result: 'win',
-        message: "🏆 Congratulations! You've won the game.",
-        winner: winnerColor,
-        loser: loserColor,
-        roomStatus: 'FINISHED',
-        gameStatus: 'GAME_OVER',
-      },
-    });
+    // Cleanup user mappings so they can join new games
+    await redis.del(`user:${winnerId}:room-game`);
+    await redis.del(`user:${loserId}:room-game`);
 
-    const loserMessage = JSON.stringify({
-      type: RoomMessages.ROOM_GAME_OVER,
-      payload: {
-        result: 'lose',
-        message: "💔 Game over. You've been checkmated.",
-        winner: winnerColor,
-        loser: loserColor,
-        roomStatus: 'FINISHED',
-        gameStatus: 'GAME_OVER',
-      },
-    });
+    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
 
-    winnerSocket?.send(winnerMessage);
-    loserSocket?.send(loserMessage);
+    // 4. Send Messages
+    const winnerSocket = socketManager.get(winnerId);
+    const loserSocket = socketManager.get(loserId);
+
+    sendMessage(
+      winnerSocket,
+      JSON.stringify({
+        type: RoomMessages.ROOM_GAME_OVER,
+        payload: {
+          result: 'win',
+          message: "🏆 Congratulations! You've won.",
+          winner: winnerColor,
+          roomStatus: 'FINISHED',
+        },
+      })
+    );
+
+    sendMessage(
+      loserSocket,
+      JSON.stringify({
+        type: RoomMessages.ROOM_GAME_OVER,
+        payload: {
+          result: 'lose',
+          message: '💔 Checkmate! Game over.',
+          winner: winnerColor,
+          roomStatus: 'FINISHED',
+        },
+      })
+    );
 
     return;
   }
-
   const validMoves = provideValidMoves(chess.fen());
 
   const oppPayload = {
@@ -291,7 +292,7 @@ export async function handleRoomMove(
       move,
       turn: chess.turn(),
       fen: chess.fen(),
-      validMoves: [],
+      validMoves,
       capturedPiece,
     },
   };
@@ -349,12 +350,16 @@ export async function handleRoomDraw(
     await redis.sRem(`room-active-games`, gameId.toString());
     await redis.expire(`room-game:${gameId}`, 86400);
 
-    // Get roomCode from Redis for DB update
+    // Get roomCode and chat from Redis for DB update
     const gameData = (await redis.hGetAll(`room-game:${gameId}`)) as Record<
       string,
       string
     >;
     const roomCode = gameData.roomCode as string;
+
+    // Get moves and chat from Redis using the parseMoves and parseChat util functions
+    const final_chat = await parseChat(`room-game:${gameId}:chat`);
+    const final_moves = await parseMoves(`room-game:${gameId}:moves`);
 
     await pc.$transaction([
       pc.game.update({
@@ -362,6 +367,10 @@ export async function handleRoomDraw(
         data: {
           draw: true,
           status: 'FINISHED',
+          endedAt: new Date(),
+          moves: final_moves,
+          chat: final_chat,
+          currentFen: gameData.fen,
         },
       }),
       pc.room.update({
@@ -372,7 +381,10 @@ export async function handleRoomDraw(
         },
       }),
     ]);
-    console.log(`GameDraw ${gameId}: ${reason}`);
+    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
+    console.log(
+      `GameDraw ${gameId}: ${reason} - Chat messages saved: ${final_chat.length}`
+    );
   } catch (error) {
     console.error(`Error handling draw for game ${gameId}:`, error);
   }
@@ -387,10 +399,14 @@ export async function handleRoomReconnection(
   const existingGame = await getRoomGameState(gameId);
 
   if (!existingGame) {
-    userSocket.send(
+    sendMessage(
+      userSocket,
       JSON.stringify({
         type: RoomMessages.ROOM_GAME_OVER,
-        payload: { message: 'The Game You are looking for is over' },
+        payload: {
+          message: 'The game you are looking for is over',
+          roomStatus: 'FINISHED',
+        },
       })
     );
     return;
@@ -410,6 +426,39 @@ export async function handleRoomReconnection(
       joinedBy: { select: { id: true, name: true } },
     },
   });
+
+  // Checking if room exists and is finished/cancelled
+  if (!room) {
+    sendMessage(
+      userSocket,
+      JSON.parse(
+        JSON.stringify({
+          type: RoomMessages.ROOM_NOT_FOUND,
+          payload: {
+            message: 'The room you are looking for does not exist',
+            roomStatus: 'FINISHED',
+          },
+        })
+      )
+    );
+    return;
+  }
+
+  if (room.status === 'FINISHED' || room.status === 'CANCELLED') {
+    sendMessage(
+      userSocket,
+      JSON.parse(
+        JSON.stringify({
+          type: RoomMessages.ROOM_GAME_OVER,
+          payload: {
+            message: `This room has been ${room.status.toLowerCase()}. You cannot reconnect.`,
+            roomStatus: room.status,
+          },
+        })
+      )
+    );
+    return;
+  }
 
   const isCreator = room?.createdById === userId;
   const opponentInfo = isCreator ? room?.joinedBy : room?.createdBy;
@@ -545,7 +594,6 @@ export async function handleRoomGameLeave(
   socketManager: Map<number, WebSocket>
 ) {
   try {
-    // --- Fetch room and game details (exclude finished/cancelled rooms) ---
     const room = await pc.room.findFirst({
       where: {
         game: { id: gameId },
@@ -565,7 +613,6 @@ export async function handleRoomGameLeave(
     }
 
     if (room.status !== 'ACTIVE') {
-      // Not an active game, ignore this handler
       userSocket.send(
         JSON.stringify({
           type: ErrorMessages.SERVER_ERROR,
@@ -575,24 +622,17 @@ export async function handleRoomGameLeave(
       return;
     }
 
-    // --- Determine roles ---
     const isCreator = room.createdById === userId;
-    const isJoiner = room.joinedById === userId;
     const winnerId = isCreator ? room.joinedById : room.createdById;
 
-    // --- Fetch final Redis data (if exists) ---
     const finalGameData = (await redis.hGetAll(
       `room-game:${gameId}`
     )) as Record<string, string>;
 
     if (finalGameData && Object.keys(finalGameData).length > 0) {
-      const movesRaw = await redis.lRange(`room-game:${gameId}:moves`, 0, -1);
-      const chatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
+      const final_chat = await parseChat(`room-game:${gameId}:chat`);
+      const final_moves = await parseMoves(`room-game:${gameId}:moves`);
 
-      const moves = movesRaw.map((m) => JSON.parse(m));
-      const chat = chatRaw.map((c) => JSON.parse(c));
-
-      // --- Persist final game snapshot ---
       await pc.game.update({
         where: { id: gameId },
         data: {
@@ -600,13 +640,12 @@ export async function handleRoomGameLeave(
           loserId: userId,
           draw: false,
           endedAt: new Date(),
-          moves,
-          chat,
+          moves: final_moves,
+          chat: final_chat,
           currentFen: finalGameData.fen,
         },
       });
     } else {
-      // --- No redis data, fallback to marking result ---
       await pc.game.update({
         where: { id: gameId },
         data: {
@@ -618,13 +657,12 @@ export async function handleRoomGameLeave(
       });
     }
 
-    // --- Update room to finished ---
     await pc.room.update({
       where: { id: room.id },
       data: { status: 'FINISHED' },
     });
+    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
 
-    // --- Notify sockets ---
     const oppSocket = socketManager.get(winnerId!);
 
     // Send game over message to winner with confetti
@@ -642,7 +680,6 @@ export async function handleRoomGameLeave(
       })
     );
 
-    // Send resignation confirmation to the user who left
     userSocket.send(
       JSON.stringify({
         type: RoomMessages.ROOM_LEFT,
@@ -654,7 +691,6 @@ export async function handleRoomGameLeave(
       })
     );
 
-    // --- Redis cleanup ---
     await redis.sRem('room-active-games', gameId.toString());
     await redis.del(`room-game:${gameId}`);
     await redis.del(`room-game:${gameId}:moves`);
@@ -677,8 +713,10 @@ export async function handleRoomLeave(
         status: { notIn: ['FINISHED', 'CANCELLED'] },
       },
     });
+
     if (!room) {
-      userSocket.send(
+      sendMessage(
+        userSocket,
         JSON.stringify({
           type: RoomMessages.ROOM_NOT_FOUND,
           payload: { message: 'Room not found' },
@@ -686,39 +724,47 @@ export async function handleRoomLeave(
       );
       return;
     }
+
     if (room.status === 'WAITING') {
       if (userId !== room.createdById) {
-        userSocket.send(
+        sendMessage(
+          userSocket,
           JSON.stringify({
             type: ErrorMessages.SERVER_ERROR,
-            payload: { message: 'You Did not created this room' },
+            payload: { message: 'You did not create this room' },
           })
         );
         return;
       }
+
       await pc.room.update({
-        where: {
-          id: room.id,
-        },
-        data: {
-          status: 'CANCELLED',
-        },
+        where: { id: room.id },
+        data: { status: 'CANCELLED' },
       });
-      userSocket.send(
+
+      await redis.del(`room:${roomCode}:lobby-chat`);
+
+      sendMessage(
+        userSocket,
         JSON.stringify({
           type: RoomMessages.ROOM_LEFT,
           payload: {
             message: 'Room Left Successfully',
+            roomStatus: 'CANCELLED',
           },
         })
       );
       return;
     }
+
+    // FULL room - determine roles
     const isCreator = room.createdById === userId;
     const isJoiner = room.joinedById === userId;
     const opponentId = isCreator ? room.joinedById : room.createdById;
+    const oppSocket = opponentId ? roomSocketManager.get(opponentId) : null;
 
     if (room.status === 'FULL' && isCreator) {
+      // Creator leaving FULL room = CANCEL entire room
       await pc.room.update({
         where: { id: room.id },
         data: {
@@ -727,20 +773,30 @@ export async function handleRoomLeave(
         },
       });
 
-      if (opponentId) {
-        const oppSocket = roomSocketManager.get(opponentId);
-        oppSocket?.send(
+      await redis.del(`room:${roomCode}:lobby-chat`);
+
+      if (oppSocket) {
+        sendMessage(
+          oppSocket,
           JSON.stringify({
             type: RoomMessages.ROOM_OPPONENT_LEFT,
-            payload: { message: 'Room creator left. Room cancelled.' },
+            payload: {
+              message: 'Room creator left. Room has been cancelled.',
+              reason: 'creator_left',
+              roomStatus: 'CANCELLED',
+            },
           })
         );
       }
 
-      userSocket.send(
+      sendMessage(
+        userSocket,
         JSON.stringify({
-          type: RoomMessages.ROOM_GAME_OVER,
-          payload: { message: 'You left before game start.' },
+          type: RoomMessages.ROOM_LEFT,
+          payload: {
+            message: 'You left the room. Room cancelled.',
+            roomStatus: 'CANCELLED',
+          },
         })
       );
     } else if (room.status === 'FULL' && isJoiner) {
@@ -751,24 +807,44 @@ export async function handleRoomLeave(
           status: 'WAITING',
         },
       });
-      const creatorSocket = roomSocketManager.get(room.createdById);
-      creatorSocket?.send(
-        JSON.stringify({
-          type: RoomMessages.ROOM_OPPONENT_LEFT,
-          payload: { message: 'Opponent left. Waiting for new player...' },
-        })
-      );
 
-      userSocket.send(
+      await redis.del(`room:${roomCode}:lobby-chat`);
+
+      if (oppSocket) {
+        sendMessage(
+          oppSocket,
+          JSON.stringify({
+            type: RoomMessages.ROOM_OPPONENT_LEFT,
+            payload: {
+              message: 'Opponent left. Waiting for new player...',
+              reason: 'opponent_left',
+              roomStatus: 'WAITING',
+            },
+          })
+        );
+        console.log(`✅ Notification sent to creator ${opponentId}`);
+      }
+
+      sendMessage(
+        userSocket,
         JSON.stringify({
-          type: RoomMessages.ROOM_GAME_OVER,
-          payload: { message: 'You left before game start.' },
+          type: RoomMessages.ROOM_LEFT,
+          payload: {
+            message: 'You left the room.',
+            roomStatus: 'WAITING',
+          },
         })
       );
     }
   } catch (error) {
-    console.log('error in room game leave method: ', error);
-    return null;
+    console.error('Error in handleRoomLeave:', error);
+    sendMessage(
+      userSocket,
+      JSON.stringify({
+        type: ErrorMessages.SERVER_ERROR,
+        payload: { message: 'Failed to leave room. Please try again.' },
+      })
+    );
   }
 }
 
@@ -779,10 +855,8 @@ async function saveGameProgress(
   lastMoveBy: 'w' | 'b'
 ) {
   try {
-    const movesRaw = await redis.lRange(`room-game:${gameId}:moves`, 0, -1);
-    const moves = movesRaw.map((m) => JSON.parse(m));
-    const chatRaw = await redis.lRange(`room-game:${gameId}:chat`, 0, -1);
-    const chat = chatRaw.map((c) => JSON.parse(c));
+    const chat = await parseChat(`room-game:${gameId}:chat`);
+    const moves = await parseMoves(`room-game:${gameId}:moves`);
     const capturedPiecesRaw = await redis.lRange(
       `room-game:${gameId}:capturedPieces`,
       0,
@@ -825,7 +899,6 @@ export async function resetCancelledRoom(
       return null;
     }
 
-    // Reset room for reuse
     await pc.room.update({
       where: { code: roomCode },
       data: {

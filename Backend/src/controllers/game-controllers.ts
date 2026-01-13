@@ -1,33 +1,29 @@
 import express, { Request, Response } from 'express';
 // import {v4 as uuidv4} from "uuid"
-import { getGamesCount } from '../Services/GameServices';
+import { getStats } from '../Services/GameServices';
 import { authMiddleware } from '../middleware';
 import pc from '../clients/prismaClient';
 import { Chess } from 'chess.js';
-import { ComputerDifficulty } from '@prisma/client';
 import { redis } from '../clients/redisClient';
 import { ComputerGameMessages } from '../utils/messages';
 import {
   getComputerGameState,
   handlePlayerQuit,
 } from '../Services/ComputerGameServices';
+import { ComputerDifficulty } from '../generated/prisma/enums';
 const gameRouter = express.Router();
 const ALLOWED_DIFFICULTIES: ComputerDifficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 
-gameRouter.get('/guest-games/total', async (req: Request, res: Response) => {
+gameRouter.get('/stats-total', async (_req: Request, res: Response) => {
   try {
-    const count = await getGamesCount();
-    console.log(count);
-    if (count === null || count === undefined) {
-      res.status(400).json({
-        message: 'count is null or undefined',
-        success: false,
-      });
-      return;
-    }
-    res.status(200).json({ success: true, count });
+    const statsObj = await getStats();
+    // console.log(count);
+    res.status(200).json({ success: true, stats: statsObj });
+    return;
   } catch (error) {
     res.status(500).json({ message: 'Internal Server error' });
+    console.log(error);
+    return;
   }
 });
 

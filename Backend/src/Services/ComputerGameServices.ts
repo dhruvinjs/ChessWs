@@ -11,7 +11,7 @@ import { spawn } from 'child_process';
 import { WebSocket } from 'ws';
 import { Chess } from 'chess.js';
 import pc from '../clients/prismaClient';
-import provideValidMoves, { delay } from '../utils/chessUtils';
+import provideValidMoves, { parseMoves } from '../utils/chessUtils';
 // this are the depthLevels according to which the computer will calculate the best-move
 const ComputerGameLevels: Record<string, number> = {
   EASY: 3,
@@ -100,8 +100,7 @@ export async function getComputerGameState(gameId: number) {
     string
   >;
 
-  const movesRaw = await redis.lRange(`computer-game:${gameId}:moves`, 0, -1);
-  const moves = movesRaw.map((m) => JSON.parse(m));
+  const moves = await parseMoves(`computer-game:${gameId}:moves`);
 
   const capturedPieces = await redis.lRange(
     `computer-game:${gameId}:capturedPieces`,
@@ -168,6 +167,7 @@ export async function handlePlayerMove(
     const boardMove = board.move({
       from: move.from,
       to: move.to,
+      promotion: move.promotion || 'q',
     });
     if (!boardMove) {
       userSocket.send(
@@ -274,12 +274,15 @@ export async function handlePlayerMove(
       0,
       -1
     );
-    const movesRaw = await redis.lRange(
-      `computer-game:${computerGameId}:moves`,
-      0,
-      -1
+    // const movesRaw = await redis.lRange(
+    //   `computer-game:${computerGameId}:moves`,
+    //   0,
+    //   -1
+    // );
+    // const updatedMoves = movesRaw.map((m) => JSON.parse(m));
+    const updatedMoves = await parseMoves(
+      `computer-game:${computerGameId}:moves`
     );
-    const updatedMoves = movesRaw.map((m) => JSON.parse(m));
     await pc.computerGame.update({
       where: {
         id: computerGameId,
@@ -447,12 +450,10 @@ export async function handleComputerMove(
       0,
       -1
     );
-    const movesRaw = await redis.lRange(
-      `computer-game:${computerGameId}:moves`,
-      0,
-      -1
+    const updatedMoves = await parseMoves(
+      `computer-game:${computerGameId}:moves`
     );
-    const updatedMoves = movesRaw.map((m) => JSON.parse(m));
+    // const updatedMoves = movesRaw.map((m) => JSON.parse(m));
     await pc.computerGame.update({
       where: {
         id: computerGameId,
@@ -525,12 +526,10 @@ export async function handleComputerGameDraw(
       0,
       -1
     );
-    const movesRaw = await redis.lRange(
-      `computer-game:${computerGameId}:moves`,
-      0,
-      -1
+    const updatedMoves = await parseMoves(
+      `computer-game:${computerGameId}:moves`
     );
-    const updatedMoves = movesRaw.map((m) => JSON.parse(m));
+    // const updatedMoves = movesRaw.map((m) => JSON.parse(m));
 
     await pc.computerGame.update({
       where: { id: computerGameId },
@@ -564,12 +563,7 @@ async function saveComputerGameProgress(
   gameState: any
 ) {
   try {
-    const movesRaw = await redis.lRange(
-      `computer-game:${computerGameId}:moves`,
-      0,
-      -1
-    );
-    const moves = movesRaw.map((m) => JSON.parse(m));
+    const moves = await parseMoves(`computer-game:${computerGameId}:moves`);
     const capturedPiecesRaw = await redis.lRange(
       `computer-game:${computerGameId}:capturedPieces`,
       0,

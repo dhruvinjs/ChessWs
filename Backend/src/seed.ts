@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
+import pc from './clients/prismaClient';
 
-const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
@@ -9,7 +8,7 @@ async function main() {
   // --- 1. Create Users ---
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  const alice = await prisma.user.create({
+  const alice = await pc.user.create({
     data: {
       name: 'Alice',
       email: 'alice@example.com',
@@ -18,7 +17,7 @@ async function main() {
     },
   });
 
-  const bob = await prisma.user.create({
+  const bob = await pc.user.create({
     data: {
       name: 'Bob',
       email: 'bob@example.com',
@@ -27,7 +26,7 @@ async function main() {
     },
   });
 
-  const charlie = await prisma.user.create({
+  const charlie = await pc.user.create({
     data: {
       name: 'Charlie',
       email: 'charlie@example.com',
@@ -46,5 +45,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await pc.$disconnect();
   });

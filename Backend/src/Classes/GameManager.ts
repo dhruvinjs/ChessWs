@@ -17,12 +17,16 @@ import {
   removePlayerFromQueue,
 } from '../Services/MatchMaking';
 import { Chess } from 'chess.js';
-import provideValidMoves, { GUEST_MATCHMAKING_KEY } from '../utils/chessUtils';
+import provideValidMoves, {
+  GUEST_MATCHMAKING_KEY,
+  parseMoves,
+} from '../utils/chessUtils';
 import pc from '../clients/prismaClient';
 export class GameManager {
   private socketMap: Map<string, WebSocket> = new Map();
   private globalSetInterval: NodeJS.Timeout | null = null;
   private checkQueueInterval: NodeJS.Timeout | null = null;
+  private disconnectionQueueInterval: NodeJS.Timeout | null = null;
   async addUser(socket: WebSocket, id: string) {
     this.socketMap.set(id, socket);
     this.gameMessageHandler(socket, id);
@@ -53,7 +57,7 @@ export class GameManager {
   async checkQueueAndSendMessage() {
     //already running then return otherwise 2 setIntervals will be running
     if (this.checkQueueInterval) return;
-    //Check every 30 seconds for players in queue
+    //Checking every  30 seconds for players in queue
 
     this.checkQueueInterval = setInterval(async () => {
       const now = Date.now();
@@ -66,7 +70,7 @@ export class GameManager {
         this.checkQueueInterval = null;
         return;
       }
-      // Remove players who have been in queue for more than 5 minutes
+      // Removing players who have been in queue for more than 5 minutes
       const expiredPlayers = await redis.zRangeByScore(
         GUEST_MATCHMAKING_KEY,
         0,
@@ -74,9 +78,6 @@ export class GameManager {
       );
 
       if (expiredPlayers.length > 0) {
-        console.log(
-          `Removing ${expiredPlayers.length} expired players from queue`
-        );
         for (const playerId of expiredPlayers) {
           await redis.zRem(GUEST_MATCHMAKING_KEY, playerId);
           await redis.zRem('guest:notified:players', playerId);
@@ -96,15 +97,13 @@ export class GameManager {
         }
       }
 
-      // Notify players waiting for 3+ minutes but less than 5 minutes
+      // Notify players waiting for 2+ minutes but less than 5 minutes
       const queue = await redis.zRangeByScore(
         GUEST_MATCHMAKING_KEY,
         0, // max or larger score
-        twoMinutesAgo // min or lower score becuase 3 minutes ago is still smaller than 0
+        twoMinutesAgo // min or lower score becuase 2 minutes ago is still smaller than 0
       );
-      console.log(
-        `in checkQueueInterval, found ${queue.length} players waiting 3+ minutes`
-      );
+
       if (queue.length <= 0) return;
       console.log('QUEUE EXISTS CHECKPOINT');
       for (const playerId of queue) {
@@ -149,9 +148,6 @@ export class GameManager {
       return;
     }
 
-    console.log('⏰ Starting global timer');
-
-    //running all the time
     this.globalSetInterval = setInterval(async () => {
       try {
         // Get all active games
@@ -248,7 +244,73 @@ export class GameManager {
       } catch (error) {
         console.error('Error in timer:', error);
       }
-    }, 1000); // Run every 1 second
+    }, 1000);
+  }
+
+  async checkDisconnectionQueue() {
+    if (this.disconnectionQueueInterval) return;
+
+    this.disconnectionQueueInterval = setInterval(async () => {
+      const thirtySecondsAgo = Date.now() - 30 * 1000;
+
+      const queue = await redis.zRangeByScore(
+        `guest-games:disconnection:queue`,
+        0,
+        thirtySecondsAgo
+      );
+
+
+      if (!queue || queue.length === 0) {
+        console.log('No players in guest-gamees disconnection queue');
+        if (this.disconnectionQueueInterval) {
+          clearInterval(this.disconnectionQueueInterval);
+          this.disconnectionQueueInterval = null;
+        }
+        return;
+      }
+
+      for (const gameAndPlayerIds of queue) {
+        const [playerId, gameId] = gameAndPlayerIds.split(':');
+
+        // Check if game still exists
+        const game = await redis.exists(`guest-game:${gameId}`);
+        if (!game) {
+          await redis.zRem(`guest-games:disconnection:queue`, gameAndPlayerIds);
+          continue;
+        }
+
+        // Check current game status
+        const currentStatus = await redis.hGet(`guest-game:${gameId}`, 'status');
+
+        // If game is already over or player reconnected (status is ACTIVE), remove from queue
+        if (currentStatus === GameMessages.GAME_OVER || currentStatus === GameMessages.GAME_ACTIVE) {
+          await redis.zRem(`guest-games:disconnection:queue`, gameAndPlayerIds);
+          continue;
+        }
+
+        // Get game state to determine opponent
+        const gameState = await getGameState(gameId);
+        if (!gameState) {
+          await redis.zRem(`guest-games:disconnection:queue`, gameAndPlayerIds);
+          continue;
+        }
+
+        // Determine opponent
+        const opponentId = gameState.blackPlayerId === playerId ? gameState.whitePlayerId : gameState.blackPlayerId;
+        const opponentSocket = this.socketMap.get(opponentId);
+
+        // Call playerLeft with opponent socket if it exists, otherwise without socket
+        if (opponentSocket) {
+          await playerLeft(playerId, gameId, opponentSocket);
+        } else {
+          // Edge case: both players disconnected, no socket to notify
+          await playerLeft(playerId, gameId);
+        }
+
+        // Remove from queue after processing
+        await redis.zRem(`guest-games:disconnection:queue`, gameAndPlayerIds);
+      }
+    }, 30000);
   }
 
   async handleTimeExpired(
@@ -285,8 +347,7 @@ export class GameManager {
         0,
         -1
       );
-      const raw_moves = await redis.lRange(`guest-game:${gameId}:moves`, 0, -1);
-      const final_moves = raw_moves.map((move) => JSON.parse(move));
+      const final_moves = await parseMoves(`guest-game:${gameId}:moves`);
       //Time Logic FOR DB
       const player1TimerLeft =
         existingGameFromDb.player1Color === 'w' ? whiteTimer : blackTimer;
@@ -312,6 +373,7 @@ export class GameManager {
           player2TimeLeft: player2TimeLeft,
         },
       });
+      await redis.hIncrBy(`stats`, 'guestGamesCount', 1);
       const winnerSocket = this.socketMap.get(winnerId);
       const loserSocket = this.socketMap.get(loserId);
       const winnerMessage = JSON.stringify({
@@ -341,6 +403,7 @@ export class GameManager {
       loserSocket?.send(loserMessage);
     } catch (error) {
       console.log('error in handleTimeExpired: ', error);
+      return null;
     }
   }
 
@@ -507,7 +570,6 @@ export class GameManager {
           return;
         }
 
-        // const newGameId = uuidv4();
         const chess = new Chess();
 
         //matchesPlayerId is player1Id becuase he was the one standing in the queue so
@@ -614,7 +676,6 @@ export class GameManager {
           id,
           this.socketMap
         );
-        // provideValidMoves(gameId,socket)
       }
 
       if (type === GameMessages.LEAVE_GAME) {
@@ -639,8 +700,8 @@ export class GameManager {
           if (!restored) return;
         }
 
-        console.log('Player Left Block');
-        playerLeft(id, gameId, socket, this.socketMap);
+        // console.log('Player Left Block');
+        playerLeft(id, gameId, socket);
       }
 
       if (type === GameMessages.RECONNECT) {
@@ -762,62 +823,56 @@ export class GameManager {
   }
 
   async handleDisconnection(playerId: string) {
-    //this is the gameId:string which can be retrieved using the playerId
     const gameId = await redis.get(`user:${playerId}:game`);
     if (!gameId) {
-      // await removePlayerFromQueue(playerId);
-      // if(removed)
+      this.socketMap.delete(playerId);
       return GameMessages.DISCONNECTED;
     }
+
     const existingGame = await getGameState(gameId);
-    if (!existingGame) return GameMessages.GAME_NOT_FOUND;
+    if (!existingGame) {
+      this.socketMap.delete(playerId);
+      return GameMessages.GAME_NOT_FOUND;
+    }
 
     if (existingGame.gameEnded) {
       console.log(`Game ${gameId} already over, ignoring disconnection`);
-      // Clean up socket but don't change game state
       this.socketMap.delete(playerId);
       return;
     }
-    // if disconnected player is white then connected user is black and message
-    // will be sent to that connected_user
-    const connected_user =
+
+    const connectedUserId =
       existingGame.whitePlayerId === playerId
         ? existingGame.blackPlayerId
         : existingGame.whitePlayerId;
-    const user_socket = this.socketMap.get(connected_user);
-    const message = JSON.stringify({
+
+    const connectedUserSocket = this.socketMap.get(connectedUserId);
+
+    // Notify opponent about disconnection
+    const disconnectMessage = JSON.stringify({
       type: GameMessages.DISCONNECTED,
       payload: {
-        message: 'Opponent Left due to bad connectivty',
+        message: 'Opponent left due to bad connectivity',
       },
     });
 
     await redis.hSet(`guest-game:${gameId}`, {
       status: GameMessages.DISCONNECTED,
       disconnectedBy: playerId,
-      timestamp: Date.now().toString(),
+      timestamp: Date.now()
     });
-    user_socket?.send(message);
 
-    setTimeout(async () => {
-      const latestStatus = await redis.hGet(`guest-game:${gameId}`, 'status');
-      if (latestStatus !== GameMessages.DISCONNECTED) return;
+    connectedUserSocket?.send(disconnectMessage);
 
-      const winner = connected_user;
+    // Add to disconnection queue of sortedsets  with current timestamp
+    await redis.zAdd('guest-games:disconnection:queue', {
+      value: `${playerId}:${gameId}`,
+      score: Date.now(),
+    });
 
-      await redis.hSet(`guest-game:${gameId}`, {
-        status: GameMessages.GAME_OVER,
-        winner: winner,
-      });
-      const message = JSON.stringify({
-        type: GameMessages.GAME_OVER,
-        payload: {
-          winner: winner,
-          reason: GameMessages.DISCONNECTED,
-        },
-      });
-      user_socket?.send(message);
-    }, 60 * 1000);
+    await this.checkDisconnectionQueue();
+
+    this.socketMap.delete(playerId);
   }
 }
 
