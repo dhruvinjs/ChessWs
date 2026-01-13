@@ -1,6 +1,6 @@
-# CheckVerse
+# ChessVerse
 
-CheckVerse is a high-performance, real-time multiplayer chess application built on the **PERN** stack. It features competitive matchmaking, AI-driven gameplay, and a efficient room-recycling system to optimize server resources.
+ChessVerse is a high-performance, real-time multiplayer chess application built on the **PERN** stack. It features competitive matchmaking, AI-driven gameplay, and a efficient room-recycling system to optimize server resources.
 
 ---
 
