@@ -41,7 +41,7 @@ export class GameManager {
     // Check if player is already in matchmaking queue (e.g., after page reload)
     const isInQueue = await redis.zScore(GUEST_MATCHMAKING_KEY, id);
     if (isInQueue !== null) {
-      console.log(`Player ${id} is already in queue, restoring search state`);
+      // console.log(`Player ${id} is already in queue, restoring search state`);
       socket.send(
         JSON.stringify({
           type: GameMessages.ALREADY_IN_QUEUE,
@@ -105,7 +105,7 @@ export class GameManager {
       );
 
       if (queue.length <= 0) return;
-      console.log('QUEUE EXISTS CHECKPOINT');
+      // console.log('QUEUE EXISTS CHECKPOINT');
       for (const playerId of queue) {
         // Check if we've already notified this player using sorted set
         const notifiedScore = await redis.zScore(
@@ -122,7 +122,7 @@ export class GameManager {
           await redis.zRem(GUEST_MATCHMAKING_KEY, playerId);
           continue;
         }
-        console.log(`Sending the messages to user ${playerId} CHECKPOINT`);
+        // console.log(`Sending the messages to user ${playerId} CHECKPOINT`);
         playerSocket.send(
           JSON.stringify({
             type: GameMessages.NO_ACTIVE_USERS,
@@ -301,10 +301,10 @@ export class GameManager {
 
         // Call playerLeft with opponent socket if it exists, otherwise without socket
         if (opponentSocket) {
-          await playerLeft(playerId, gameId, opponentSocket);
+          await playerLeft(playerId, gameId, this.socketMap);
         } else {
           // Edge case: both players disconnected, no socket to notify
-          await playerLeft(playerId, gameId);
+          await playerLeft(playerId, gameId,this.socketMap);
         }
 
         // Remove from queue after processing
@@ -664,7 +664,7 @@ export class GameManager {
         // Check if game exists in Redis, if not restore from DB
         const gameExists = await redis.exists(`guest-game:${gameId}`);
         if (!gameExists) {
-          console.log(`Game ${gameId} not found in Redis, restoring from DB`);
+          // console.log(`Game ${gameId} not found in Redis, restoring from DB`);
           const restored = await this.restoreGuestGameFromDb(gameId, socket);
           if (!restored) return;
         }
@@ -701,7 +701,7 @@ export class GameManager {
         }
 
         // console.log('Player Left Block');
-        playerLeft(id, gameId, socket);
+        playerLeft(id, gameId, this.socketMap);
       }
 
       if (type === GameMessages.RECONNECT) {
@@ -722,7 +722,7 @@ export class GameManager {
         // Check if game exists in Redis, if not restore from DB
         const gameExists = await redis.exists(`guest-game:${gameId}`);
         if (!gameExists) {
-          console.log(`Game ${gameId} not found in Redis, restoring from DB`);
+          // console.log(`Game ${gameId} not found in Redis, restoring from DB`);
           const restored = await this.restoreGuestGameFromDb(gameId, socket);
           if (!restored) return;
         }
@@ -748,7 +748,7 @@ export class GameManager {
         // Check if game exists in Redis, if not restore from DB
         const gameExists = await redis.exists(`guest-game:${gameId}`);
         if (!gameExists) {
-          console.log(`Game ${gameId} not found in Redis, restoring from DB`);
+          // console.log(`Game ${gameId} not found in Redis, restoring from DB`);
           const restored = await this.restoreGuestGameFromDb(gameId, socket);
           if (!restored) return;
         }
@@ -785,7 +785,7 @@ export class GameManager {
         // Check if game exists in Redis, if not restore from DB
         const gameExists = await redis.exists(`guest-game:${gameId}`);
         if (!gameExists) {
-          console.log(`Game ${gameId} not found in Redis, restoring from DB`);
+          // console.log(`Game ${gameId} not found in Redis, restoring from DB`);
           const restored = await this.restoreGuestGameFromDb(gameId, socket);
           if (!restored) return;
         }
@@ -811,7 +811,7 @@ export class GameManager {
         // Check if game exists in Redis, if not restore from DB
         const gameExists = await redis.exists(`guest-game:${gameId}`);
         if (!gameExists) {
-          console.log(`Game ${gameId} not found in Redis, restoring from DB`);
+          // console.log(`Game ${gameId} not found in Redis, restoring from DB`);
           const restored = await this.restoreGuestGameFromDb(gameId, socket);
           if (!restored) return;
         }
@@ -836,7 +836,7 @@ export class GameManager {
     }
 
     if (existingGame.gameEnded) {
-      console.log(`Game ${gameId} already over, ignoring disconnection`);
+      // console.log(`Game ${gameId} already over, ignoring disconnection`);
       this.socketMap.delete(playerId);
       return;
     }

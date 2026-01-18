@@ -63,9 +63,9 @@ class RoomManager {
           Object.keys(gameData).length > 0 &&
           gameData.status !== RoomMessages.ROOM_GAME_OVER
         ) {
-          console.log(
-            `♻️ Reconnecting user ${userId} to active game ${gameIdFromRedis}`
-          );
+          // console.log(
+          //   `♻️ Reconnecting user ${userId} to active game ${gameIdFromRedis}`
+          // );
           await handleRoomReconnection(
             userId,
             userSocket,
@@ -102,7 +102,7 @@ class RoomManager {
           createdAt: 'desc',
         },
       });
-      console.log(room);
+      // console.log(room);
       if (!room) {
         console.log(`✅ No active/waiting room found for user ${userId}`);
         return;
@@ -136,15 +136,15 @@ class RoomManager {
         const isCreator = userId === room.createdById;
 
         if (!isCreator) {
-          console.log(
-            `⚠️ User ${userId} tried to reconnect to WAITING room but is not creator`
-          );
+          // console.log(
+          //   `⚠️ User ${userId} tried to reconnect to WAITING room but is not creator`
+          // );
           return;
         }
 
-        console.log(
-          `🔄 Creator ${userId} reconnecting to WAITING room (roomCode: ${room.code})`
-        );
+        // console.log(
+        //   `🔄 Creator ${userId} reconnecting to WAITING room (roomCode: ${room.code})`
+        // );
 
         userSocket.send(
           JSON.stringify({
@@ -1119,7 +1119,7 @@ class RoomManager {
   ) {
     if (isCreator) {
       // Creator can disconnect from WAITING without issue
-      console.log(`Creator disconnected from WAITING room ${roomCode}`);
+      // console.log(`Creator disconnected from WAITING room ${roomCode}`);
       return;
     }
 
@@ -1176,7 +1176,7 @@ class RoomManager {
     roomCode: string,
     opponentSocket: WebSocket | undefined
   ) {
-    console.log(`Room ${roomCode} reverted to WAITING`);
+    // console.log(`Room ${roomCode} reverted to WAITING`);
 
     await pc.room.update({
       where: { code: roomCode },

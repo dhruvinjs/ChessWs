@@ -48,7 +48,7 @@ server.on('upgrade', (req, socket, head) => {
     console.log('Cookie Header:', cookieHeader);
 
     if (!cookieHeader) {
-      // console.log("❌ No cookie header found");
+      // console.log(" No cookie header found");
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       socket.destroy();
       return;
@@ -61,7 +61,7 @@ server.on('upgrade', (req, socket, head) => {
       if (token) {
         jwt.verify(token, process.env.SECRET_TOKEN!, (err, decoded) => {
           if (err) {
-            console.log('❌ Token verification failed');
+            console.log('Token verification failed');
             socket.destroy();
             return;
           }
@@ -117,10 +117,6 @@ wss.on('connection', async (socket, req: Request) => {
   // userId now ALWAYS COMES FROM JWT COOKIE
   //@ts-ignore
   const userId = socket.userId;
-
-  // console.log(`=== WebSocket Connected ===`);
-  // console.log(`Path: ${pathname}`);
-  // console.log(`User ID: ${userId}`);
 
   try {
     // Room

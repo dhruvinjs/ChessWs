@@ -1,5 +1,5 @@
 import { ChatInterface } from "../Components/room/ChatInterface";
-import { RoomHeader, ChessBoard, MoveHistory } from "../Components";
+import { RoomHeader, ChessBoard, MoveHistory, DrawOfferDialog } from "../Components";
 import { PlayerInfo } from "../Components/chess";
 import { ConfirmDialog } from "../Components/ConfirmDialog";
 import { GameMessages } from "../types/chess";
@@ -281,6 +281,8 @@ function RoomChessPageComponent() {
       </div>
 
       {/* Draw Offer Dialog */}
+      <DrawOfferDialog />
+      
       {/* Resign Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showResignConfirm}

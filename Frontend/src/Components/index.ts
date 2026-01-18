@@ -12,6 +12,7 @@ export { ChessBoard } from "./chess/ChessBoard";
 export { GameStatus } from "./chess/GameStatus";
 export { MoveHistory } from "./chess/MoveHistory";
 export { Square } from "./chess/Square";
+export { DrawOfferDialog } from "./chess/DrawOfferDialog";
 
 // Toast Messages
 export { showMessage, ToastProvider } from "./ToastMessages";

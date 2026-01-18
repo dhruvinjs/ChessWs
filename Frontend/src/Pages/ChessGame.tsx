@@ -1,4 +1,4 @@
-import { ChessBoard, MoveHistory } from "../Components";
+import { ChessBoard, MoveHistory, DrawOfferDialog } from "../Components";
 import { PlayerInfo } from "../Components/chess";
 import { ConfirmDialog } from "../Components/ConfirmDialog";
 import { GameMessages } from "../types/chess";
@@ -339,6 +339,9 @@ export function ChessGame() {
         confirmText="Quit Game"
         cancelText="Stay"
       />
+
+      {/* Draw Offer Dialog */}
+      <DrawOfferDialog />
     </div>
   );
 }

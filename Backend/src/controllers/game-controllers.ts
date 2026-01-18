@@ -10,7 +10,7 @@ import {
   getComputerGameState,
   handlePlayerQuit,
 } from '../Services/ComputerGameServices';
-import { ComputerDifficulty } from '../generated/prisma/enums';
+import { ComputerDifficulty } from '../..//generated/prisma/enums';
 const gameRouter = express.Router();
 const ALLOWED_DIFFICULTIES: ComputerDifficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 

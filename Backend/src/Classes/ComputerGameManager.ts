@@ -140,16 +140,15 @@ class ComputerGameManager {
             })
           );
 
-          // 🎯 FIX: Check if it's computer's turn and make a move if needed
           const currentTurn = gameState.fen.split(' ')[1]; // "w" or "b"
-          console.log(
-            `[Computer Game] Player color: ${gameState.playerColor}, Current turn: ${currentTurn}`
-          );
+          // console.log(
+          //   `[Computer Game] Player color: ${gameState.playerColor}, Current turn: ${currentTurn}`
+          // );
 
           if (gameState.playerColor !== currentTurn) {
-            console.log(
-              `[Computer Game] It's computer's turn, calculating move...`
-            );
+            // console.log(
+            //   `[Computer Game] It's computer's turn, calculating move...`
+            // );
             await delay(1000); // Small delay so player sees the board first
             const computerMove: Move = await getComputerMove(
               gameState.fen,
@@ -202,14 +201,14 @@ class ComputerGameManager {
 
           // 🎯 FIX: Check if it's computer's turn and make a move if needed
           const currentTurn = restored.fen.split(' ')[1]; // "w" or "b"
-          console.log(
-            `[Computer Game] Player color: ${restored.playerColor}, Current turn: ${currentTurn}`
-          );
+          // console.log(
+            // `[Computer Game] Player color: ${restored.playerColor}, Current turn: ${currentTurn}`
+          // );
 
           if (restored.playerColor !== currentTurn) {
-            console.log(
-              `[Computer Game] It's computer's turn, calculating move...`
-            );
+            // console.log(
+            //   `[Computer Game] It's computer's turn, calculating move...`
+            // );
             await delay(1000); // Small delay so player sees the board first
             const computerMove: Move = await getComputerMove(
               restored.fen,

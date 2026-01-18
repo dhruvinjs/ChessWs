@@ -91,7 +91,7 @@ ws://localhost:8080/guest — Anonymous quick-play sessions.
 Local Setup
 ---
 #### 1. Infrastructure
-Docker Compose will automatically start both PostgreSQL and Redis.
+Docker Compose will automatically  Backend and  Redis.
 ```
   docker-compose up -d
 ```

@@ -142,7 +142,7 @@ export async function handleGuestGameMove(
       capturedPiece = capturedCode;
 
       await redis.rPush(`guest-game:${gameId}:capturedPieces`, capturedPiece);
-      console.log('Captured Piece Block: ', capturedPiece);
+      // console.log('Captured Piece Block: ', capturedPiece);
     }
     const updatedGuestGameMoveCnt = await redis.hIncrBy(
       `guest-game:${gameId}`,
@@ -498,36 +498,29 @@ export async function getStats() {
 export async function playerLeft(
   playerId: string,
   gameId: string,
-  socket?: WebSocket,
+  socketMap?: Map<string, WebSocket> 
 ) {
   const game = await getGameState(gameId);
 
   if (!game) {
     console.log('Game Not found');
-    // Only send message if socket exists
-    if (socket) {
-      socket.send(
-        JSON.stringify({
-          type: GameMessages.GAME_NOT_FOUND,
-          payload: {
-            message: 'Cannot leave game due to game not found',
-          },
-        })
-      );
-    }
     return;
   }
 
-  // Check if game is already over
   if (game.gameEnded) {
     console.log('Game already over, ignoring player left');
     return;
   }
 
-  console.log('In player left method');
+  // console.log('In player left method');
 
   const winnerColor = playerId === game.whitePlayerId ? 'b' : 'w';
   const loserColor = winnerColor === 'b' ? 'w' : 'b';
+  
+  // Determine the opponent
+  const opponentId = playerId === game.whitePlayerId 
+    ? game.blackPlayerId 
+    : game.whitePlayerId;
 
   try {
     await redis
@@ -585,22 +578,39 @@ export async function playerLeft(
     }
 
     console.log(`✅ Game ${gameId} ended - Status set to GAME_OVER`);
-    // Only send message if socket exists (opponent might also be disconnected)
-    if (socket) {
-      socket.send(JSON.stringify({
-        type: GameMessages.GAME_OVER,
-        payload: {
-          result: 'win',
-          message: 'Player Left You Won!',
-          winner: winnerColor,
-          loser: loserColor,
-        },
-      }));
+    
+    // Send win message to the OPPONENT
+    if (socketMap) {
+      const opponentSocket = socketMap.get(opponentId);
+      if (opponentSocket) {
+        opponentSocket.send(JSON.stringify({
+          type: GameMessages.GAME_OVER,
+          payload: {
+            result: 'win',
+            message: '🎉 You Won! Your opponent left the game.',
+            winner: winnerColor,
+            loser: loserColor,
+          },
+        }));
+      }
+      
+      // Also notify the player who left (if still connected)
+      const leavingPlayerSocket = socketMap.get(playerId);
+      if (leavingPlayerSocket) {
+        leavingPlayerSocket.send(JSON.stringify({
+          type: GameMessages.GAME_OVER,
+          payload: {
+            result: 'lose',
+            message: 'You resigned from the game.',
+            winner: winnerColor,
+            loser: loserColor,
+          },
+        }));
+      }
     }
   } catch (error) {
     console.error('Error updating game status:', error);
   }
-
 }
 
 export interface Move {
