@@ -40,14 +40,14 @@ class RoomManager {
     this.roomSocketManager.set(userId, userSocket);
     this.messageHandlerForRoom(userId, userSocket);
 
-    userSocket.send(
-      JSON.stringify({
-        type: RoomMessages.ASSIGN_ID_FOR_ROOM,
-        payload: {
-          message: 'Id Assigned for room',
-        },
-      })
-    );
+    // userSocket.send(
+    //   JSON.stringify({
+    //     type: RoomMessages.ASSIGN_ID_FOR_ROOM,
+    //     payload: {
+    //       message: 'Id Assigned for room',
+    //     },
+    //   })
+    // );
     await this.checkAndRestoreActiveGame(userId, userSocket);
   }
 
@@ -1191,7 +1191,7 @@ class RoomManager {
         JSON.stringify({
           type: RoomMessages.ROOM_OPPONENT_LEFT,
           payload: {
-            message: 'Opponent disconnected. Waiting for new player...',
+            message: 'Opponent disconnected. Waiting for new R...',
             roomStatus: 'WAITING',
           },
         })

@@ -184,6 +184,18 @@ function RoomChessPageComponent() {
     };
   }, [roomId, roomCode, navigate, user?.id]);
 
+  // ✅ Handle room cancellation - redirect participant to home
+  useEffect(() => {
+    if (roomStatus === "CANCELLED" || roomStatus === "FINISHED") {
+      console.log(`🔴 Room ${roomStatus} - redirecting to /room`);
+      const timer = setTimeout(() => {
+        navigate("/room");
+      }, 2000); // Give time for the toast message to show
+
+      return () => clearTimeout(timer);
+    }
+  }, [roomStatus, navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-amber-50 to-orange-50 dark:from-black dark:via-gray-900 dark:to-amber-950 p-4">
       <div className="w-full max-w-7xl mx-auto flex flex-col gap-4">
@@ -221,8 +233,8 @@ function RoomChessPageComponent() {
           {/* Game Board Section - Center */}
           <div className="lg:col-span-3 order-1 lg:order-2 flex flex-col items-center gap-4">
             {/* Chessboard with Player Info */}
-            <div className="w-full max-w-full">
-              {gameStatus === GameMessages.SEARCHING ? (
+          <div className="w-full max-w-[min(100%,70vh)] mx-auto">
+                {gameStatus === GameMessages.SEARCHING ? (
                 <div className="flex items-center justify-center h-full aspect-square text-center text-xl font-semibold text-slate-600 dark:text-slate-400 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
                   <p>Waiting for game to start...</p>
                 </div>

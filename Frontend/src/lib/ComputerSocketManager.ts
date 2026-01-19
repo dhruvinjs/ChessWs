@@ -156,12 +156,6 @@ export class ComputerSocketManager {
           return;
         }
 
-        // console.log('🤖 Computer move:', payload.move);
-        // console.log(
-        // "📊 Valid moves for player's turn:",
-        // payload.validMoves?.length
-        // );
-
         // Update with computer's move + new validMoves for player's turn
         store.updateGameState(
           payload.fen,
@@ -176,7 +170,7 @@ export class ComputerSocketManager {
           store.addCapturedPiece(payload.capturedPiece);
         }
 
-        toast("Computer moved!", { icon: "🤖" });
+        // toast("Computer moved!", { icon: "🤖" });
         break;
 
       case ComputerGameMessages.PLAYER_CHECK:

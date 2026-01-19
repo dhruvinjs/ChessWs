@@ -10,15 +10,21 @@ export function useUserQuery() {
       try {
         const response = await authApis.getProfile();
 
-        // FIX: The backend returns 'user', not 'userProfile'
+        // Backend returns { success: true, userProfile: { user: {...} }, isGuest: false }
         const userData = response.user;
-
+        console.log(userData)
         if (!userData) {
           throw new Error("User data not found in response");
         }
 
-        // Ensure we spread the actual user object found in the JSON
-        return { ...userData, isGuest: false };
+        // Return the user object with isGuest flag from response
+        return { 
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          chessLevel: userData.chessLevel,
+          isGuest: response.isGuest 
+        };
       } catch (error: unknown) {
         const status = axios.isAxiosError(error)
           ? error.response?.status
@@ -28,10 +34,14 @@ export function useUserQuery() {
 
         try {
           const guestResponse = await authApis.getOrCreateGuest();
-          // Backend might return { user: {...} } or just the user object
-          const guest = guestResponse.user || guestResponse;
-
-          return { ...guest, isGuest: true };
+          // Backend returns { id: string, success: true, isGuest: true }
+          return {
+            id: 0, // Guest ID is a string but we use 0 for frontend
+            name: "Guest",
+            email: "",
+            isGuest: true,
+            chessLevel: "BEGINNER",
+          } as User;
         } catch (guestError) {
           console.error("Guest creation failed:", guestError);
           // Ultimate fallback to prevent application crash

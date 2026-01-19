@@ -103,9 +103,8 @@ export interface UserProfile {
   };
 }
 
-export interface ProfileResponse {
+export interface ProfileResponse extends UserProfile{
   success: boolean;
-  userProfile: UserProfile;
   isGuest: boolean;
 }
 

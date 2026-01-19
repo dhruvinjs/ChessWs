@@ -122,17 +122,34 @@ export function ChessGame() {
             <div className="flex-shrink-0 w-full flex items-center justify-center">
               <div className="w-full max-w-[min(92vw,52vh)] md:max-w-[min(70vw,80vh)] lg:max-w-[min(60vw,85vh)] xl:max-w-[700px] 2xl:max-w-[750px] flex flex-col gap-0">
                 {/* Back Button */}
-                <div className="w-full mb-3 md:mb-4">
-                  <button
-                    onClick={handleQuitClick}
-                    className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/90 text-slate-700 dark:text-white backdrop-blur-md shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200"
-                    style={{ minWidth: "44px", minHeight: "44px" }}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    <span className="text-sm font-medium">Back</span>
-                  </button>
-                </div>
+{/* RESPONSIVE HEADER - Move this to the top of your return block */}
+<div className="w-full flex md:hidden items-center px-4 py-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-50">
+  <button
+    onClick={handleQuitClick}
+    className="flex items-center gap-2 px-3 h-10 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-lg active:scale-95 transition-all"
+  >
+    <ArrowLeft className="h-4 w-4" />
+    <span className="text-xs font-bold">BACK</span>
+  </button>
+  
+  {/* Optional: Add search status here for mobile if needed */}
+  {gameStatus === GameMessages.SEARCHING && (
+    <span className="ml-auto text-[10px] font-bold text-emerald-500 animate-pulse uppercase">
+      Finding Opponent...
+    </span>
+  )}
+</div>
 
+{/* DESKTOP BACK BUTTON - Re-add this inside your board container, but hidden on mobile */}
+<div className="hidden md:block w-full mb-4">
+  <button
+    onClick={handleQuitClick}
+    className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-700/90 text-slate-700 dark:text-white backdrop-blur-md shadow-sm border border-slate-200 dark:border-slate-700 transition-all"
+  >
+    <ArrowLeft className="h-4 w-4" />
+    <span className="text-sm font-medium">Back to Home</span>
+  </button>
+</div>
                 {/* Opponent Info (Top) */}
                 <div className="w-full">
                   <PlayerInfo

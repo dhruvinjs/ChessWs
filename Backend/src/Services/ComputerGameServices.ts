@@ -20,7 +20,6 @@ const ComputerGameLevels: Record<string, number> = {
 };
 // Use path relative to project root, not dist folder
 const stockfish_path = path.join(process.cwd(), 'bin', 'stockfish');
-
 export function getComputerMove(
   fen: string,
   difficulty: string
@@ -193,7 +192,7 @@ export async function handlePlayerMove(
         `computer-game:${computerGameId}:capturedPieces`,
         capturedPiece
       );
-      console.log(`Player Captured Piece: ${capturedPiece}`);
+      // console.log(`Player Captured Piece: ${capturedPiece}`);
     }
 
     userSocket.send(
@@ -314,7 +313,7 @@ export async function handlePlayerMove(
     board.fen(),
     gameState.difficulty
   );
-  console.log(`[ComputerGame] Computer move calculated:`, computerMove);
+  // console.log(`[ComputerGame] Computer move calculated:`, computerMove);
   // await delay(2000)
   await handleComputerMove(userSocket, computerMove, computerGameId, userId);
 }

@@ -85,9 +85,9 @@ router.post('/register', async (req: Request, res: Response) => {
     res.clearCookie('guestId');
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Set to false for development, true in production
       sameSite: 'lax',
-      maxAge: 6 * 60 * 60 * 1000, // 6 hours in ms
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
     res.status(200).json({
       message: 'User Created',
@@ -123,11 +123,12 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     //Checking if the redis has the profile cached
     const userProfileInRedis = await redis.get(`user:${id}:profile`);
     if (userProfileInRedis) {
+      const userProfile= JSON.parse(userProfileInRedis)
       // const userProfile = await redis.get(`user:{id}:profile`);
-      console.log(JSON.parse(userProfileInRedis));
+      // console.log(JSON.parse(userProfileInRedis));
       res.status(200).json({
         success: true,
-        userProfile: JSON.parse(userProfileInRedis),
+        ...userProfile,
         isGuest: false,
       });
       return;
@@ -234,7 +235,6 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    // const room=user.created
     // Calculate room games from createdRooms and joinedRooms
     const allRoomGames = [
       ...user.createdRooms.map((r) => ({
@@ -334,11 +334,9 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
       return total + totalLength;
     }, 0);
     const totalTimePlayedMs = roomGameTime + computerGameTime + guestGameTime;
-    // console.log(totalTimePlayedMs);
     const totalHours = Math.floor(totalTimePlayedMs / (1000 * 60 * 60));
     const totalMinutes = Math.floor((totalTimePlayedMs % 3600000) / 60000);
     const totalTimePlayed = `${totalHours}h ${totalMinutes}m`;
-    // console.log(totalTimePlayed);
 
     const userProfile = {
       user: {
@@ -377,7 +375,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     await redis.setEx(`user:${id}:profile`, 30, JSON.stringify(userProfile)); // Reduced to 30 seconds for faster updates
     res.status(200).json({
       success: true,
-      userProfile,
+      ...userProfile,
       isGuest: false,
     });
   } catch (error) {
@@ -428,9 +426,9 @@ router.post('/login', async (req: Request, res: Response) => {
     res.clearCookie('id');
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Set to false for development, true in production
       sameSite: 'lax',
-      maxAge: 6 * 60 * 60 * 1000, // 6 hours in ms
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
     res.status(200).json({
       success: true,

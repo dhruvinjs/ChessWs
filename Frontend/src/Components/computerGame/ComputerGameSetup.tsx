@@ -95,7 +95,7 @@ export const ComputerGameSetup: React.FC = () => {
 
       // 🎯 FIX: Check for success properly
       if (response.success === true) {
-        toast.success("New game created!");
+        // toast.success("New game created!");
         // Navigate to game page - WebSocket will load the game
         navigate("/computer/game");
       } else {
@@ -132,8 +132,8 @@ export const ComputerGameSetup: React.FC = () => {
       // 🎯 FIX: Proper response handling
       if (response.success === true) {
         // Scenario A: New game created successfully
-        toast.success("Game created!");
-        console.log("✅ Navigating to /computer/game");
+        // toast.success("Game created!");
+        // console.log("✅ Navigating to /computer/game");
 
         // Navigate to game page - WebSocket will load the game data
         navigate("/computer/game");
@@ -146,12 +146,12 @@ export const ComputerGameSetup: React.FC = () => {
         toast.error(response.message || "You have an active game");
       } else {
         // Scenario C: Unexpected response
-        console.error("❌ Unexpected response:", response);
+        // console.error("❌ Unexpected response:", response);
         toast.error(response.message || "Failed to create game");
         setPendingSetup(null);
       }
     } catch (error: any) {
-      console.error("Failed to create game:", error);
+      // console.error("Failed to create game:", error);
       toast.error(
         error.response?.data?.message || "Failed to connect or create game"
       );

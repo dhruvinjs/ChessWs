@@ -177,82 +177,73 @@ const RoomHeaderComponent = ({
     onLeave();
   }, [onLeave]);
 
-  const handleLeaveCancel = useCallback(() => {
-    setShowLeaveDialog(false);
-  }, []);
-
-  const handleLeaveClick = useCallback(() => {
-    setShowLeaveDialog(true);
-  }, []);
-
-  // Show timers only when all conditions are met
-  // const showTimers =
-  //   gameActive && whiteTimer !== undefined && blackTimer !== undefined;
-
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 p-4 md:p-5 rounded-2xl shadow-xl flex items-center justify-between w-full">
-      {/* Left Section - Title and Room Code */}
-      <div className="flex items-center gap-4">
+    <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-700 p-4 md:p-5 rounded-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4 md:gap-0">
+      
+      {/* Left Section - Title and Room Details */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-2 md:mb-1">
             <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
               <span className="inline-block w-1.5 h-6 bg-indigo-500 rounded"></span>
               Chess Room
             </h1>
             <RoleBadge isCreator={isCreator} />
           </div>
-          <div className="flex flex-col gap-2 mt-1">
-            {/* Room Code */}
+          
+          {/* Room Code & Status - Stacked on small, horizontal on medium */}
+          <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-start sm:items-center gap-2 mt-1">
             <CopyButton
               roomCode={roomCode}
               copied={copied}
               onCopy={handleCopyRoomCode}
             />
-
-            {/* Status and Opponent Info */}
             <StatusBadge status={status} opponentName={opponentName} />
           </div>
         </div>
       </div>
 
-      {/* Right Section - Timers, Player Count and Action Buttons */}
-      <div className="flex items-center gap-3">
-        {/* Player Count */}
-        <PlayerCount playerCount={playerCount} maxPlayers={maxPlayers} />
+      {/* Right Section - Action Area */}
+      <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t md:border-t-0 pt-3 md:pt-0 border-slate-200 dark:border-slate-700">
+        
+        {/* Statistics & Actions group */}
+        <div className="flex items-center gap-3">
+          <PlayerCount playerCount={playerCount} maxPlayers={maxPlayers} />
 
-        {/* Start Game Button - only for creator when room is full and game not started */}
-        {isCreator && status === "FULL" && !gameActive && onStartGame && (
-          <Button
-            size="sm"
-            variant="primary"
-            text="🎮 Start Game"
-            onClick={onStartGame}
-            className="text-sm px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-lg animate-pulse"
-          />
-        )}
+          {/* Start Game Button */}
+          {isCreator && status === "FULL" && !gameActive && onStartGame && (
+            <Button
+              size="sm"
+              variant="primary"
+              text="🎮 Start" // Shortened text for mobile
+              onClick={onStartGame}
+              className="text-xs md:text-sm px-4 md:px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold shadow-lg animate-pulse whitespace-nowrap"
+            />
+          )}
+        </div>
 
-        {/* Leave Button - Hidden when game is finished */}
+        {/* Leave Button */}
         {status !== "FINISHED" && (
           <Button
             size="md"
             variant="outline"
-            text={gameActive ? "Resign & Leave Room" : "Leave Room"}
-            onClick={handleLeaveClick}
-            className="text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+            text={gameActive ? (window.innerWidth < 768 ? "Resign" : "Resign & Leave") : "Leave"}
+            onClick={() => setShowLeaveDialog(true)}
+            className="text-[10px] md:text-xs border-red-200 text-red-600 dark:border-red-700 dark:text-red-400 whitespace-nowrap"
           />
         )}
 
         {/* Game Over Message */}
         {status === "FINISHED" && (
-          <div className="text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-700">
-            Game Finished - Returning to lobby...
+          <div className="text-[10px] md:text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 md:px-4 py-2 rounded-lg border border-amber-200 dark:border-amber-700">
+            Finished
           </div>
         )}
       </div>
 
       <ConfirmDialog
         isOpen={showLeaveDialog}
-        onClose={handleLeaveCancel}
+        onClose={() => setShowLeaveDialog(false)}
         onConfirm={handleLeaveConfirm}
         title="Leave Room"
         message="Are you sure you want to leave this room? If a game is in progress, you will forfeit the match."
