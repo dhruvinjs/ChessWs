@@ -13,15 +13,15 @@ export class RoomSocketManager {
   public connect(): Promise<void> {
     // If already connected, return immediately
     if (this.socket?.readyState === WebSocket.OPEN) {
-      console.log(
-        "✅ RoomSocket already connected, reusing existing connection"
-      );
+      // console.log(
+      //   "✅ RoomSocket already connected, reusing existing connection"
+      // );
       return Promise.resolve();
     }
 
     // If currently connecting, wait for it to complete
     if (this.socket?.readyState === WebSocket.CONNECTING) {
-      console.log("⏳ RoomSocket already connecting, waiting...");
+      // console.log("⏳ RoomSocket already connecting, waiting...");
       return new Promise((resolve, reject) => {
         const checkConnection = setInterval(() => {
           if (this.socket?.readyState === WebSocket.OPEN) {
@@ -41,7 +41,7 @@ export class RoomSocketManager {
       });
     }
 
-    console.log("🔌 Creating new RoomSocket connection...");
+    // console.log("🔌 Creating new RoomSocket connection...");
     return new Promise((resolve, reject) => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host =
@@ -49,11 +49,11 @@ export class RoomSocketManager {
         "localhost:8080";
       const url = `${protocol}//${host}/room`;
 
-      console.log(`🏠 [RoomSocket] Connecting to: ${url}`);
+      // console.log(`🏠 [RoomSocket] Connecting to: ${url}`);
       this.socket = new WebSocket(url);
 
       this.socket.onopen = () => {
-        console.log("✅ RoomSocket connected successfully");
+        // console.log("✅ RoomSocket connected successfully");
         this.reconnectAttempts = 0;
         resolve();
       };
@@ -67,13 +67,13 @@ export class RoomSocketManager {
       };
 
       this.socket.onclose = (event) => {
-        console.log(
-          `🔌 RoomSocket closed. Code: ${event.code}, Reason: ${event.reason}`
-        );
+        // console.log(
+        //   `🔌 RoomSocket closed. Code: ${event.code}, Reason: ${event.reason}`
+        // );
         this.socket = null;
 
         if (this.isManuallyDisconnecting || event.code === 1000) {
-          console.log("✅ Clean disconnect - not reconnecting");
+          // console.log("✅ Clean disconnect - not reconnecting");
           this.reconnectAttempts = 0;
           return;
         }
@@ -84,9 +84,9 @@ export class RoomSocketManager {
             1000 * Math.pow(2, this.reconnectAttempts),
             10000
           );
-          console.log(
-            `🔄 Attempting to reconnect room socket (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`
-          );
+          // console.log(
+          //   `🔄 Attempting to reconnect room socket (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`
+          // );
           this.reconnectTimeout = setTimeout(() => {
             if (!this.isManuallyDisconnecting) {
               this.connect().catch((err) => {
@@ -119,7 +119,7 @@ export class RoomSocketManager {
     }
 
     const { type, payload } = message;
-    console.log("📩 RoomSocket message received:", type, payload);
+    // console.log("📩 RoomSocket message received:", type, payload);
 
     const {
       setFen,
@@ -132,7 +132,7 @@ export class RoomSocketManager {
 
     switch (type) {
       case GameMessages.ASSIGN_ID_FOR_ROOM:
-        console.log("✅ Room ID assigned");
+        // console.log("✅ Room ID assigned");
         break;
 
       case GameMessages.USER_HAS_JOINED: {
@@ -142,7 +142,7 @@ export class RoomSocketManager {
             ? payload.isCreator
             : currentState.isRoomCreator;
 
-        console.log(`👥 USER_HAS_JOINED:`, payload);
+        // console.log(`👥 USER_HAS_JOINED:`, payload);
 
         useGameStore.setState({
           opponentId: payload.opponentId || null,
@@ -386,11 +386,11 @@ export class RoomSocketManager {
           });
         }
 
-        console.log("🔄 Reconnected to room game");
+        // console.log("🔄 Reconnected to room game");
         break;
 
       case GameMessages.ROOM_LEFT: {
-        console.log("🚪 ROOM_LEFT received:", payload);
+        // console.log("🚪 ROOM_LEFT received:", payload);
 
         if (payload.roomStatus) {
           useGameStore.setState({
@@ -416,7 +416,7 @@ export class RoomSocketManager {
 
         setTimeout(() => {
           if (window.location.pathname.includes("/room/")) {
-            console.log("🔌 Disconnecting socket after leaving room");
+            // console.log("🔌 Disconnecting socket after leaving room");
             this.disconnect();
             window.location.href = "/room";
           }
@@ -427,7 +427,7 @@ export class RoomSocketManager {
       // ✅ FIXED: Proper handling of ROOM_OPPONENT_LEFT
       case GameMessages.ROOM_OPPONENT_LEFT: {
         if (payload.roomStatus === "CANCELLED") {
-          console.log("🔴 Room CANCELLED - exiting and redirecting...");
+          // console.log("🔴 Room CANCELLED - exiting and redirecting...");
 
           useGameStore.setState({
             roomStatus: "CANCELLED",
@@ -448,11 +448,10 @@ export class RoomSocketManager {
           );
 
           setTimeout(() => {
-            console.log("🔄 Redirecting to /room");
             window.location.href = "/room";
           }, 2000);
         } else if (payload.roomStatus === "WAITING") {
-          console.log("⏳ Room status changed to WAITING - clearing opponent");
+          // console.log("⏳ Room status changed to WAITING - clearing opponent");
 
           // Update state to reflect opponent leaving
           useGameStore.setState({
@@ -470,7 +469,7 @@ export class RoomSocketManager {
             { type: "warning", duration: 5000 }
           );
 
-          console.log("✅ State updated - room now WAITING for new player");
+          // console.log("✅ State updated - room now WAITING for new player");
         }
         break;
       }
@@ -525,7 +524,7 @@ export class RoomSocketManager {
         break;
 
       case GameMessages.ROOM_NOT_READY:
-        console.log("⏳ Room not ready - waiting for players");
+        // console.log("⏳ Room not ready - waiting for players");
         break;
 
       case GameMessages.ROOM_GAME_ACTIVE_ERROR:
@@ -595,7 +594,7 @@ export class RoomSocketManager {
   }
 
   public startGame(roomCode: string) {
-    console.log("🎮 Starting game for room:", roomCode);
+    // console.log("🎮 Starting game for room:", roomCode);
     this.send({
       type: GameMessages.INIT_ROOM_GAME,
       payload: { roomCode },
@@ -603,7 +602,7 @@ export class RoomSocketManager {
   }
 
   public makeMove(roomGameId: number, move: MovePayload) {
-    console.log("📤 Sending room move:", { roomGameId, move });
+    // console.log("📤 Sending room move:", { roomGameId, move });
     this.send({
       type: GameMessages.ROOM_MOVE,
       payload: { roomGameId, ...move },
@@ -611,7 +610,7 @@ export class RoomSocketManager {
   }
 
   public resignGame(roomGameId: number) {
-    console.log("👋 Resigning from room game:", roomGameId);
+    // console.log("👋 Resigning from room game:", roomGameId);
     this.send({
       type: GameMessages.ROOM_LEAVE_GAME,
       payload: { roomGameId },
@@ -640,7 +639,7 @@ export class RoomSocketManager {
   }
 
   public leaveRoom(roomId: string) {
-    console.log("🚪 Leaving room:", roomId);
+    // console.log("🚪 Leaving room:", roomId);
     this.send({
       type: GameMessages.LEAVE_ROOM,
       payload: { roomId },
@@ -684,13 +683,13 @@ export class RoomSocketManager {
       showMessage("Connection Error", "Connection lost", { type: "error" });
       return;
     }
-    console.log("📤 Sending room message:", msg.type, msg.payload);
+    // console.log("📤 Sending room message:", msg.type, msg.payload);
     this.socket.send(JSON.stringify(msg));
   }
 
-  // ✅ FIXED: Proper disconnect method without duplicates
+
   public disconnect() {
-    console.log("🔌 Disconnecting room socket...");
+    // console.log("🔌 Disconnecting room socket...");
 
     // Clear any pending reconnection timeouts
     if (this.reconnectTimeout) {

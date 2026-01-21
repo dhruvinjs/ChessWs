@@ -111,10 +111,8 @@ export const GameMessages = {
   CANCEL_SEARCH: "cancel_search",
   SEARCH_CANCELLED: "search_cancelled",
 };
-// Add this to your types/chess.ts file in frontend
 
 export const ComputerGameMessages = {
-  //No Draw offers are there either you win or lose
   COMPUTER_GAME_ACTIVE: "computer_game_active",
   COMPUTER_GAME_OVER: "computer_game_over",
   INIT_COMPUTER_GAME: "init_computer_game",

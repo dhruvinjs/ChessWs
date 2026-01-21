@@ -1,6 +1,6 @@
 import { Move, PieceColor } from "./chess";
 import { GameMessages } from "./chess";
-// Combined payload for INIT_GAME and GAME_FOUND
+
 export type GameModes = "guest" | "room" | "computer";
 export interface GamePayload {
   color: PieceColor;

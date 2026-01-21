@@ -24,14 +24,11 @@ export function App() {
   useAppSetup();
   const { isLoading } = useUserQuery();
 
-  // ✅ Show loading screen while fetching user data
+
   if (isLoading) {
     return <LoadingScreen />;
   }
 
-  // ✅ If there's an error OR no user data, still render the app
-  // The layouts will handle authentication and redirects
-  // This prevents white screen for unauthorized users
 
   return (
     <BrowserRouter>

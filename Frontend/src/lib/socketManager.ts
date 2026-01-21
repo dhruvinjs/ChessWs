@@ -39,18 +39,7 @@ export class SocketManager {
       } = useGameStore.getState();
 
       switch (type) {
-        // ========================================
-        // SILENT / CONSOLE ONLY - Internal Setup
-        // ========================================
-        // case GameMessages.ASSIGN_ID:
-        //   break;
 
-        // case GameMessages.ASSIGN_ID_FOR_ROOM:
-        //   break;
-
-        // ========================================
-        // GAME MECHANICS - No Toast Needed
-        // ========================================
         case GameMessages.MOVE: {
           const {
             move: guestMove,
@@ -223,7 +212,6 @@ export class SocketManager {
             count,
             capturedPieces,
           });
-          // .log("🔄 Reconnected to game");
           break;
         }
 
@@ -544,10 +532,8 @@ export class SocketManager {
         // ROOM RECONNECTION - Silent
         // ========================================
         case GameMessages.ROOM_RECONNECT:
-          // Reconnect with game state
-          reconnect(payload);
+         reconnect(payload);
 
-          // Also sync room state if provided
           if (payload.roomCode && payload.isCreator !== undefined) {
             useGameStore.setState({
               roomId: payload.roomCode,
@@ -557,12 +543,8 @@ export class SocketManager {
               roomGameId: payload.roomGameId || payload.gameId,
               roomStatus: "ACTIVE",
               gameStarted: true,
-              // Ensure valid moves are set from reconnection
               validMoves: payload.validMoves || [],
             });
-            // console.log(
-            //   `🔄 Room reconnection - syncing host status: isCreator=${payload.isCreator}`
-            // );
           }
 
           console.log("🔄 Reconnected to room game");
@@ -688,10 +670,6 @@ export class SocketManager {
           );
           break;
 
-        // ========================================
-        // CHAT - Handle in UI (No Toast)
-        // ========================================
-
         case GameMessages.ROOM_CHAT: {
           // Add chat message to store
           const { sender, message: chatMessage, timestamp } = payload;
@@ -733,7 +711,7 @@ export class SocketManager {
           });
           showMessage(
             "⏰ Queue Expired",
-            payload.message || "Matchmaking session expired. Please try again.",
+            payload.message || "No Opponents found right now!",
             { type: "error" }
           );
           break;
@@ -788,15 +766,15 @@ export class SocketManager {
   }
 
   public init(type: GameModes, userId?: number | string): void {
-    console.log(
-      `🔧 SocketManager.init called with type: ${type}, userId: ${userId}, currentType: ${this.currentConnectionType}`
-    );
+    // console.log(
+    //   `🔧 SocketManager.init called with type: ${type}, userId: ${userId}, currentType: ${this.currentConnectionType}`
+    // );
 
     // If trying to connect to a DIFFERENT type, close the existing connection first
     if (this.currentConnectionType && this.currentConnectionType !== type) {
-      console.log(
-        `🔄 Switching from ${this.currentConnectionType} to ${type} - closing old connection`
-      );
+      // console.log(
+      //   `🔄 Switching from ${this.currentConnectionType} to ${type} - closing old connection`
+      // );
       this.closeSocket();
     }
 
@@ -806,19 +784,19 @@ export class SocketManager {
       this.socket.readyState === WebSocket.OPEN &&
       this.currentConnectionType === type
     ) {
-      console.log(`✅ Already connected to ${type} WebSocket`);
+      // console.log(`✅ Already connected to ${type} WebSocket`);
       return;
     }
 
     // If currently connecting, let it finish
     if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
-      console.log(`⏳ WebSocket is already connecting...`);
+      // console.log(`⏳ WebSocket is already connecting...`);
       return;
     }
 
     // Close existing socket if any
     if (this.socket) {
-      console.log(`🔌 Closing existing socket before reconnecting...`);
+      // console.log(`🔌 Closing existing socket before reconnecting...`);
       this.closeSocket();
     }
 
@@ -831,7 +809,7 @@ export class SocketManager {
           return;
         }
         wsUrl = `${this.wsBaseUrl}/guest?id=${userId}`;
-        console.log(`🎮 Creating guest WebSocket connection to: ${wsUrl}`);
+        // console.log(`🎮 Creating guest WebSocket connection to: ${wsUrl}`);
         break;
 
       case "room":
@@ -843,12 +821,12 @@ export class SocketManager {
           return;
         }
         wsUrl = `${this.wsBaseUrl}/room?userId=${userId}`;
-        console.log(`🏠 Creating room WebSocket connection to: ${wsUrl}`);
+        // console.log(`🏠 Creating room WebSocket connection to: ${wsUrl}`);
         break;
 
       case "computer":
         wsUrl = `${this.wsBaseUrl}/computer`;
-        console.log(`🤖 Creating computer WebSocket connection to: ${wsUrl}`);
+        // console.log(`🤖 Creating computer WebSocket connection to: ${wsUrl}`);
         break;
 
       default:
@@ -857,18 +835,18 @@ export class SocketManager {
     }
 
     try {
-      console.log(`🚀 Attempting to create WebSocket...`);
+      // console.log(`🚀 Attempting to create WebSocket...`);
       this.socket = new WebSocket(wsUrl);
       this.currentConnectionType = type;
 
       this.socket.onopen = () => {
-        console.log(`✅ Successfully connected to ${type} WebSocket:`, wsUrl);
+        // console.log(`✅ Successfully connected to ${type} WebSocket:`, wsUrl);
       };
 
-      this.socket.onclose = (event) => {
-        console.log(
-          `🔌 ${type} WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`
-        );
+      this.socket.onclose = (_event) => {
+        // console.log(
+        //   `🔌 ${type} WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`
+        // );
         this.socket = null;
         this.currentConnectionType = null;
       };
@@ -879,7 +857,7 @@ export class SocketManager {
 
       this.socket.onmessage = this.handleMessage.bind(this);
 
-      console.log(`📡 WebSocket instance created, waiting for connection...`);
+      // console.log(`📡 WebSocket instance created, waiting for connection...`);
     } catch (error) {
       console.error(`❌ Failed to create WebSocket:`, error);
       this.currentConnectionType = null;

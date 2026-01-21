@@ -56,7 +56,7 @@ export class ComputerSocketManager {
       this.socket = new WebSocket(url);
 
       this.socket.onopen = () => {
-        console.log("✅ WebSocket connected successfully");
+        // console.log("✅ WebSocket connected successfully");
         this.reconnectAttempts = 0;
         store.setConnectionStatus("connected");
         resolve();
@@ -228,7 +228,7 @@ export class ComputerSocketManager {
         break;
 
       case ComputerGameMessages.NO_ACTIVE_GAME:
-        console.log("ℹ️ No active game found - backend says no game exists");
+        // console.log("ℹ️ No active game found - backend says no game exists");
         store.setGameStatus("idle");
         store.setGameData(null);
         store.setIsThinking(false);
@@ -270,7 +270,7 @@ export class ComputerSocketManager {
   }
 
   public disconnect() {
-    console.log("🔌 Manually disconnecting WebSocket");
+    // console.log("🔌 Manually disconnecting WebSocket");
     const store = useComputerGameStore.getState();
 
     if (this.socket) {

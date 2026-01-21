@@ -89,7 +89,7 @@ export class GameManager {
                 type: GameMessages.QUEUE_EXPIRED,
                 payload: {
                   message:
-                    'Your matchmaking session has expired. Please try again.',
+                    'We could not find an opponent for you at the moment. Please try joining the queue again in a few seconds',
                 },
               })
             );

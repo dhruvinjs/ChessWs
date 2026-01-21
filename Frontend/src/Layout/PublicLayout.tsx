@@ -9,16 +9,17 @@ export function PublicLayout() {
   const location = useLocation();
   const { data: user, isLoading } = useUserQuery();
 
-  // Only redirect authenticated (non-guest) users from login/register pages
+
   useEffect(() => {
     if (isLoading) return;
 
-    const authPages = ['/login', '/register'];
+    const authPages = ['/login', '/register','/'];
     const isOnAuthPage = authPages.includes(location.pathname);
 
     if (user && !user.isGuest && isOnAuthPage) {
       navigate('/home', { replace: true });
     }
+    // console.log(user)
   }, [user, isLoading, location.pathname, navigate]);
 
   if (isLoading) {

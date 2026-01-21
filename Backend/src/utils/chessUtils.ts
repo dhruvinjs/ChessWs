@@ -95,7 +95,7 @@ export async function parseMoves(redisKey: string): Promise<InputJsonValue[]> {
     try {
       return JSON.parse(m);
     } catch {
-      return { from: '', to: '', promotion: null };
+      return null
     }
-  });
+  }).filter(Boolean);
 }

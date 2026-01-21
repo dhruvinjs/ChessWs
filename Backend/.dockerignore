@@ -9,6 +9,7 @@ pnpm-debug.log*
 dist
 build
 
+
 # Environment files
 .env
 .env.*
@@ -59,3 +60,6 @@ logs
 .prettierrc
 .eslintrc*
 .editorconfig
+
+# stockfish-engine
+bin/

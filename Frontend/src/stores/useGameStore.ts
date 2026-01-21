@@ -171,16 +171,16 @@ export const useGameStore = create<GameState>()(
 
         // Only initialize if guestId is different or not set
         if (currentGuestId !== guestId) {
-          console.log(
-            `🎮 Zustand: Initializing guest connection with ID: ${guestId}`
-          );
+          // console.log(
+          //   `🎮 Zustand: Initializing guest connection with ID: ${guestId}`
+          // );
           set({ guestId });
           const socketManager = SocketManager.getInstance();
           socketManager.init("guest", guestId);
         } else {
-          console.log(
-            `⏭️ Zustand: Guest ID unchanged, skipping WebSocket init`
-          );
+          // console.log(
+          //   `⏭️ Zustand: Guest ID unchanged, skipping WebSocket init`
+          // );
         }
       },
 
@@ -499,7 +499,7 @@ export const useGameStore = create<GameState>()(
         }
 
         // ALWAYS call the cancel API - NO WebSocket messages
-        console.log("🔄 Calling cancel API for room:", roomId);
+        // console.log("🔄 Calling cancel API for room:", roomId);
         try {
           const { roomApis } = await import("../api/api");
           await roomApis.cancelRoom(roomId);
@@ -524,7 +524,7 @@ export const useGameStore = create<GameState>()(
 
       // ✅ Exit room after game is over - NO API CALL
       exitRoom: () => {
-        console.log("👋 exitRoom called - just resetting state (no API call)");
+        // console.log("👋 exitRoom called - just resetting state (no API call)");
 
         // Just reset the room state without calling cancel API
         set({

@@ -19,7 +19,10 @@ const ComputerGameLevels: Record<string, number> = {
   HARD: 7,
 };
 // Use path relative to project root, not dist folder
-const stockfish_path = path.join(process.cwd(), 'bin', 'stockfish');
+const stockfish_path = process.env.NODE_ENV === 'production' 
+  ? '/usr/games/stockfish' 
+  : path.join(process.cwd(), 'bin', 'stockfish');
+
 export function getComputerMove(
   fen: string,
   difficulty: string
@@ -31,7 +34,7 @@ export function getComputerMove(
     const timer = setTimeout(() => {
       engine.kill();
       reject(new Error('Computer Timed Out'));
-    }, 10000);
+    }, 20000);
 
     engine.stdout.on('data', (data: Buffer) => {
       const str_data = data.toString().trim().split('\n');
@@ -309,13 +312,29 @@ export async function handlePlayerMove(
     );
     return;
   }
+
+  try {
+  // This is where the "Computer Timed Out" reject() happens
   const computerMove: Move = await getComputerMove(
     board.fen(),
     gameState.difficulty
   );
-  // console.log(`[ComputerGame] Computer move calculated:`, computerMove);
-  // await delay(2000)
+
   await handleComputerMove(userSocket, computerMove, computerGameId, userId);
+  
+} catch (error) {
+
+  console.error("Engine Error:", (error as Error).message);
+
+ userSocket.send(
+    JSON.stringify({
+      type: ErrorMessages.SERVER_ERROR,
+      payload: {
+        message: "The chess engine is busy or timed out. Please try your move again.",
+      },
+    })
+  );
+}
 }
 export async function handleComputerMove(
   userSocket: WebSocket,

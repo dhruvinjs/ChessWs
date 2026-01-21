@@ -64,7 +64,7 @@ export function Profile() {
   };
 
   // Get the userProfile from response
-  const userProfile = profileData?.userProfile;
+  const userProfile = profileData;
 
   // Compute stats from profile data
   const stats = useMemo(() => {

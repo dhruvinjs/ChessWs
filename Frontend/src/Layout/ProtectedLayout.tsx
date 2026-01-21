@@ -12,12 +12,12 @@ export function ProtectedLayout() {
   const location = useLocation();
   const { data: user, isLoading } = useUserQuery();
 
-  // Redirect unauthenticated users to login
+  
   useEffect(() => {
     if (isLoading) return;
 
     if (!user) {
-      console.log("No user found, redirecting to login");
+      // console.log("No user found, redirecting to login");
       navigate("/login", { replace: true });
       return;
     }
@@ -62,7 +62,7 @@ export function ProtectedLayout() {
     return null;
   }
 
-  // Determine if we should hide the Navbar (e.g., in active matches)
+
   const isGamePage =
     location.pathname === "/game" ||
     location.pathname === "/computer/game" ||
