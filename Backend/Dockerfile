@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y stockfish && rm -rf /var/lib/apt/lists/
 RUN npm install -g pm2
 COPY ecosystem.config.cjs ./
 
+# Creating logs directory for PM2
+RUN mkdir -p /app/logs
+
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev

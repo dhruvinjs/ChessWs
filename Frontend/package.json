@@ -1,6 +1,6 @@
 {
-  "name": "basicchatapp",
-  "private": true,
+  "name": "chessverse_frontend",
+  "private": false,
   "version": "0.0.0",
   "type": "module",
   "scripts": {

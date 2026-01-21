@@ -236,11 +236,6 @@ export async function handleRoomMove(
       .sRem('room-active-games', gameId.toString())
       .exec();
 
-    // Cleanup user mappings so they can join new games
-    await redis.del(`user:${winnerId}:room-game`);
-    await redis.del(`user:${loserId}:room-game`);
-
-    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
 
     // 4. Send Messages
     const winnerSocket = socketManager.get(winnerId);
@@ -342,13 +337,7 @@ export async function handleRoomDraw(
     userSocket.send(message);
     opponentSocket?.send(message);
 
-    await redis.hSet(`room-game:${gameId}`, {
-      status: RoomMessages.ROOM_GAME_OVER,
-      winner: 'draw',
-      drawReason: reason,
-    });
-    await redis.sRem(`room-active-games`, gameId.toString());
-    await redis.expire(`room-game:${gameId}`, 86400);
+ 
 
     // Get roomCode and chat from Redis for DB update
     const gameData = (await redis.hGetAll(`room-game:${gameId}`)) as Record<
@@ -356,11 +345,18 @@ export async function handleRoomDraw(
       string
     >;
     const roomCode = gameData.roomCode as string;
+    const user1Id = Number(gameData.user1);
+    const user2Id = Number(gameData.user2);
+
 
     // Get moves and chat from Redis using the parseMoves and parseChat util functions
     const final_chat = await parseChat(`room-game:${gameId}:chat`);
     const final_moves = await parseMoves(`room-game:${gameId}:moves`);
-
+    const final_capturedPieces = await redis.lRange(
+      `room-game:${gameId}:capturedPieces`,
+      0,
+      -1
+    );
     await pc.$transaction([
       pc.game.update({
         where: { id: gameId },
@@ -371,6 +367,7 @@ export async function handleRoomDraw(
           moves: final_moves,
           chat: final_chat,
           currentFen: gameData.fen,
+          capturedPieces:final_capturedPieces
         },
       }),
       pc.room.update({
@@ -381,7 +378,22 @@ export async function handleRoomDraw(
         },
       }),
     ]);
-    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
+  await redis
+      .multi()
+      .hIncrBy(`stats`, 'roomGamesCount', 1)
+      .hSet(`room-game:${gameId}`, {
+        status: RoomMessages.ROOM_GAME_OVER,
+        winner: 'draw',
+        drawReason: reason,
+      })
+      .sRem('room-active-games', gameId.toString())
+      .del(`user:${user1Id}:room-game`)
+      .del(`user:${user2Id}:room-game`)
+      .del(`room-game:${gameId}`)
+      .del(`room-game:${gameId}:moves`)
+      .del(`room-game:${gameId}:chat`)
+      .del(`room-game:${gameId}:capturedPieces`)
+      .exec();
     console.log(
       `GameDraw ${gameId}: ${reason} - Chat messages saved: ${final_chat.length}`
     );
@@ -643,6 +655,7 @@ export async function handleRoomGameLeave(
           moves: final_moves,
           chat: final_chat,
           currentFen: finalGameData.fen,
+          status:"FINISHED"
         },
       });
     } else {
@@ -653,6 +666,7 @@ export async function handleRoomGameLeave(
           loserId: userId,
           draw: false,
           endedAt: new Date(),
+          status:"FINISHED"
         },
       });
     }
@@ -661,7 +675,17 @@ export async function handleRoomGameLeave(
       where: { id: room.id },
       data: { status: 'FINISHED' },
     });
-    await redis.hIncrBy(`stats`, 'roomGamesCount', 1);
+      await redis
+      .multi()
+      .hIncrBy(`stats`, 'roomGamesCount', 1)
+      .sRem('room-active-games', gameId.toString())
+      .del(`room-game:${gameId}`)
+      .del(`room-game:${gameId}:moves`)
+      .del(`room-game:${gameId}:chat`)
+      .del(`room-game:${gameId}:capturedPieces`)
+      .del(`user:${userId}:room-game`)
+      .del(`user:${winnerId}:room-game`)
+      .exec();
 
     const oppSocket = socketManager.get(winnerId!);
 
@@ -691,10 +715,7 @@ export async function handleRoomGameLeave(
       })
     );
 
-    await redis.sRem('room-active-games', gameId.toString());
-    await redis.del(`room-game:${gameId}`);
-    await redis.del(`room-game:${gameId}:moves`);
-    await redis.del(`room-game:${gameId}:chat`);
+
   } catch (error) {
     console.error('Error in handleRoomGameLeave:', error);
   }
@@ -822,7 +843,7 @@ export async function handleRoomLeave(
             },
           })
         );
-        console.log(`✅ Notification sent to creator ${opponentId}`);
+        // console.log(`✅ Notification sent to creator ${opponentId}`);
       }
 
       sendMessage(

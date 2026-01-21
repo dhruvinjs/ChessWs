@@ -38,39 +38,34 @@ export const ComputerChessPage: React.FC = () => {
   useEffect(() => {
     // Wait for user query to finish loading
     if (isUserLoading) {
-      console.log("User query still loading...");
+      // console.log("User query still loading...");
       return;
     }
 
     // Check if we have valid user data (user can be guest with id: 0)
     if (!user || user.id === undefined) {
-      console.log("No user data available", { user, isUserLoading });
+      // console.log("No user data available", { user, isUserLoading });
       return;
     }
 
-    console.log("User data loaded:", {
-      userId: user.id,
-      isGuest: user.isGuest,
-    });
-
     // ✅ Initialize WebSocket if not already connected
     if (!socketInitialized.current && !computerSocketManager.isConnected()) {
-      console.log(
-        "🔌 ComputerChessPage: Connecting WebSocket for user:",
-        user.id
-      );
+      // console.log(
+      //   "🔌 ComputerChessPage: Connecting WebSocket for user:",
+      //   user.id
+      // );
       socketInitialized.current = true;
       setConnectionStatus("connecting");
 
       computerSocketManager
         .connect()
         .then(() => {
-          console.log("✅ WebSocket connected successfully");
+          // console.log("✅ WebSocket connected successfully");
           setConnectionStatus("connected");
 
           // Wait 5 seconds for game data, then redirect to setup if no game
           loadingTimeoutRef.current = setTimeout(() => {
-            console.log("No game data received after 5s, redirecting to setup");
+            // console.log("No game data received after 5s, redirecting to setup");
             const currentGameData = useComputerGameStore.getState().gameData;
             if (!hasRedirected.current && !currentGameData) {
               hasRedirected.current = true;
@@ -85,7 +80,7 @@ export const ComputerChessPage: React.FC = () => {
           setIsLoadingGame(false);
         });
     } else if (computerSocketManager.isConnected()) {
-      console.log("✅ WebSocket already connected, reusing connection");
+      // console.log("✅ WebSocket already connected, reusing connection");
       socketInitialized.current = true;
       setConnectionStatus("connected");
       // Check if we already have game data
@@ -96,9 +91,6 @@ export const ComputerChessPage: React.FC = () => {
 
     // NOTE: Don't disconnect on unmount - keep socket connected for reload scenarios
     return () => {
-      console.log(
-        "🧹 ComputerChessPage: Component unmounting (keeping socket connected)"
-      );
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
@@ -116,7 +108,6 @@ export const ComputerChessPage: React.FC = () => {
 
   useEffect(() => {
     if (gameData && gameStatus === "active") {
-      console.log("✅ Game data received, stopping loading");
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
@@ -162,13 +153,11 @@ export const ComputerChessPage: React.FC = () => {
     navigate("/home");
   };
 
-  // 🎯 NEW: New Game button handlers
   const handleNewGameClick = () => {
     if (gameStatus === "active") {
       // Show confirmation dialog if game is active
       setShowNewGameDialog(true);
     } else {
-      // If game is finished, just reset and go to setup
       resetGame();
       navigate("/computer");
     }

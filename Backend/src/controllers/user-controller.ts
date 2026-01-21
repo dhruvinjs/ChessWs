@@ -9,7 +9,7 @@ const router = express.Router();
 import { nanoid } from 'nanoid';
 import { redis } from '../clients/redisClient';
 import { roomManager } from '../Classes/RoomManager';
-import { addGuestGamesToUserProfile } from '../utils/chessUtils';
+import { addGuestGamesToUserProfile, calculateTotalTimePlayed } from '../utils/chessUtils';
 import { removePlayerFromQueue } from '../Services/MatchMaking';
 
 export enum ChessLevel {
@@ -120,6 +120,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
   try {
     //@ts-ignore
     const id = req.userId;
+
     //Checking if the redis has the profile cached
     const userProfileInRedis = await redis.get(`user:${id}:profile`);
     if (userProfileInRedis) {
@@ -310,34 +311,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     };
 
     // Calculate room game time
-    const roomGameTime = allRoomGames.reduce((total, games) => {
-      const started = new Date(games.createdAt!).getTime();
-      const ended = games.endedAt
-        ? new Date(games.endedAt).getTime()
-        : new Date(games.updatedAt!).getTime();
-
-      const totalLength = ended - started;
-      return total + totalLength;
-    }, 0);
-    const computerGameTime = user.computerGames.reduce((total, games) => {
-      const started = new Date(games.createdAt).getTime();
-      const ended = new Date(games.updatedAt).getTime();
-      const totalLength = ended - started;
-      return total + totalLength;
-    }, 0);
-    const guestGameTime = allGuestGames.reduce((total, games) => {
-      const started = new Date(games.createdAt).getTime();
-      const ended = games.endedAt
-        ? new Date(games.endedAt).getTime()
-        : new Date(games.updatedAt).getTime();
-      const totalLength = ended - started;
-      return total + totalLength;
-    }, 0);
-    const totalTimePlayedMs = roomGameTime + computerGameTime + guestGameTime;
-    const totalHours = Math.floor(totalTimePlayedMs / (1000 * 60 * 60));
-    const totalMinutes = Math.floor((totalTimePlayedMs % 3600000) / 60000);
-    const totalTimePlayed = `${totalHours}h ${totalMinutes}m`;
-
+    const totalTimePlayed = calculateTotalTimePlayed(allRoomGames,user.computerGames,allGuestGames)
     const userProfile = {
       user: {
         id: user.id,
@@ -372,7 +346,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
         joined: user.joinedRooms,
       },
     };
-    await redis.setEx(`user:${id}:profile`, 30, JSON.stringify(userProfile)); // Reduced to 30 seconds for faster updates
+    await redis.setEx(`user:${id}:profile`, 30, JSON.stringify(userProfile)); 
     res.status(200).json({
       success: true,
       ...userProfile,

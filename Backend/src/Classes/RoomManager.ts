@@ -624,13 +624,12 @@ class RoomManager {
         const moves = provideValidMoves(chess.fen());
 
         // Store lobby chat messages to Redis if any exist
-        // Check Redis for any pre-game lobby chat
         const lobbyChatKey = `room:${roomCode}:lobby-chat`;
         const lobbyChatExists = await redis.exists(lobbyChatKey);
         if (lobbyChatExists) {
           const lobbyChat = await redis.lRange(lobbyChatKey, 0, -1);
           if (lobbyChat.length > 0) {
-            // Transfer lobby chat to game chat
+  
             for (const chat of lobbyChat) {
               await redis.rPush(`room-game:${gameId}:chat`, chat);
             }
@@ -638,7 +637,7 @@ class RoomManager {
               `📝 Transferred ${lobbyChat.length} lobby chat messages to game ${gameId}`
             );
           }
-          // Clean up lobby chat after transfer
+       
           await redis.del(lobbyChatKey);
         }
 

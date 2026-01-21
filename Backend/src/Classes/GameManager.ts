@@ -551,6 +551,8 @@ export class GameManager {
         const blackPlayerId = isPlayerWhite ? matchedPlayerId : id;
         const whitePlayerSocket = this.socketMap.get(whitePlayerId);
         const blackPlayerSocket = this.socketMap.get(blackPlayerId);
+
+        const player1Color = whitePlayerId === matchedPlayerId ? 'w' : 'b';
         const playerDisconnectedPayload = {
           type: GameMessages.DISCONNECTED,
           payload: {
@@ -574,17 +576,39 @@ export class GameManager {
 
         //matchesPlayerId is player1Id becuase he was the one standing in the queue so
         // technically he is the player1 and other player who just came is player2
-        const guestGameDB = await pc.guestGames.create({
-          data: {
-            currentFen: chess.fen(),
-            player1GuestId: matchedPlayerId,
-            player2GuestId: id,
-            player1Color: isPlayerWhite ? 'w' : 'b',
-            player1TimeLeft: 600,
-            player2TimeLeft: 600,
-            status: 'ACTIVE',
-          },
-        });
+         let guestGameDB;
+        try {
+          guestGameDB = await pc.guestGames.create({
+            data: {
+              currentFen: chess.fen(),
+              player1GuestId: matchedPlayerId,
+              player2GuestId: id,
+              player1Color:player1Color,
+              player1TimeLeft: 600,
+              player2TimeLeft: 600,
+              status: 'ACTIVE',
+            },
+          });
+        } catch (dbError) {
+          console.error('Database error creating game:', dbError);
+          
+          // Notify both players of the error
+          const errorPayload = {
+            type: ErrorMessages.SERVER_ERROR,
+            payload: {
+              message: 'Unable to create game due to database connectivity. Please try again.',
+            },
+          };
+          
+          whitePlayerSocket.send(JSON.stringify(errorPayload));
+          blackPlayerSocket.send(JSON.stringify(errorPayload));
+          
+          // Re-queue both players
+          await insertPlayerInQueue(whitePlayerId);
+          await insertPlayerInQueue(blackPlayerId);
+          
+          return; 
+        }
         // Save game state in Redis
         await redis
           .multi()

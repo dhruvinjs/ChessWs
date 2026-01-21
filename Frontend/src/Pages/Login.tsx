@@ -108,6 +108,7 @@ export function Login() {
                   Email Address
                 </label>
                 <Input
+                  required={true}
                   inputRef={emailRef}
                   placeholder="name@example.com"
                   type="email"
@@ -120,12 +121,11 @@ export function Login() {
                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
                     Password
                   </label>
-                  <Link to="/forgot-password" size="sm" className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700">
-                    Forgot?
-                  </Link>
+                  
                 </div>
                 <div className="relative">
                   <Input
+                  required={true}
                     inputRef={passwordRef}
                     placeholder="••••••••"
                     type={showPassword ? 'text' : 'password'}

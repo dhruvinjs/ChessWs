@@ -145,7 +145,6 @@ export const LoadingScreen = () => {
           />
         </div>
 
-        {/* Helpful tip for free tier */}
         <motion.p
           className="text-sm text-slate-500 dark:text-slate-400 italic"
           initial={{ opacity: 0 }}

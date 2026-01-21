@@ -175,8 +175,7 @@ export const useGameStore = create<GameState>()(
           //   `🎮 Zustand: Initializing guest connection with ID: ${guestId}`
           // );
           set({ guestId });
-          const socketManager = SocketManager.getInstance();
-          socketManager.init("guest", guestId);
+          SocketManager.getInstance().init("guest", guestId);
         } else {
           // console.log(
           //   `⏭️ Zustand: Guest ID unchanged, skipping WebSocket init`
@@ -196,6 +195,9 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
+          // Clear room state when starting a regular game
+          roomGameId: null,
+          roomStatus: null,
         }),
 
       processServerMove: (payload) => {
@@ -285,7 +287,7 @@ export const useGameStore = create<GameState>()(
       },
 
       move: (move) => {
-        const { gameId, roomGameId, drawOfferReceived } = get();
+        const { gameId, roomGameId, drawOfferReceived, roomStatus } = get();
 
         // Auto-reject draw offer if one is pending when player makes a move
         if (drawOfferReceived) {
@@ -297,7 +299,8 @@ export const useGameStore = create<GameState>()(
         }
 
         // Check if it's a room game or regular game
-        if (roomGameId) {
+        // Only use roomSocketManager if we're in an active room game (roomStatus is ACTIVE)
+        if (roomGameId && roomStatus === "ACTIVE") {
           // Room game move
           roomSocketManager.makeMove(roomGameId, move);
         } else if (gameId) {
@@ -327,6 +330,9 @@ export const useGameStore = create<GameState>()(
           loser: null,
           drawOfferReceived: false,
           drawOfferSent: false,
+          // Clear room state to prevent confusion with regular games
+          roomGameId: null,
+          roomStatus: null,
         });
       },
 
@@ -346,12 +352,13 @@ export const useGameStore = create<GameState>()(
 
       // ✅ Draw actions
       offerDraw: () => {
-        const { gameId, roomGameId } = get();
+        const { gameId, roomGameId, roomStatus } = get();
         if (!gameId && !roomGameId) return;
 
-        if (roomGameId) {
+        // Only use roomSocketManager if we're in an active room game
+        if (roomGameId && roomStatus === "ACTIVE") {
           roomSocketManager.offerDraw(roomGameId);
-        } else {
+        } else if (gameId) {
           SocketManager.getInstance().send({
             type: GameMessages.OFFER_DRAW,
             payload: {},
@@ -372,12 +379,13 @@ export const useGameStore = create<GameState>()(
       },
 
       acceptDraw: () => {
-        const { gameId, roomGameId } = get();
+        const { gameId, roomGameId, roomStatus } = get();
         if (!gameId && !roomGameId) return;
 
-        if (roomGameId) {
+        // Only use roomSocketManager if we're in an active room game
+        if (roomGameId && roomStatus === "ACTIVE") {
           roomSocketManager.acceptDraw(roomGameId);
-        } else {
+        } else if (gameId) {
           SocketManager.getInstance().send({
             type: GameMessages.ACCEPT_DRAW,
             payload: {},
@@ -393,12 +401,13 @@ export const useGameStore = create<GameState>()(
       },
 
       rejectDraw: () => {
-        const { gameId, roomGameId } = get();
+        const { gameId, roomGameId, roomStatus } = get();
         if (!gameId && !roomGameId) return;
 
-        if (roomGameId) {
+        // Only use roomSocketManager if we're in an active room game
+        if (roomGameId && roomStatus === "ACTIVE") {
           roomSocketManager.rejectDraw(roomGameId);
-        } else {
+        } else if (gameId) {
           SocketManager.getInstance().send({
             type: GameMessages.REJECT_DRAW,
             payload: {},

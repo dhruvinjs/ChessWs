@@ -25,7 +25,7 @@ export class SocketManager {
       const message = JSON.parse(event.data);
       const { type, payload } = message;
 
-      console.log("🔌 WebSocket message received:", type, payload);
+      // console.log("🔌 WebSocket message received:", type, payload);
 
       const {
         setFen,
@@ -50,12 +50,12 @@ export class SocketManager {
             blackTimer: guestBlackTimer,
           } = payload;
 
-          console.log("📥 MOVE received:", {
-            guestMoveFen,
-            guestMove,
-            validMovesCount: guestMoveValidMoves?.length,
-            myColor: useGameStore.getState().color,
-          });
+          // console.log("📥 MOVE received:", {
+          //   guestMoveFen,
+          //   guestMove,
+          //   validMovesCount: guestMoveValidMoves?.length,
+          //   myColor: useGameStore.getState().color,
+          // });
 
           // Update game state with new position and captured piece (same pattern as ROOM_MOVE)
           const guestGameState = useGameStore.getState();
@@ -309,14 +309,14 @@ export class SocketManager {
               ? joinIsCreator
               : currentState.isRoomCreator;
 
-          console.log(`👥 USER_HAS_JOINED received:`, {
-            opponentId: joinedOpponentId,
-            opponentName,
-            roomCode,
-            roomStatus: joinRoomStatus,
-            isCreator: finalIsCreator,
-            currentRoomId: currentState.roomId,
-          });
+          // console.log(`👥 USER_HAS_JOINED received:`, {
+          //   opponentId: joinedOpponentId,
+          //   opponentName,
+          //   roomCode,
+          //   roomStatus: joinRoomStatus,
+          //   isCreator: finalIsCreator,
+          //   currentRoomId: currentState.roomId,
+          // });
 
           useGameStore.setState({
             opponentId: joinedOpponentId,
@@ -327,10 +327,10 @@ export class SocketManager {
             ...(roomCode && { roomId: roomCode }),
           });
 
-          console.log(
-            `✅ ${opponentName} joined room - isCreator=${finalIsCreator}, roomStatus=${joinRoomStatus || "FULL"
-            }`
-          );
+          // console.log(
+          //   `✅ ${opponentName} joined room - isCreator=${finalIsCreator}, roomStatus=${joinRoomStatus || "FULL"
+          //   }`
+          // );
           // Room header will show this visually
           break;
         }
@@ -547,7 +547,7 @@ export class SocketManager {
             });
           }
 
-          console.log("🔄 Reconnected to room game");
+          // console.log("🔄 Reconnected to room game");
           break;
 
         // ========================================

@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import pc from '../clients/prismaClient';
 import { redis } from '../clients/redisClient';
 import WebSocket from 'ws';
+import { ComputerGame, GuestGames } from '../../generated/prisma/client';
 import { InputJsonValue } from '@prisma/client/runtime/client';
 export const MOVE_BEFORE_SAFE = 5;
 export const GUEST_MATCHMAKING_KEY =
@@ -98,4 +99,45 @@ export async function parseMoves(redisKey: string): Promise<InputJsonValue[]> {
       return null
     }
   }).filter(Boolean);
+}
+
+
+// Profile Utils 
+
+
+export function calculateTotalTimePlayed(
+  roomGames: any[],
+  computerGames: ComputerGame[],
+  guestGames: GuestGames[]
+): string {
+  const roomGameTime = calculateTimeOfGame(roomGames);
+  const computerGameTime = calculateTimeOfGame(computerGames);
+  const guestGameTime = calculateTimeOfGame(guestGames);
+
+  const totalTimeMs = roomGameTime + computerGameTime + guestGameTime;
+  
+  return formatTime(totalTimeMs);
+}
+
+export function calculateTimeOfGame(games: any[]): number {
+  return games.reduce((total, game) => {
+    const startTime = new Date(game.createdAt).getTime();
+    const endTime = game.endedAt 
+      ? new Date(game.endedAt).getTime() 
+      : new Date(game.updatedAt).getTime();
+    
+    return total + (endTime - startTime);
+  }, 0);
+}
+
+
+function formatTime(milliseconds: number): string {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }

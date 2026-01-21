@@ -357,7 +357,7 @@ export async function handleComputerMove(
   const board = new Chess(gameState.fen);
   let capturedPieceNotation = null;
 
-  console.log(`[ComputerGame] Processing computer move:`, move);
+  // console.log(`[ComputerGame] Processing computer move:`, move);
 
   try {
     const boardMove = board.move({
@@ -365,7 +365,7 @@ export async function handleComputerMove(
       to: move.to,
     });
 
-    console.log(`[ComputerGame] Board move successful:`, boardMove);
+    // console.log(`[ComputerGame] Board move successful:`, boardMove);
     await redis.rPush(
       `computer-game:${computerGameId}:moves`,
       JSON.stringify(boardMove)
@@ -380,12 +380,11 @@ export async function handleComputerMove(
         `computer-game:${computerGameId}:capturedPieces`,
         capturedPiece
       );
-      console.log(`Computer Captured Piece: ${capturedPiece}`);
+      // console.log(`Computer Captured Piece: ${capturedPiece}`);
     }
     const validMovesAfterComputerMove = provideValidMoves(board.fen());
 
     // Send computer move confirmation
-    console.log(`[ComputerGame] Sending computer move to client`);
     userSocket.send(
       JSON.stringify({
         type: ComputerGameMessages.COMPUTER_MOVE,

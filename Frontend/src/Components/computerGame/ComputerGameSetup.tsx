@@ -58,7 +58,7 @@ export const ComputerGameSetup: React.FC = () => {
   // --- Logic Functions ---
 
   const handleContinueExisting = () => {
-    console.log("👉 Continuing existing game:", existingGameId);
+    // console.log("👉 Continuing existing game:", existingGameId);
     setShowExistingDialog(false);
     setExistingGameId(null);
     setPendingSetup(null);
@@ -73,14 +73,14 @@ export const ComputerGameSetup: React.FC = () => {
       return;
     }
 
-    console.log("🔄 Quitting existing game and starting new:", existingGameId);
+    // console.log("🔄 Quitting existing game and starting new:", existingGameId);
     setShowExistingDialog(false);
     setIsCreating(true);
 
     try {
       // A. Quit the existing game
       await computerGameApi.cancelComputerGame(existingGameId);
-      console.log("✅ Existing game cancelled");
+      // console.log("✅ Existing game cancelled");
 
       // B. Small delay for cleanup
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -91,12 +91,8 @@ export const ComputerGameSetup: React.FC = () => {
         pendingSetup.playerColor
       );
 
-      console.log("📦 Create game response:", response);
 
-      // 🎯 FIX: Check for success properly
       if (response.success === true) {
-        // toast.success("New game created!");
-        // Navigate to game page - WebSocket will load the game
         navigate("/computer/game");
       } else {
         toast.error(response.message || "Failed to create new game");
@@ -127,23 +123,16 @@ export const ComputerGameSetup: React.FC = () => {
         playerColor
       );
 
-      console.log("📦 Create game response:", response);
 
-      // 🎯 FIX: Proper response handling
       if (response.success === true) {
-        // Scenario A: New game created successfully
-        // toast.success("Game created!");
-        // console.log("✅ Navigating to /computer/game");
-
-        // Navigate to game page - WebSocket will load the game data
         navigate("/computer/game");
         setPendingSetup(null);
       } else if (response.success === false && response.computerGameId) {
         // Scenario B: Existing game found - show dialog
-        console.log("⚠️ Existing game found:", response.computerGameId);
+        // console.log("⚠️ Existing game found:", response.computerGameId);
         setExistingGameId(response.computerGameId);
         setShowExistingDialog(true);
-        toast.error(response.message || "You have an active game");
+        // toast.error(response.message || "You have an active game");
       } else {
         // Scenario C: Unexpected response
         // console.error("❌ Unexpected response:", response);

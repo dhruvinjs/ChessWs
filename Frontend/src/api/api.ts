@@ -177,25 +177,21 @@ export interface JoinRoomResponse {
 
 export const roomApis = {
   createRoom: async (): Promise<CreateRoomResponse> => {
-    console.log("API: Creating new room..."); // Debug log
     const res = await userApi.post("/room/create");
-    console.log("API: Create room response:", res.data); // Debug log
+    // console.log("API: Create room response:", res.data); // Debug log
     return res.data;
   },
 
   joinRoom: async (roomId: string): Promise<JoinRoomResponse> => {
-    // console.log('API: Joining room with ID:', roomId); // Debug log
     const payload = { roomId };
 
     const res = await userApi.post("/room/join", payload);
-    // console.log('API: Response:', res.data); // Debug log
     return res.data;
   },
 
   cancelRoom: async (roomId: string) => {
-    console.log("API: Cancelling room with ID:", roomId);
     const res = await userApi.patch(`/room/${roomId}/status`, { roomId });
-    console.log("API: Cancel room response:", res.data);
+    // console.log("API: Cancel room response:", res.data);
     return res.data;
   },
 };
@@ -206,14 +202,14 @@ export const computerGameApi = {
       difficulty,
       playerColor,
     });
-    console.log("API: Create room response:", res.data); // Debug log
+    // console.log("API: Create room response:", res.data); // Debug log
     return res.data;
   },
   cancelComputerGame: async (computerGameId: number) => {
     const res = await gamesApi.patch("/computer/finish", {
       computerGameId,
     });
-    console.log("API: Create room response:", res.data); // Debug log
+    // console.log("API: Create room response:", res.data); // Debug log
     return res.data;
   },
 };

@@ -105,12 +105,14 @@ export function Register() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4">
                 <Input
+                  required={true}
                   inputRef={nameRef}
                   placeholder="Full Name"
                   type="text"
                   className="w-full rounded-xl py-3.5 px-4 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-indigo-500 transition-all"
                 />
                 <Input
+                  required={true}
                   inputRef={emailRef}
                   placeholder="Email Address"
                   type="email"
@@ -121,6 +123,7 @@ export function Register() {
               <div className="space-y-3">
                 <div className="relative">
                   <Input
+                    required={true}
                     inputRef={passwordRef}
                     placeholder="Password"
                     type={showPassword ? 'text' : 'password'}
@@ -145,6 +148,7 @@ export function Register() {
 
               <div className="relative">
                 <Input
+                  required={true}
                   inputRef={confirmPasswordRef}
                   placeholder="Confirm Password"
                   type={showConfirmPassword ? 'text' : 'password'}
