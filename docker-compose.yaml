@@ -14,12 +14,8 @@ services:
     
   redis:
     image: redis:alpine
-    ports:
-    - "6379:6379"
     volumes:
-    #  - './redis.conf:/usr/local/etc/redis.conf'
      - 'redis_data:/data'
-    # command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
 
 volumes:
   redis_data:
